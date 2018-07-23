@@ -1,0 +1,1109 @@
+Deconstructing the Ladder Network Architecture
+
+Mohammad Pezeshki∗
+Linxi Fan(cid:63)
+Phil´emon Brakel∗
+Aaron Courville∗†
+Yoshua Bengio∗†
+∗Universit´e de Montr´eal, (cid:63)Columbia University, †CIFAR
+
+MOHAMMAD.PEZESHKI@UMONTREAL.CA
+LINXI.FAN@COLUMBIA.EDU
+PBPOP3@GMAIL.COM
+AARON.COURVILE@UMONTREAL.CA
+YOSHUA.BENGIO@UMONTREAL.CA
+
+Abstract
+
+The Ladder Network is a recent new approach
+to semi-supervised learning that turned out to be
+very successful. While showing impressive per-
+formance, the Ladder Network has many com-
+ponents intertwined, whose contributions are not
+obvious in such a complex architecture. This pa-
+per presents an extensive experimental investiga-
+tion of variants of the Ladder Network in which
+we replaced or removed individual components
+to learn about their relative importance. For
+semi-supervised tasks, we conclude that the most
+important contribution is made by the lateral con-
+nections, followed by the application of noise,
+and the choice of what we refer to as the ‘combi-
+nator function’. As the number of labeled train-
+ing examples increases, the lateral connections
+and the reconstruction criterion become less im-
+portant, with most of the generalization improve-
+ment coming from the injection of noise in each
+layer. Finally, we introduce a combinator func-
+tion that reduces test error rates on Permutation-
+Invariant MNIST to 0.57% for the supervised set-
+ting, and to 0.97% and 1.0% for semi-supervised
+settings with 1000 and 100 labeled examples, re-
+spectively.
+
+1. Introduction
+Labeling data sets is typically a costly task and in many
+settings there are far more unlabeled examples than labeled
+ones. Semi-supervised learning aims to improve the perfor-
+mance on some supervised learning problem by using in-
+formation obtained from both labeled and unlabeled exam-
+ples. Since the recent success of deep learning methods has
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+mainly relied on supervised learning based on very large la-
+beled datasets, it is interesting to explore semi-supervised
+deep learning approaches to extend the reach of deep learn-
+ing to these settings.
+Since unsupervised methods for pre-training layers of neu-
+ral networks were an essential part of the ﬁrst wave of
+deep learning methods (Hinton et al., 2006; Vincent et al.,
+2008; Bengio, 2009), a natural next step is to investi-
+gate how ideas inspired by Restricted Boltzmann Ma-
+chine training and regularized autoencoders can be used for
+semi-supervised learning. Examples of approaches based
+on such ideas are the discriminative RBM (Larochelle &
+Bengio, 2008) and a deep architecture based on semi-
+supervised autoencoders that was used for document clas-
+siﬁcation (Ranzato & Szummer, 2008). More recent ex-
+amples of approaches for semi-supervised deep learning
+are the semi-supervised Variational Autoencoder (Kingma
+et al., 2014) and the Ladder Network (Rasmus et al., 2015)
+which obtained very impressive, state of the art results
+(1.13% error) on the MNIST handwritten digits classiﬁca-
+tion benchmark using just 100 labeled training examples.
+The Ladder Network adds an unsupervised component to
+the supervised learning objective of a deep feedforward
+network by treating this network as part of a deep stack
+of denoising autoencoders or DAEs (Vincent et al., 2010)
+that learns to reconstruct each layer (including the input)
+based on a corrupted version of it, using feedback from up-
+per levels. The term ’ladder’ refers to how this architecture
+extends the stacked DAE in the way the feedback paths are
+formed.
+This paper is focusing on the design choices that lead to
+the Ladder Network’s superior performance and tries to
+disentangle them empirically. We identify some general
+properties of the model that make it different from stan-
+dard feedforward networks and compare various architec-
+tures to identify those properties and design choices that are
+the most essential for obtaining good performance with the
+Ladder Network. While the original authors of the Ladder
+
+Deconstructing the Ladder Network Architecture
+
+Network paper explored some variants of their model al-
+ready, we provide a thorough comparison of a large number
+of architectures controlling for both hyperparameter set-
+tings and data set selection. Finally, we also introduce a
+variant of the Ladder Network that yields new state-of-the-
+art results for the Permutation-Invariant MNIST classiﬁca-
+tion task in both semi- and fully- supervised settings.
+
+2. The Ladder Network Architecture
+In this section, we describe the Ladder Network Archi-
+tecture1. Consider a dataset with N labeled examples
+(x(1), y∗(1)), (x(2), y∗(2)), ..., (x(N ), y∗(N ))
+and M
+unlabeled examples x(N + 1), x(N + 2), ..., x(N + M )
+where M (cid:29) N. The objective is to learn a function that
+models P (y|x) by using both the labeled examples and the
+large quantity of unlabeled examples.
+In the case of the
+Ladder Network, this function is a deep Denoising Auto
+Encoder (DAE) in which noise is injected into all hidden
+layers and the objective function is a weighted sum of the
+supervised Cross Entropy cost on the top of the encoder
+and the unsupervised denoising Square Error costs at each
+layer of the decoder. Since all layers are corrupted by
+noise, another encoder path with shared parameters is
+responsible for providing the clean reconstruction targets,
+i.e. the noiseless hidden activations (See Figure 1).
+Through lateral skip connections, each layer of the noisy
+encoder is connected to its corresponding layer in the de-
+coder. This enables the higher layer features to focus on
+more abstract and task-speciﬁc features. Hence, at each
+layer of the decoder, two signals, one from the layer above
+and the other from the corresponding layer in the encoder
+are combined.
+Formally, the Ladder Network is deﬁned as follows:
+
+˜x, ˜z(1), ..., ˜z(L), ˜y = Encodernoisy(x),
+x, z(1), ..., z(L), y = Encoderclean(x),
+
+ˆx, ˆz(1), ..., ˆz(L) = Decoder(˜z(1), ..., ˜z(L)),
+
+(1)
+(2)
+(3)
+
+where Encoder and Decoder can be replaced by any multi-
+layer architecture such as a multi-layer perceptron in this
+case. The variables x, y, and ˜y are the input, the noiseless
+output, and the noisy output respectively. The true target is
+denoted as y∗. The variables z(l), ˜z(l), and ˆz(l) are the hid-
+den representation, its noisy version, and its reconstructed
+version at layer l. The objective function is a weighted sum
+of supervised (Cross Entropy) and unsupervised costs (Re-
+construction costs).
+Cost = −ΣN
+
+n=1 log P(cid:0)˜y(n) = y∗(n)|x(n)(cid:1)+
+
+ΣM
+
+n=N +1ΣL
+
+l=1λl ReconsCost(z(l)(n), ˆz(l)(n)).
+
+(4)
+(5)
+
+1Please refer to (Rasmus et al., 2015; Valpola, 2014) for more
+
+detailed explanation of the Ladder Network architecture.
+
+Note that while the noisy output ˜y is used in the Cross En-
+tropy term, the classiﬁcation task is performed by the noise-
+less output y at test time.
+In the forward path, individual layers of the encoder are for-
+malized as a linear transformation followed by Batch Nor-
+malization (Ioffe & Szegedy, 2015) and then application of
+a nonlinear activation function:
+
+pre = W (l) · ˜h(l−1),
+˜z(l)
+µ(l) = mean(˜z(l)
+pre),
+σ(l) = stdv(˜z(l)
+pre),
+pre − µ(l)
+˜z(l)
+
+˜z(l) =
+
+˜h(l) = φ(cid:0)γ(l)(˜z(l) + β(l))(cid:1)
+
+σ(l)
+
++ N (0, σ2),
+
+(6)
+(7)
+(8)
+
+(9)
+
+(10)
+where ˜h(l−1) is the post-activation at layer l − 1 and W (l)
+is the weight matrix from layer l − 1 to layer l. Batch Nor-
+malization is applied to the pre-normalization ˜z(l)
+pre using the
+mini-batch mean µ(l) and standard deviation σ(l). The next
+step is to add Gaussian noise with mean 0 and variance σ2
+to compute pre-activation ˜z(l). The parameters β(l) and γ(l)
+are responsible for shifting and scaling before applying the
+nonlinearity φ(·). Note that the above equations describe
+the noisy encoder. If we remove noise (N (0, σ2)) and re-
+place ˜h and ˜z with h and z respectively, we will obtain the
+noiseless version of the encoder.
+At each layer of the decoder in the backward path, the sig-
+nal from the layer ˆz(l+1) and the noisy signal ˜z(l) are com-
+bined into the reconstruction ˆz(l) by the following equa-
+tions:
+
+pre = V (l) · ˆz(l+1),
+u(l+1)
+µ(l+1) = mean(u(l+1)
+pre ),
+σ(l+1) = stdv(u(l+1)
+pre ),
+
+u(l+1) =
+
+pre − µ(l+1)
+u(l+1)
+
+σ(l+1)
+
+ˆz(l) = g(˜z(l), u(l+1))
+
+(11)
+(12)
+(13)
+
+(14)
+
+(15)
+
+,
+
+where V (l) is a weight matrix from layer l + 1 to layer
+l. We call the function g(·,·) the combinator function as it
+combines the vertical u(l+1) and the lateral ˜z(l) connections
+in an element-wise fashion. The original Ladder Network
+proposes the following design for g(·,·), which we call the
+vanilla combinator:
+
+g(˜z(l), u(l+1)) = b0 + w0z (cid:12) ˜z(l)+
+
+w0u (cid:12) u(l+1) + w0zu (cid:12) ˜z(l) (cid:12) u(l+1)+
+wσ (cid:12) Sigmoid(b1 + w1z (cid:12) ˜z(l)+
+w1u (cid:12) u(l+1) + w1zu (cid:12) ˜z(l) (cid:12) u(l+1)),
+
+(16)
+
+Deconstructing the Ladder Network Architecture
+
+where (cid:12) is an element-wise multiplication operator and
+each per-element weight is initialized as:
+← 1
+w{0,1}z
+← 0
+w{0,1}u
+w{0,1}zu, b{0,1} ← 0
+← 1
+wσ
+
+
+
+(17)
+
+In later sections, we will explore alternative initializa-
+tion schemes on the vanilla combinator.
+the
+ReconsCost(z(l), ˆz(l)) in equation (4) is deﬁned as the fol-
+lowing:
+
+Finally,
+
+ReconsCost(z(l), ˆz(l)) = || ˆz(l) − µ(l)
+
+σ(l)
+
+− z(l)||2.
+
+(18)
+
+where ˆz(l) is normalized using µ(l) and σ(l) which are the
+encoder’s sample mean and standard deviation statistics of
+the current mini batch, respectively. The reason for this
+second normalization is to cancel the effect of unwanted
+noise introduced by the limited batch size of Batch Nor-
+malization.
+
+3. Components of the Ladder Network
+Now that the precise architecture of the Ladder Network
+has been described in details, we can identify a couple
+of important additions to the standard feed-forward neural
+network architecture that may have a pronounced impact
+on the performance. A distinction can also be made be-
+tween those design choices that follow naturally from the
+motivation of the ladder network as a deep autoencoder and
+those that are more ad-hoc and task speciﬁc.
+The most obvious addition is the extra reconstruction cost
+for every hidden layer and the input layer. While it is clear
+that the reconstruction cost provides an unsupervised ob-
+jective to harness the unlabeled examples, it is not clear
+how important the penalization is for each layer and what
+role it plays for fully-supervised tasks.
+A second important change is the addition of Gaussian
+noise to the input and the hidden representations. While
+adding noise to the ﬁrst layer is a part of denoising autoen-
+coder training, it is again not clear whether it is necessary
+to add this noise at every layer or not. We would also like
+to know if the noise helps by making the reconstruction
+task nontrivial and useful or just by regularizing the feed-
+forward network in a similar way that noise-based regu-
+larizers like dropout (Srivastava et al., 2014) and adaptive
+weight noise (Graves, 2011) do.
+Finally, the lateral skip connections are the most notable
+deviation from the standard denoising autoencoder archi-
+tecture. The way the vanilla Ladder Network combines the
+lateral stream of information ˜z(l) and the downward stream
+
+of information u(l+1) is somewhat unorthodox. For this
+reason, we have conducted extensive experiments on both
+the importance of the lateral connections and the precise
+choice for the function that combines the lateral and down-
+ward information streams (which we refer to as the combi-
+nator function).
+
+4. Experimental Setup
+In this section, we introduce different variants of the Lad-
+der Architecture and describe our experiment methodology.
+Some variants are derived by removal of one component of
+the model while other variants are derived by the replace-
+ment of that component with a new one. This enables us to
+isolate each component and observe its effects while other
+components remain unchanged. Table 1 depicts the hierar-
+chy of the different variants and the baseline models.
+
+Table 1. Schematic ordering of the different models. All the vari-
+ants of the VANILLA model are derived by either removal or re-
+placement of a single component. The BASELINE is a multi-layer
+feedforward neural networks with the same number of layers and
+units as the vanilla model.
+
+Models
+
+VANILLA
+
+Removal of a component
+
+Noise variants
+
+FIRSTNOISE
+FIRSTRECONS
+FIRSTN&R
+NOLATERAL
+
+NOSIG
+NOMUL
+LINEAR
+
+Vanilla Combinator variants
+
+Replacement of a component
+
+Vanilla Combinator Initialization
+
+RANDINIT
+REVINIT
+
+MLP Combinators
+
+MLP
+AUGMENTED-MLP
+Gaussian Combinators
+
+GAUSSIAN
+GATEDGAUSS
+
+Baseline models
+
+Feedforward network
+Feedforward network + noise
+
+Deconstructing the Ladder Network Architecture
+
+Figure 1. The Ladder Network consists of two encoders (on each side of the ﬁgure) and one decoder (in the middle). At each layer
+of both encoders (equations 6 to 10), z(l) and ˜z(l) are computed by applying a linear transformation and normalization on h(l−1) and
+˜h(l−1), respectively. The noisy version of the encoder (left) has an extra Gaussian noise injection term. Batch normalization correction
+(γl, βl) and non-linearity are then applied to obtain h(l) and ˜h(l). At each layer of the decoder, two streams of information, the lateral
+connection ˜z(l) (gray lines) and the vertical connection u(l+1), are required to reconstruct ˆz(l) (equations 11 to 15). Acronyms CE and
+RC stand for Cross Entropy and Reconstruction Cost respectively. The ﬁnal objective function is a weighted sum of all Reconstruction
+costs and the Cross Entropy cost.
+
+4.1. Variants derived by removal of a component
+
+4.1.1. NOISE VARIANTS
+
+Different conﬁgurations of noise injection, penalizing re-
+construction errors, and the lateral connection removal sug-
+gest four different variants:
+
+• Add noise only to the ﬁrst layer (FIRSTNOISE).
+• Only penalize the reconstruction at the ﬁrst layer
+
+(FIRSTRECONS), i.e. λ(l≥1) are set to 0.
+
+• Apply both of the above changes: add noise and
+layer
+
+penalize the reconstruction only at
+(FIRSTN&R).
+
+the ﬁrst
+
+• Remove all
+
+lateral connections from FIRSTN&R.
+Therefore, equivalent to to a denoising autoencoder
+with an additional supervised cost at the top, the en-
+coder and the decoder are connected only through the
+topmost connection. We call this variant NOLAT-
+ERAL.
+
+4.1.2. VANILLA COMBINATOR VARIANTS
+
+4.2.2. GAUSSIAN COMBINATOR VARIANTS
+
+Deconstructing the Ladder Network Architecture
+
+We try different variants of the vanilla combinator function
+that combines the two streams of information from the lat-
+eral and the vertical connections in an unusual way. As
+deﬁned in equation 16, the output of the vanilla combina-
+tor depends on u, ˜z, and u (cid:12) ˜z 2, which are connected to
+the output via two paths, one linear and the other through a
+sigmoid non-linearity unit.
+The simplest way of combining lateral connections with
+vertical connections is to simply add them in an element-
+wise fashion, similar to the nature of skip-connections in
+a recently published work on Residual Learning (He et al.,
+2015). We call this variant LINEAR combinator function.
+We also derive two more variants NOSIG and NOMULT in
+the way of stripping down the vanilla combinator function
+to the simple LINEAR one:
+
+• Remove sigmoid non-linearity (NOSIG). The corre-
+sponding per-element weights are initialized in the
+same way as the vanilla combinator.
+
+• Remove the multiplicative term ˜z (cid:12) u (NOMULT).
+
+• Simple linear combination (LINEAR)
+
+g(˜z, u) = b + wu (cid:12) u + wz (cid:12) ˜z
+
+(19)
+
+where the initialization scheme resembles the vanilla
+one in which wz is initialized to one while wu and b
+are initialized to zero.
+
+4.2. Variants derived by replacement of a component
+
+4.2.1. VANILLA COMBINATOR INITIALIZATION
+
+Note that the vanilla combinator is initialized in a very spe-
+ciﬁc way (equation 17), which sets the initial weights for
+lateral connection ˜z to 1 and vertical connection u to 0.
+This particular scheme encourages the Ladder decoder path
+to learn more from the lateral information stream ˜z than the
+vertical u at the beginning of training.
+We explore two variants of the initialization scheme:
+
+• Random initialization (RANDINIT): all per-element
+
+parameters are randomly initialized to N (0, 0.2).
+
+• Reverse initialization (REVINIT): all per-element pa-
+rameters w{0,1}z, w{0,1}zu, and b{0,1} are initialized
+to zero while w{0,1}u and wσ are initialized to one.
+
+2For simplicity, subscript i and superscript l are implicit from
+
+now on.
+
+Another choice for the combinator function with a prob-
+abilistic interpretation is the GAUSSIAN combinator pro-
+posed in the original paper about the Ladder Architecture
+(Rasmus et al., 2015). Based on the theory in the Section
+4.1 of (Valpola, 2014), assuming that both additive noise
+and the conditional distribution P (z(l)|u(l+1)) are Gaus-
+sian distributions, the denoising function is linear with re-
+spect to ˜z(l). Hence, the denoising function could be a
+weighted sum over ˜z(l) and a prior on z(l). The weights
+and the prior are modeled as a function of the vertical sig-
+nal:
+
+g(˜z, u) = ν(u) (cid:12) ˜z + (1 − ν(u)) (cid:12) µ(u),
+
+(20)
+
+in which
+µ(u) = w1 (cid:12) Sigmoid(w2 (cid:12) u + w3) + w4 (cid:12) u + w5,
+
+(21)
+ν(u) = w6 (cid:12) Sigmoid(w7 (cid:12) u + w8) + w9 (cid:12) u + w10.
+(22)
+
+Strictly speaking, ν(u) is not a proper weight, because it
+is not guaranteed to be positive all the time. To make the
+Gaussian interpretation rigorous, we explore a variant that
+we call GATEDGAUSS, where equations 20 and 21 stay the
+same but 22 is replaced by:
+
+ν(u) = Sigmoid(w6 (cid:12) u + w7).
+
+(23)
+
+GATEDGAUSS guarantees that 0 < ν(u) < 1. We expect
+that ν(u)i will be close to 1 if the information from the
+lateral connection for unit i is more helpful to reconstruc-
+tion, and close to 0 if the vertical connection becomes more
+useful. The GATEDGAUSS combinator is similar in nature
+to the gating mechanisms in other models such as Gated
+Recurrent Unit (Cho et al., 2014) and highway networks
+(Srivastava et al., 2015).
+
+4.2.3. MLP (MULTILAYER PERCEPTRON)
+
+COMBINATOR VARIANTS
+
+We also propose another type of element-wise combinator
+functions based on fully-connected MLPs. We have ex-
+plored two classes in this family. The ﬁrst one, denoted
+simply as MLP, maps two scalars [u, ˜z] to a single out-
+put g(˜z, u). We empirically determine the choice of acti-
+vation function for the hidden layers. Preliminary experi-
+ments show that the Leaky Rectiﬁer Linear Unit (LReLU)
+(Maas et al., 2013) performs better than either the conven-
+tional ReLU or the sigmoid unit. Our LReLU function is
+formulated as
+
+(cid:40)
+
+LReLU(x) =
+
+.
+
+(24)
+
+if x ≥ 0,
+
+x,
+0.1 x, otherwise
+
+Deconstructing the Ladder Network Architecture
+
+We experiment with different numbers of layers and hidden
+units per layer in the MLP. We present results for three spe-
+ciﬁc conﬁgurations: [4] for a single hidden layer of 4 units,
+[2, 2] for 2 hidden layers each with 2 units, and [2, 2, 2] for
+3 hidden layers. For example, in the [2, 2, 2] conﬁguration,
+the MLP combinator function is deﬁned as:
+
+(cid:16)
+
+g(˜z, u) = W3 · LReLU
+
+(cid:17)
+
+W2 · LReLU(W1 · [u, ˜z] + b1) + b2
+
+(25)
+
++ b3
+
+where W1, W2, and W3 are 2 × 2 weight matrices; b1, b2,
+and b3 are 2 × 1 bias vectors.
+The second class, which we denote as AMLP (Augmented
+MLP), has a multiplicative term as an augmented input
+unit. We expect that this multiplication term allows the
+vertical signal (u(l+1)) to override the lateral signal (˜z), and
+also allows the lateral signal to select where the vertical sig-
+nal is to be instantiated. Since the approximation of multi-
+plication is not easy for a single-layer MLP, we explicitly
+add the multiplication term as an extra input to the combi-
+nator function. AMLP maps three scalars [u, ˜z, u (cid:12) ˜z] to a
+single output. We use the same LReLU unit for AMLP.
+We do similar experiments as in the MLP case and include
+results for [4], [2, 2] and [2, 2, 2] hidden layer conﬁgura-
+tions.
+Both MLP and AMLP weight parameters are randomly
+initialized to N (0, η). η is considered to be a hyperparam-
+eter and tuned on the validation set. Precise values for the
+best η values are listed in Appendix.
+
+4.3. Methodology
+
+The experimental setup includes two semi-supervised clas-
+siﬁcation tasks with 100 and 1000 labeled examples and a
+fully-supervised classiﬁcation task with 60000 labeled ex-
+amples for Permutation-Invariant MNIST handwritten digit
+classiﬁcation. Labeled examples are chosen randomly but
+the number of examples for different classes is balanced.
+The test set is not used during all the hyperparameter search
+and tuning. Each experiment is repeated 10 times with 10
+different but ﬁxed random seeds to measure the standard er-
+ror of the results for different parameter initializations and
+different selections of labeled examples.
+All variants and the vanilla Ladder Network itself are
+trained using the ADAM optimization algorithm (Kingma
+& Ba, 2014) with a learning rate of 0.002 for 100 iterations
+followed by 50 iterations with a learning rate decaying lin-
+early to 0. Hyperparameters including the standard devia-
+tion of the noise injection and the denoising weights at each
+layer are tuned separately for each variant and each experi-
+ment setting (100-, 1000-, and fully-labeled). Hyperparme-
+ters are optimized by either a random search (Bergstra &
+
+Bengio, 2012), or a grid search, depending on the num-
+ber of hyperparameters involved (see Appendix for precise
+conﬁgurations).
+
+5. Results & Discussion
+Table 2 collects all results for the variants and the baselines.
+The results are organized into ﬁve main categories for each
+of the three tasks. The BASELINE model is a simple feed-
+forward neural network with no reconstruction penalty and
+BASELINE+NOISE is the same network but with additive
+noise at each layer. The best results in terms of average er-
+ror rate on the test set are achieved by the proposed AMLP
+combinator function:
+in the fully-supervised setting, the
+best average error rate is 0.569 ± 0.010, while in the semi-
+supervised settings with 100 and 1000 labeled examples,
+the averages are 1.002 ± 0.037 and 0.974 ± 0.021 respec-
+tively. A visualization of the a learned combinator function
+is shown in Appendix.
+
+5.1. Variants derived by removal
+
+The results in the table indicate that in the fully-supervised
+setting, adding noise either to the ﬁrst layer only or to all
+layers leads to a lower error rate with respect to the base-
+lines. Our intuition is that the effect of additive noise to lay-
+ers is very similar to the weight noise regularization method
+(Graves, 2011) and dropout (Hinton et al., 2012).
+In addition, it seems that removing the lateral connections
+hurts much more than the absence of noise injection or re-
+construction penalty in the intermediate layers. It is also
+worth mentioning that hyperparameter tuning yields zero
+weights for penalizing the reconstruction errors in all lay-
+ers except the input layer in the fully-supervised task for
+the vanilla model. Something similar happens for NOLAT-
+ERAL as well, where hyperparameter tuning yields zero re-
+construction weights for all layers including the input layer.
+In other words, NOLATERAL and BASELINE+NOISE be-
+come the same models for the fully-supervised task. More-
+over, the weights for the reconstruction penalty of the hid-
+den layers are relatively small in the semi-supervised task.
+This is in line with similar observations (relatively small
+weights for the unsupervised part of the objective) for the
+hybrid discriminant RBM (Larochelle & Bengio, 2008).
+The third part of Table 2 shows the relative performance of
+different combinator functions by removal. Unsurprisingly,
+the performance deteriorates considerably if we remove the
+sigmoid non-linearity (NOSIG) or the multiplicative term
+(NOMULT) or both (LINEAR) from the vanilla combinator.
+Judging from the size of the increase in average error rates,
+the multiplicative term is more important than the sigmoid
+unit.
+
+Deconstructing the Ladder Network Architecture
+
+Table 2. PI MNIST classiﬁcation results for the vanilla Ladder Network and its variants trained on 100, 1000, and 60000 (full) labeled
+examples. AER and SE stand for Average Error Rate and its Standard Error of each variant over 10 different runs. BASELINE is a
+multi-layer feed-forward neural network with no reconstruction penalty.
+
+Variant
+Baseline
+
+Baseline+noise
+
+Vanilla
+
+FirstNoise
+FirstRecons
+FirstN&R
+NoLateral
+
+RandInit
+RevInit
+NoSig
+NoMult
+Linear
+
+Gaussian
+GatedGauss
+
+MLP [4]
+MLP [2, 2]
+MLP [2, 2, 2]
+AMLP [4]
+AMLP [2, 2]
+AMLP [2, 2, 2]
+
+100
+
+1000
+
+60000
+
+AER (%)
+25.804
+23.034
+1.086
+
+1.856
+1.691
+1.856
+16.390
+
+1.232
+1.305
+1.608
+3.041
+5.027
+
+1.064
+1.308
+
+1.374
+1.209
+1.274
+1.072
+1.193
+1.002
+
+SE
+± 0.40
+± 0.48
+± 0.023
+± 0.193
+± 0.175
+± 0.193
+± 0.583
+± 0.033
+± 0.129
+± 0.124
+± 0.914
+± 0.923
+± 0.021
+± 0.038
+± 0.186
+± 0.116
+± 0.067
+± 0.015
+± 0.039
+± 0.038
+
+AER (%)
+
+8.734
+6.113
+1.017
+
+1.381
+1.053
+1.058
+5.251
+
+1.011
+1.031
+1.223
+1.735
+2.769
+
+0.983
+1.094
+
+0.996
+1.059
+1.095
+0.974
+1.029
+0.979
+
+SE
+
+± 0.058
+± 0.105
+± 0.017
+± 0.029
+± 0.021
+± 0.175
+± 0.099
+± 0.025
+± 0.017
+± 0.014
+± 0.030
+± 0.024
+± 0.019
+± 0.016
+± 0.028
+± 0.023
+± 0.053
+± 0.021
+± 0.023
+± 0.025
+
+AER (%)
+
+1.182
+0.820
+0.608
+
+0.732
+0.608
+0.732
+0.820
+
+0.614
+0.631
+0.633
+0.674
+0.849
+
+0.604
+0.632
+
+0.605
+0.573
+0.602
+0.598
+0.569
+0.578
+
+SE
+
+± 0.010
+± 0.009
+± 0.013
+± 0.015
+± 0.013
+± 0.016
+± 0.009
+± 0.015
+± 0.018
+± 0.010
+± 0.018
+± 0.014
+± 0.010
+± 0.011
+± 0.012
+± 0.016
+± 0.010
+± 0.014
+± 0.010
+± 0.013
+
+5.2. Variants derived by replacements
+
+As described in Section 4.1.2 and Equation 17, the per-
+element weights of the lateral connections are initialized
+to ones while those of the vertical are initialized to zeros.
+Interestingly, the results are slightly worse for the RAN-
+DINIT variant, in which these weights are initialized ran-
+domly. The REVINIT variant is even worse than the ran-
+dom initialization scheme. We suspect that the reason is
+that the optimization algorithm ﬁnds it easier to reconstruct
+a representation z starting from its noisy version ˜z, rather
+than starting from an initially arbitrary reconstruction from
+the untrained upper layers. Another justiﬁcation is that the
+initialization scheme in Equation 17 corresponds to opti-
+mizing the Ladder Network as if it behaves like a stack of
+decoupled DAEs initially, therefore during early training it
+is like that the Auto-Encoders are trained more indepen-
+dently.
+The GAUSSIAN combinator performs better
+than the
+vanilla combinator. GATEDGAUSS, the other variant with
+strict 0 < σ(u) < 1, does not perform as well as the one
+with unconstrained σ(u). In the GAUSSIAN formulation, ˜z
+
+is regulated by two functions of u: µ(u) and σ(u). This
+combinator interpolates between the noisy activations and
+the predicted reconstruction, and the scaling parameter can
+be interpreted as a measure of the certainty of the network.
+Finally, the AMLP model yields state-of-the-art results
+in all of 100-, 1000- and 60000-labeled experiments for
+PI MNIST. It outperforms both the MLP and the vanilla
+model. The additional multiplicative input unit ˜z (cid:12) u helps
+the learning process signiﬁcantly.
+
+5.3. Probabilistic Interpretations of the Ladder
+
+Network
+
+Since many of the motivations behind regularized autoen-
+coder architectures are based on observations about gener-
+ative models, we brieﬂy discuss how the Ladder Network
+can be related to some other models with varying degrees
+of probabilistic interpretability. Considering that the com-
+ponents that are most deﬁning of the Ladder Network seem
+to be the most important ones for semi-supervised learn-
+ing in particular, comparisons with generative models are
+at least intuitively appealing to get more insight about how
+
+Deconstructing the Ladder Network Architecture
+
+the model learns about unlabeled examples.
+By training the individual denoising autoencoders that
+make up the Ladder Network with a single objective func-
+tion, this coupling goes as far as encouraging the lower
+levels to produce representations that are going to be easy
+to reconstruct by the upper levels. We ﬁnd a similar term
+(-log of the top-level prior evaluated at the output of the
+encoder) in hierarchical extensions of the variational au-
+toencoder (Rezende et al., 2014; Bengio, 2014). While the
+Ladder Network differs too much from an actual variational
+autoencoder to be treated as such, the similarities can still
+give one intuitions about the role of the noise and the inter-
+actions between the layers. Conversely, one also may won-
+der how a variational autoencoder might beneﬁt from some
+of the components of Ladder Network like Batch Normal-
+ization and multiplicative connections.
+When one simply views the Ladder Network as a pecu-
+liar type of denoising autoencoder, one could extend the
+recent work on the generative interpretation of denoising
+autoencoders (Alain & Bengio, 2013; Bengio et al., 2013)
+to interpret the Ladder Network as a generative model as
+well. It would be interesting to see if the Ladder Network
+architecture can be used to generate samples and if the ar-
+chitecture’s success at semi-supervised learning translates
+to this profoundly different use of the model.
+
+6. Conclusion
+The paper systematically compares different variants of the
+recent Ladder Network architecture (Rasmus et al., 2015;
+Valpola, 2014) with two feedforward neural networks as
+the baselines and the standard architecture (proposed in the
+original paper). Comparisons are done in a deconstructive
+way, starting from the standard architecture. Based on the
+comparisons of different variants we conclude that:
+
+• Unsurprisingly, the reconstruction cost is crucial to
+obtain the desired regularization from unlabeled data.
+• Applying additive noise to each layer and especially
+the ﬁrst layer has a regularization effect which helps
+generalization. This seems to be one of the most im-
+portant contributors to the performance on the fully
+supervised task.
+
+• The lateral connection is a vital component in the Lad-
+der architecture to the extent that removing it consid-
+erably deteriorates the performance for all of the semi-
+supervised tasks.
+
+• The precise choice of the combinator function has a
+less dramatic impact, although the vanilla combinator
+can be replaced by the Augmented MLP to yield better
+performance, in fact allowing us to improve the record
+
+error rates on Permutation-Invariant MNIST for semi-
+and fully-supervised settings.
+
+We hope that these comparisons between different architec-
+tural choices will help to improve understanding of semi-
+supervised learning’s success for the Ladder Network and
+like architectures, and perhaps even deep architectures in
+general.
+
+References
+Alain, Guillaume and Bengio, Yoshua. What regularized
+auto-encoders learn from the data generating distribu-
+tion. In ICLR’2013. also arXiv report 1211.4246, 2013.
+
+Bengio, Yoshua. Learning deep architectures for ai. Foun-
+dations and trends R(cid:13) in Machine Learning, 2(1):1–127,
+2009.
+
+Bengio, Yoshua. How auto-encoders could provide credit
+assignment in deep networks via target propagation.
+Technical report, arXiv:1407.7906, 2014.
+
+Bengio, Yoshua, Yao, Li, Alain, Guillaume, and Vincent,
+Pascal. Generalized denoising auto-encoders as genera-
+tive models. In NIPS’2013, 2013.
+
+Bergstra, James and Bengio, Yoshua. Random search for
+hyper-parameter optimization. The Journal of Machine
+Learning Research, 13(1):281–305, 2012.
+
+Cho, Kyunghyun, van Merri¨enboer, Bart, Bahdanau,
+Dzmitry, and Bengio, Yoshua. On the properties of neu-
+ral machine translation: Encoder-decoder approaches.
+arXiv preprint arXiv:1409.1259, 2014.
+
+Graves, Alex. Practical variational inference for neural net-
+In Advances in Neural Information Processing
+
+works.
+Systems, pp. 2348–2356, 2011.
+
+He, Kaiming, Zhang, Xiangyu, Ren, Shaoqing, and Sun,
+Jian. Deep residual learning for image recognition. arXiv
+preprint arXiv:1512.03385, 2015.
+
+Hinton, Geoffrey E, Osindero, Simon, and Teh, Yee-Whye.
+A fast learning algorithm for deep belief nets. Neural
+computation, 18(7):1527–1554, 2006.
+
+Hinton, Geoffrey E., Srivastava, Nitish, Krizhevsky, Alex,
+Sutskever, Ilya, and Salakhutdinov, Ruslan. Improving
+neural networks by preventing co-adaptation of feature
+detectors. Technical report, arXiv:1207.0580, 2012.
+
+Ioffe, Sergey and Szegedy, Christian. Batch normalization:
+Accelerating deep network training by reducing internal
+covariate shift. arXiv preprint arXiv:1502.03167, 2015.
+
+Deconstructing the Ladder Network Architecture
+
+Vincent, Pascal, Larochelle, Hugo, Lajoie, Isabelle, Ben-
+gio, Yoshua, and Manzagol, Pierre-Antoine. Stacked de-
+noising autoencoders: Learning useful representations in
+a deep network with a local denoising criterion. J. Ma-
+chine Learning Res., 11, 2010.
+
+Kingma, Diederik and Ba,
+
+Jimmy.
+method for stochastic optimization.
+arXiv:1412.6980, 2014.
+
+Adam:
+
+A
+arXiv preprint
+
+Kingma, Diederik P, Mohamed, Shakir, Rezende,
+Danilo Jimenez, and Welling, Max. Semi-supervised
+In Advances in
+learning with deep generative models.
+Neural Information Processing Systems, pp. 3581–3589,
+2014.
+
+Langley, P. Crafting papers on machine learning. In Lang-
+ley, Pat (ed.), Proceedings of the 17th International Con-
+ference on Machine Learning (ICML 2000), pp. 1207–
+1216, Stanford, CA, 2000. Morgan Kaufmann.
+
+Larochelle, Hugo and Bengio, Yoshua. Classiﬁcation us-
+ing discriminative restricted boltzmann machines.
+In
+Proceedings of the 25th international conference on Ma-
+chine learning, pp. 536–543. ACM, 2008.
+
+Maas, Andrew L, Hannun, Awni Y, and Ng, Andrew Y.
+Rectiﬁer nonlinearities improve neural network acoustic
+models. In Proc. ICML, volume 30, 2013.
+
+Ranzato, Marc’Aurelio and Szummer, Martin.
+
+Semi-
+supervised learning of compact document representa-
+In Proceedings of the 25th
+tions with deep networks.
+international conference on Machine learning, pp. 792–
+799. ACM, 2008.
+
+Rasmus, Antti, Valpola, Harri, Honkala, Mikko, Berglund,
+Mathias, and Raiko, Tapani. Semi-supervised learning
+with ladder network. arXiv preprint arXiv:1507.02672,
+2015.
+
+Rezende, Danilo J., Mohamed, Shakir, and Wierstra, Daan.
+Stochastic backpropagation and approximate inference
+in deep generative models. In ICML’2014, 2014.
+
+Srivastava, Nitish, Hinton, Geoffrey, Krizhevsky, Alex,
+Sutskever, Ilya, and Salakhutdinov, Ruslan. Dropout:
+A simple way to prevent neural networks from overﬁt-
+ting. The Journal of Machine Learning Research, 15(1):
+1929–1958, 2014.
+
+Srivastava, Rupesh K, Greff, Klaus, and Schmidhuber,
+In Advances in
+J¨urgen. Training very deep networks.
+Neural Information Processing Systems, pp. 2368–2376,
+2015.
+
+Valpola, Harri. From neural pca to deep unsupervised
+
+learning. arXiv preprint arXiv:1411.7783, 2014.
+
+Vincent, Pascal, Larochelle, Hugo, Bengio, Yoshua, and
+Manzagol, Pierre-Antoine. Extracting and composing
+robust features with denoising autoencoders. In Proceed-
+ings of the 25th international conference on Machine
+learning, pp. 1096–1103. ACM, 2008.
+
+

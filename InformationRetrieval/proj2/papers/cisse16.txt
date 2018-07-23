@@ -1,0 +1,1485 @@
+ADIOS: Architectures Deep In Output Space
+
+Moustapha Ciss´e∗
+Maruan Al-Shedivat†
+Samy Bengio‡
+Facebook AI Research∗, Carnegie Mellon University†, Google Brain‡
+
+MOUSTAPHACISSE@FB.COM
+ALSHEDIVAT@CS.CMU.EDU
+BENGIO@GOOGLE.COM
+
+Abstract
+
+Multi-label classiﬁcation is a generalization of
+binary classiﬁcation where the task consists in
+predicting sets of labels. With the availability
+of ever larger datasets, the multi-label setting has
+become a natural one in many applications, and
+the interest in solving multi-label problems has
+grown signiﬁcantly. As expected, deep learn-
+ing approaches are now yielding state-of-the-art
+performance for this class of problems. Unfor-
+tunately, they usually do not take into account
+the often unknown but nevertheless rich relation-
+ships between labels. In this paper, we propose
+to make use of this underlying structure by learn-
+ing to partition the labels into a Markov Blan-
+ket Chain and then applying a novel deep archi-
+tecture that exploits the partition. Experiments
+on several popular and large multi-label datasets
+demonstrate that our approach not only yields
+signiﬁcant improvements, but also helps to over-
+come trade-offs speciﬁc to the multi-label classi-
+ﬁcation setting.
+
+1. Introduction
+Data sources, such as social media, news services, and
+crowd-sourced experiments, usually generate data where
+every instance can be assigned several labels (also called
+classes, categories, or tags). This turns modern classiﬁca-
+tion problems into not only enormous scale but also multi-
+label in many practical settings. For example in text clas-
+siﬁcation, a document naturally conveys different related
+topics (e.g. sports and tourism). In image categorization
+as well, a picture contains more than one object of interest.
+Furthermore, the labels usually carry rich semantic struc-
+tures (Deng et al., 2009; Partalas et al., 2015).
+A straightforward approach to Multi-Label Classiﬁcation
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+(MLC) consists in reducing the original problem to sev-
+eral independent single-label tasks (Tsoumakas & Katakis,
+2007). This decomposition, called binary relevance, is ap-
+pealing because of its simplicity and scalability. Unfortu-
+nately, it disregards the complex inter-dependencies that of-
+ten exist between the labels. Consequently, it suffers from
+the lack of expressiveness and is prone to inconsistent pre-
+dictions. On the other hand, the methods that exploit label
+dependencies can signiﬁcantly improve the classiﬁcation
+performance. However, most of the contributions hitherto
+suffer from the cost of increased training and prediction
+complexity and, hence, are limited in their applicability to
+cases with modest numbers of examples and categories.
+The recent advancements in deep and representation learn-
+ing have been successfully applied to address some of the
+issues of MLC (Nam et al., 2014). The proposed model in
+this prior study highlights the amenability of several tools,
+either developed or commonly used in deep learning, in
+the multi-label setting. In particular, it demonstrates that
+a simple multilayer perceptron with hidden rectiﬁed lin-
+ear units (ReLU) (Glorot et al., 2011) trained with Ada-
+Grad (Duchi et al., 2011) to jointly predict all the labels cor-
+rectly can achieve state-of-the-art performance. The rea-
+son for this signiﬁcant performance improvement in com-
+parison to several existing approaches is threefold: Firstly,
+many real-world MLC problems exhibit Zipf’s law-like la-
+bel frequency distribution, i.e., few categories are very pop-
+ular while the majority is rare. Therefore, when AdaGrad
+is used, the learning rate becomes adapted to the data dis-
+tribution by allowing larger gradient steps for the rarely oc-
+curring labels in comparison to more frequent ones. Sec-
+ondly, hidden ReLUs encourage a sparse intermediate rep-
+resentation that is presumably more discriminative (Ben-
+gio et al., 2013b; Olshausen & Field, 1997). Moreover,
+dropout regularization (Hinton et al., 2012) prevents spe-
+cialization of groups of hidden units into predicting only
+some particular classes. Finally, the shared intermediate
+representation across the tasks (labels) implicitly models
+the dependencies between them and provides sharing of the
+statistical strength. This procedure, also called multitask-
+ing (Caruana, 1997), is an important argument for learn-
+ing deep architectures for MLC. It naturally exploits la-
+
+ADIOS: Architectures Deep In Output Space
+
+bel dependencies which importance in the design of accu-
+rate multi-label classiﬁers has been developed into a opinio
+communis (Read et al., 2011; Dembczy´nski et al., 2012;
+Cisse et al., 2013).
+The categories in real world multi-label problems have a
+rich variety of relationships: Some labels may entail oth-
+ers (e.g., the presence of stars in a picture implies the rel-
+evance of night) or can be mutually exclusive (e.g., a real-
+istic picture will likely not contain both trees and whales).
+There are also weaker types of relationships such as posi-
+tive correlation (e.g., topics such as politics and economics
+tend to appear together). While such relationships can
+undoubtedly be exploited directly—some labels are pre-
+dictable based on the co-occurrence with the others—the
+traditional deep neural networks incorporate label depen-
+dence information into the learning process only through
+multitasking (Nam et al., 2014; Bengio et al., 2013b). In-
+deed, all the recent architectures are designed to extract a
+hierarchy of representations from the input and to termi-
+nate with a single output layer that yields predictions. Even
+though they can be deep in the input space, they are ﬂat in
+their output. One exception is the use of a hierarchical soft-
+max (Jean et al., 2014) which organizes the set of labels as
+a tree. Unfortunately, unless the tree structure is known in
+advance, using a random tree has been shown to yield poor
+performance.
+In this work, we propose a novel deep architecture for solv-
+ing MLC tasks by directly leveraging label dependence in-
+formation. Our proposal relies on a well-known observa-
+tion in MLC (Deng et al., 2014): For a given example, it
+is often possible to infer the validity of several labels rely-
+ing on the correctness information about a carefully chosen
+subset of categories. For instance, in scene classiﬁcation,
+one does not need to observe an image before deciding the
+rightness of the label night once she knows that lights, stars
+or moon are present. In probabilistic terms, the labels light,
+stars, and moon separate the label night from the image;
+they are the Markov Blanket (MB) (Pearl, 2014). A parti-
+tion of the set of tags into two subsets such that one subset
+is a Markov Blanket of the other, which we call a Markov
+Blanket Chained (MBC) partition, suggests a deep archi-
+tecture composed of two main parts. The ﬁrst part is akin
+to a traditional MLP and goes from the inputs to the la-
+bels of the Markov blanket. The second part goes from the
+Markov blanket to its complement set of categories, poten-
+tially with intermediate hidden layers. It uses the labels of
+the Markov Blanket as a high-level representation of the in-
+put data. Overall, the resulting Architecture is also Deep In
+the Output Space (ADIOS).
+In practice, it is likely that an MBC partition does not
+strictly exist or cannot be precisely discovered since we
+only observe the relationships that are present in the data.
+
+However, it is often possible to learn a good approximate
+MB that contains enough information to predict the other
+labels accurately. Moreover, in the cases where the in-
+formation provided by the estimated MB is insufﬁcient,
+composing this high-level information with a representa-
+tion directly extracted from the input yields improved per-
+formance.
+The remainder of the paper is organized as follows: Sec-
+tion 2 summarizes the previous related work. Section 3
+presents a simple approach to building an approximate
+Markov Blanket Chained partition of the set of labels. In
+Section 4, the details of the model and the learning algo-
+rithm are provided. Section 5 presents experimental results
+on several popular and large multi-label datasets validating
+the model and providing several insights.
+
+2. Related Work
+Label dependence exploitation is a blossoming line of re-
+search in multi-label classiﬁcation (Read et al., 2011; Har-
+iharan et al., 2010; Weston et al., 2013).
+It has recently
+attracted signiﬁcant contributions that fall into four main
+groups. The ﬁrst family of approaches, to which classiﬁer
+chains belong (Read et al., 2011; Zaragoza et al., 2011),
+expands the initial representation of the data with addi-
+tional features that represent the labels. The methods of
+the second group (Tai & Lin, 2012; Hsu et al., 2009) as-
+sume a low-rank label matrix and learn a low-dimensional
+embedding of the labels capturing interdependencies be-
+tween them. The most representative works in this direc-
+tion are Principle Label Space Transformation (Tai & Lin,
+2012), Compressed Sensing (Hsu et al., 2009), and Bloom
+Filters (Cisse et al., 2013). The techniques of the third cate-
+gory, such as Label Partitioning (Weston et al., 2013), clus-
+ter the labels based on their correlations to predict consis-
+tent sets. Finally, techniques such as Laconic (Bengio et al.,
+2013a) use external knowledge about label co-occurrences
+to regularize the model. All these methods bear resem-
+blances to those presented in this work in that they exploit
+dependencies between labels to improve labeling perfor-
+mance. However, they are neither trainable end-to-end nor
+do they enjoy the appealing properties of deep architec-
+tures.
+A more related approach is the recently introduced HEX
+model (Deng et al., 2014) that connects a traditional deep
+neural network to the labels through a known graph of re-
+lationships (hierarchical and mutual exclusivity) extracted
+from the Knowledge Graph (Singhal, 2012). Therefore,
+the HEX model is also deep both in the input and output
+spaces. However, it has several signiﬁcant differences com-
+pared to our proposal: Firstly, ADIOS does not use a set of
+relationships extracted from a knowledge base. Instead, the
+composition of the output layers is learned from the data.
+
+ADIOS: Architectures Deep In Output Space
+
+Secondly, ADIOS is not limited to a particular type of rela-
+tionships between the labels. In contrast, it allows complex
+combinations of initial predictions to infer the other cate-
+gories, potentially through the use of hidden layers between
+the output layers. Moreover, the inference is reduced to a
+mere forward pass rather than complicated procedures such
+as the one employed by the HEX model. Finally, HEX has
+been designed for multi-class tasks rather than multi-label
+and thus cannot be adapted easily for predicting label sets.
+
+3. Approximate MBC Partitioning
+Let L = {(cid:96)1, . . . , (cid:96)m} (0 < m < ∞) be a set of m la-
+bels and S = {(x1, y1) . . . , (xn, yn)} a training set sam-
+pled from the distribution P deﬁned on X × Y, where
+X is the space of instances and Y = 2L is the power
+set of L. For every instance xi, its corresponding la-
+bel set is represented by an m-dimensional binary vector
+yi = (yi1, ...yim) ∈ {0, 1}m such that yij = 1 if class la-
+bel (cid:96)j is relevant to example xi and yij = 0 otherwise. We
+seek for a hypothesis h : X → Y learned from the training
+set S, to predict the label set y corresponding to unseen in-
+stances x by exploiting the dependencies between the tags.
+An essential element in our proposal is the existence of a
+partition (or a good approximation thereof) of the set of
+labels L into an ordered set of disjoint subsets (Gi)1≤i≤p
+such that every label (cid:96) ∈ Gi is independent of all the other
+labels given the labels in Gi−1. That is, the knowledge of
+Gi−1 renders unnecessary all the information about (cid:96) not
+contained in Gi−1. We call such division a Markov Blan-
+ket Chained (MBC) partition. It generalizes the simple case
+where X is a Markov Blanket of Y (Nam et al., 2014).
+An MBC may not exist in practice, sensu stricto. How-
+ever, it is realistic to assume the existence of a good ap-
+proximate partition of this kind. Indeed, in some applica-
+tion like bioinformatics, one may want to predict from pro-
+teins a heterogeneous set of labels consisting of {gene func-
+tions, symptoms, diseases}1.
+In this situation, it is com-
+mon to predict symptoms from gene functions or diseases
+from symptoms. Here, we do not rely on an existing re-
+source providing explicit dependencies between the labels.
+Instead, we restrict ourselves to a good partition of the set
+of labels into two disjoint subsets G1 and G2 (G1∪G2 = L
+and G1 ∩ G2 = ∅) such that the labels in G1 are predictive
+of those in G2. To that end, we use the information gain as
+a criterion and formulate the problem as follows:
+
+arg max
+
+G1⊂L,|G1|≤k
+
+I(G2; G1) = H(G2) − H(G2|G1)
+
+(1)
+
+where H(·) is the entropy. Since (G1, G2) is a partition
+of L, if G1 is a Markov Blanket of G2, then I(G2; G1) is
+submodular and monotone because categories in G1 are in-
+
+1http://geneontology.org/
+
+Algorithm 1 Approximate MBC construction
+input Label matrix Y , partition size K = |G1|, approxi-
+mation parameter k
+set G1 = L, G2 = ∅
+for all (cid:96)i ∈ G1 do
+
+Ci = Top-k(cid:96)k∈G1Corr((cid:96)i, (cid:96)k)
+
+end for
+while |G1| < K do
+(cid:96)∗ ← arg max(cid:96)∈G1 I(G2 ∪ {(cid:96)∗}; G1 − {(cid:96)∗})
+G1 ← G1 − {(cid:96)∗}
+G2 ← G2 ∪ {(cid:96)∗}
+Update Ci for (cid:96)i : (cid:96)∗ ∈ Ci
+
+end while
+
+output (G1, G2)
+
+dependent given those in G2 (Krause & Guestrin, 2012).
+Therefore, the greedy algorithm would give a near op-
+timal solution ((1 − 1/e) approximation). However, if
+we start with (G2 = L, G1 = ∅), the independence as-
+sumption that guarantees the submodularity will clearly not
+hold. We use a backward procedure instead. We start with
+(G1 = L, G2 = ∅) and update G2 at each step by adding
+to it the label (cid:96)i ∈ G1 such that H(G2 ∪ {(cid:96)i}) − H(G2 ∪
+{(cid:96)i}|G1 − {(cid:96)i}) is maximal. The rationale behind this ap-
+proach is that if G1 is a Markov Blanket of G2 and (cid:96)i ∈ G1
+has its Markov Blanket in G1 − {(cid:96)i}, then G1 − {(cid:96)i} is
+a Markov Blanket of G2 ∪ {(cid:96)i} as proved in Theorem 3
+of (Koller & Sahami, 1995). The computation of the en-
+tropies at each step is exponential in the number of labels.
+To make this feasible, we use two approximations: (1) we
+only consider the combinations of labels represented in the
+training set. (2) Since H(G2|G1) decomposes into a sum
+of conditional entropies H((cid:96)i|G1) with (cid:96)i ∈ G2 (thanks to
+the independence), we restrict the conditioning set to the
+k most correlated labels of (cid:96)i in G1. Moreover, one could
+also add the features X in the conditioning set. However,
+this increases the complexity and does not improve the re-
+sults. The procedure is summarized in Algorithm 1 where
+Corr((cid:96)i, (cid:96)k) represents the correlation between the labels
+(cid:96)i and (cid:96)k. This algorithm can further be accelerated by
+caching intermediate results as in the lazy-greedy method
+for maximizing submodular functions (Minoux, 1978).
+We show in the experiments that the partition found by
+this method serves our purpose of building an architecture
+where G1 is predictive of G2. Besides, the partitions ob-
+tained by Algorithm 1 are stable as they do not vary much
+with respect to the size of the data used to construct them.
+For example, on Delicious dataset (983 labels), we observe
+only a small difference between the partition obtained by
+using 30% of the training data compared to the one ob-
+tained using the entire dataset. Table 1 shows examples of
+labels from G1 and G2 after partitioning Delicious data.
+
+ADIOS: Architectures Deep In Output Space
+
+Example G1 labels
+spanish,
+porn, webserver,
+ﬁlesystem, screen, webradio,
+databases, keyboard, gnome,
+divx, eclipse, amazing
+Example G2 labels
+movies,
+software, mobile,
+humour, apple, photography
+
+hardware,
+gadgets,
+
+videos,
+
+Figure 1 & Table 1. The classical MLP (a) and the proposed ADIOS (b) models. The green nodes denote inputs; the gray are hidden
+units, and the red are the output units that predict labels. The table provides examples of the labels from Delicious dataset that were
+assigned to G1 and G2 layers by the MBC partitioning: G1 got more speciﬁc labels, while G2 got more abstract or ambiguous.
+
+4. ADIOS Model
+In this section, we present the ADIOS model that exploits
+an (approximate) MBC partition of the labels to learn a
+neural network that is deep both in the input and the out-
+put spaces. The ﬁrst step towards this new model is the
+choice of a loss function suitable to the task of MLC. Re-
+cently, (Nam et al., 2014) has demonstrated that the Cross-
+Entropy (CE) should be preferred over other conventional
+loss functions in MLC such as the Pairwise Ranking loss
+when using neural networks for multilabel classiﬁcation.
+Indeed, the CE has several desirable properties. It scales
+better with the number of labels, and it is easier to optimize
+(thanks to a better landscape). Moreover, it is consistent
+with both the Hamming Loss (HL) and the ranking loss. In
+the particular case of the ADIOS model, CE is particularly
+interesting as it decomposes over the subsets of the MBC
+partition, hence naturally suggesting the architecture of the
+model and its corresponding learning algorithm.
+Proposition 1 Let D = {(x, y)}1≤i≤m sampled from the
+joint distribution (X × Y ), ((X, G1), G2) a Markov Blan-
+ket Chained partition of this distribution, and Gi(yk) de-
+notes the projection of a set of labels yk to Gi. The CE loss
+of a hypothesis h from a hypothesis class H is given by:
+
+m(cid:88)
+Θ (D) =
+LCE
+(cid:124)
+LCE
+
+i=1
+
+Θ1
+
+(cid:123)(cid:122)
+
+(cid:125)
+
++LCE
+
+Θ1,2
+
+(cid:124)
+
+(cid:123)(cid:122)
+
+(G1(yi), xi)
+
+(G2(yi), (xi, G1(yi)))
+
+ﬁrst layer CE
+
+second layer CE
+
+(cid:125)
+
+(2)
+
+Two main observations can be drawn from this proposition
+(see supplementary for the proof). First, it takes CE as used
+in (Nam et al., 2014) as a special case when G1 = L and
+G2 = ∅. Second, the loss function has a hierarchical struc-
+ture.
+It has two main parts taking respectively as input,
+the original feature vector xi, and the features xi combined
+
+with the label vector restricted to the subset G1, G1(y).
+Thus, predicting the categories G2(y) for a given test in-
+stance x would typically require G1(y) which is not known
+a priori. Therefore, it is necessary to rely on an estima-
+tion of G1(y) to predict G2(y). This implies the following
+question: why wouldn’t one ignore the dependence and di-
+rectly use x to predict G2(y)? The reason is, if G1 ∪ X
+is a Markov Blanket of G2, (G1(y), x) is a richer repre-
+sentations that can be more discriminative when predicting
+labels in G2. In particular, we show next that a neural net-
+work parameterization of the hypothesis h combined with
+our proposed learning algorithm results in a model that can
+more accurately predict G2(y) based on an estimation of
+G1(y) and X whenever G1 carries enough information.
+
+4.1. ADIOS DNN parameterization
+
+We parameterize ADIOS as a deep neural network (DNN)
+building on the conclusions from the recent application of
+these models in the context of MLC. The set of parame-
+ters in the vanilla DNNs is the weight matrices transferring
+a given instance from the input layer to the output, poten-
+tially through several hidden layers. In contrast, ADIOS
+model has two distinct sets of parameters in agreement with
+the loss function. The ﬁrst set of parameters, Θ1, operates
+in the input space and controls the prediction of G1(y). It
+consists of the weight matrices transferring the input x to
+the set of labels G1. The second set of parameters, Θ2,
+controls the prediction of G2(y).
+It contains the weight
+matrices going from the layer G1 to G2, potentially with
+additional matrices transferring information from the input
+to G2. The ﬁnal architecture has at least one input and two
+output layers as depicted in Figure 1b. Figure 1b corre-
+sponds to the following two cases: G1 (left) or (G1, X)
+(right) is a Markov Blanket of G2. The latter, which com-
+bines the information from the labels and the original fea-
+tures, is the one we consider for the rest of the paper.
+
+OutputInput(a) MLPXHG1G2H(b) ADIOSADIOS: Architectures Deep In Output Space
+
+4.2. ADIOS Learning
+
+For a ﬁxed architecture according to a partition (G1, G2)
+of the labels, learning the ADIOS model consists in mini-
+mizing the CE loss function deﬁned in Proposition 1. For
+the neural network parameterization described previously,
+this loss function decomposes into two main components
+to which we add regularization terms for the sets of param-
+eters Θ = {Θ1,Θ2}. For a given z = (x, y) we have:
+
+(z) + LCE
+
+Θ1,2
+
+(z) + Ω(Θ)
+
+(3)
+
+Θ (z) = LCE
+LCE
+and LCE
+
+Θ1
+
+Θ1
+
+Θ1,2
+
+are the CE losses calculated on the
+
+where LCE
+predictions of G1(y) and G2(y), respectively.
+As mentioned previously, G1(y) is usually not available at
+the test time. Hence, using G1(y) as input to ﬁt the param-
+eters Θ2 would cause a misﬁt between the train and test
+distributions. Therefore, during training, we resort to an
+estimate of G1(y) output by the ﬁrst part of the network.
+Various regularization procedures such as dropout (Srivas-
+tava et al., 2014) or batch normalization (Ioffe & Szegedy,
+2015) can be applied to hidden layers either to prevent over-
+ﬁtting or to accelerate training. However, we found beneﬁ-
+cial to add to each output layer a L1 penalty on the vector of
+its activations. This regularization constraints the network
+to produce sparse label vectors hence matching the sparsity
+of the output space in most MLC problems. Indeed for a
+given example, only a few labels are likely to be active at
+every output layer.
+All the parameters of the network are jointly optimized us-
+ing stochastic gradient descent. This naturally implements
+a sort of curriculum learning where we ﬁrst learn to predict
+the subset of labels G1, then build on top of this knowledge
+and learn to predict G2 by composing the previous predic-
+tions with a high-level representation of the inputs x given
+by hidden layers (see Figure 1b-left). Joint optimization
+also provides sharing of statistical strength through multi-
+tasking. In fact, due to the depth in the output space, there
+are two levels of multitasking: between labels of the same
+group and across different groups of tags. As we show
+in the experiments, this results in improved performance
+compared to the standard MLP with a ﬂat output layer. In
+fact, this multi-layer approach in the output space is akin
+to using recurrent networks to predict sequences of tokens,
+where the joint probability of the output sequence is fac-
+torized into the product of the probabilities of each token
+given the previous ones and the input.
+
+5. Experiments
+We conducted many experiments to verify the follow-
+ing claims:
+(1) the approximate Markov blankets, con-
+structed as described in Section 3, are often better pre-
+dictors of the rest of the labels than the original features,
+
+Table 2. Statistics of the datasets. Number of examples ranges
+from tens of thousands to a million. Last column provides infor-
+mation about the average number of labels per example.
+
+Dataset
+
+Size
+
+Inputs
+
+Labels
+
+Delicious
+MediaMill
+SUN2012
+NUS-WIDE
+BioASQ
+
+16,105
+43,907
+100,000
+269,648
+1,181,338
+
+500
+120
+1024
+500
+500
+
+983
+101
+2304
+81
+4587
+
+avg. labels
+per example
+
+19.0
+4.5
+9.8
+2.4
+4.7
+
+(2) label-based (explicit) high-level representations lead to
+better discrimination than hidden implicit features, and (3)
+ADIOS achieves the state-of-the-art results on popular and
+large datasets. Finally, we provide a few useful insights
+about the behavior of the models, deep in the output space.
+
+5.1. Datasets
+
+We used three readily available datasets that are popular
+in the multi-label community2: Delicious (text), MediaMill
+(video) and NUS-WIDE (images). Additionally, we prepro-
+cessed and used two other datasets of moderate and large
+size: image data from SUN2012 (Xiao et al., 2010) and text
+data from BioASQ competition of 20153.
+The SUN2012 image data was augmented to 100,000 ex-
+amples using small random shifts and rotations. Using
+the Caffe library (Jia et al., 2014), each image was passed
+through a version of GoogleNet (Szegedy et al., 2015) pre-
+trained on ImageNet and the last layer composed of 1024
+features were used as input to the ADIOS model. The la-
+bels were constructed from the object tags provided in the
+data.
+The BioASQ data consisted of abstracts of medical arti-
+cles and corresponding tags assigned by experts. We se-
+lected the 5000 most frequent tags and applied doc2vec (Le
+& Mikolov, 2014) to the corresponding abstracts using
+the gensim library4, producing 500-dimensional feature
+vectors per abstract, which were used as input to ADIOS.
+We further selected only the abstracts that were assigned
+at least four tags. This produced a multi-label dataset with
+approximately one million examples.
+All the datasets were randomly split into a ﬁxed training
+(60%), testing (20%) and validation sets (20%). The hyper-
+parameters of all the models (the baselines and our pro-
+posed ADIOS model) were tuned using the validation set.
+Statistics of all the datasets are summarized in Table 2.
+
+2http://mulan.sourceforge.net
+3http://bioasq.org
+4http://radimrehurek.com/gensim
+
+ADIOS: Architectures Deep In Output Space
+
+5.2. Experimental Setup
+Baselines. In our experiments, we compared ADIOS to the
+following baselines:
+
+• Binary Relevance (BR) — (also called one-vs-all) is a
+
+set of m independent logistic regression classiﬁers.
+
+• Principle Label Space Transformation (PLST) (Tai &
+Lin, 2012) learns a low dimensional representation of
+the labels by performing an SVD on the label matrix.
+Therefore, it assumes a low-rank label matrix and cap-
+tures correlations between the labels.
+
+• Multi-Label Prediction via Compressed Sensing
+(MLCS) (Hsu et al., 2009). This approach also as-
+sumes a low-rank label matrix. However, it embeds
+the labels in a lower dimensional space using random
+projections and relies on sparse recovery algorithms
+such as Orthogonal Matching Pursuit (OMP) or Lasso
+to recover the original labels from the predicted low
+dimensional representation.
+
+• FastXML (Prabhu & Varma, 2014) is an ensemble
+method that learns a set of hierarchies over the feature
+space to optimize the nDCG ranking metric.
+
+• Multi-Layer Perceptron (MLP) trained to minimize
+the cross-entropy (CE) loss as in (Nam et al., 2014).
+
+Hyper-parameters selection. For all the compared mod-
+els (ADIOS and baselines), we used the validation set to se-
+lect the hyper-parameters. For neural network models, we
+used hidden layers with 1024 ReLU units and trained the
+models using Adagrad with 20 to 50% dropout and batch
+normalization. Additionally, we used L2 regularization on
+the weight matrices and L1 activity regularization on the
+output layers when it improved performance (typical val-
+ues ranged between 10−4 to 10−3 for all the datasets).
+For PLST and MLCS, we used linear regression with L2
+regularization to predict the low-dimensional embedding
+of the labels. Moreover, we ﬁxed, the dimensionality of
+the embedding space to 500 on all datasets except on De-
+licious and NUS-WIDE where we used 50. Larger embed-
+ding dimensions did not increase performance. For MLCS,
+we used Lasso to recover the original labels. For FastXML,
+we ﬁxed the number of trees per ensemble to 50.
+Our model had a similar conﬁguration to MLP: one hidden
+layer with 1024 ReLU units between inputs and G1. We
+then added another 512-dimensional ReLU hidden layer
+between the hidden layer before G1 and G2 as well as di-
+rect connections between G1 and G2, as illustrated in the
+third diagram in Figure 1. Both hidden layers were regu-
+larized with 20-50% dropout and batch normalization. Ad-
+ditionally, activity regularization (with 10−4 to 10−3 coef-
+ﬁcients) was imposed on the output layers. ADIOS models
+
+were implemented as an extension of the Keras machine
+learning library5.
+Metrics. One of the crucial differences between the tradi-
+tional multi-class (or binary) and the multi-label settings is
+the evaluation metrics of interest. While performance on
+the former task is well summarized by two principal mea-
+sures, precision and recall (and their combinations, such as
+F1), performance on the latter can be assessed in a variety
+of ways (Tsoumakas & Katakis, 2007). The main metrics
+used for comparison are Macro-F1 and Micro-F1, which
+are computed as follows:
+
+• Macro-F1 is a category-based evaluation measure. It
+weighs all categories equally and hence is more sensi-
+tive to the ability of the classiﬁer to detect rare classes.
+Denoting the precision and recall of category c by Pc
+and Rc, respectively, Macro-F1 is given by:
+
+Pc =
+
+TPc
+
+TPc + FPc
+
+Macro-F1 =
+
+, Rc =
+
+(cid:88)
+
+c∈C
+
+,
+
+TPc
+TPc + FNc
+2Pc · Rc
+Pc + Rc
+
+.
+
+1
+|C|
+
+where TPc, FPc and FNc denote respectively the true-
+positives, false-positives, and false-negatives for the
+class label c ∈ C.
+
+• Micro-F1 is an instance-based evaluation measure
+and therefore weights higher categories that have
+higher fraction in the test set:
+
+• Precision@K: It is the fraction of correct predictions
+among the ﬁrst K predicted labels. It measures how
+well an algorithm performs as a ranking model.
+
+Prediction. Both the baselines and ADIOS, once trained,
+return scores for each label that need to be turned into spe-
+ciﬁc predictions via thresholding. In the multilabel setting,
+mere 0.5 threshold is usually suboptimal regarding the met-
+rics of interest. Therefore, we employ adaptive threshold-
+ing (Nam et al., 2014): For a given trained model (a base-
+line or ADIOS), for each sample in the training data, we
+ﬁnd a threshold that maximizes F1 score when applied to
+the model’s predictions. Next, we regress features of the
+training data to these optimal thresholds. Finally, when
+the model is tested on a new example, we obtain both
+the scores (returned by the model) and the adaptive label-
+speciﬁc thresholds (predicted using regression)6.
+
+5Keras library: http://keras.io. Our code is available
+
+at https://github.com/alshedivat/adios.
+
+6The only exception in our experiments was FastXML model
+
+(cid:80)
+
+(cid:80)
+
+P =
+
+c∈C TPc
+
+c∈C TPc + FPc
+
+, R =
+
+Micro-F1 = 2
+
+(cid:80)
+
+(cid:80)
+
+P · R
+P + R
+
+c∈C TPc
+
+c∈C TPc + FNc
+.
+
+,
+
+ADIOS: Architectures Deep In Output Space
+
+Table 3. Predictiveness of features and MBC labels. Macro F1
+score and P@5 were computed on the labels assigned to G2 pre-
+dicted either from the features, X, or from the labels of G1.
+
+Table 4. Performance of the baselines and ADIOS on the ﬁve
+datasets. The metrics used are macro F1 (maF1), micro F1 and
+precision at K (P@K) for K = 1, 5, 10.
+
+Dataset
+
+X size G1 size
+
+Delicious
+MediaMill
+NUS-WIDE
+
+500
+120
+500
+
+500
+50
+40
+
+maF1 on G2
+X
+G1
+38.70
+22.57
+10.64
+
+21.54
+11.49
+11.93
+
+P@5 on G2
+X
+G1
+55.61
+47.44
+45.48
+17.36
+25.36
+12.83
+
+5.3. Results
+Predictiveness of Markov blankets. We start by validat-
+ing our claim that given a good approximate MBC partition
+of the labels into (G1, G2), the labels in G1 can, in fact, be
+better predictors of the labels in G2 than the original fea-
+tures. To that end, we ﬁrst do an MBC partition of the set
+of labels into two equal subsets G1 and G2. Then, we com-
+pare an MLP trained on the original features with an MLP
+trained on the labels from G1 (i.e., using them as input vec-
+tors) to predict the labels in G2. In this task, we performed
+experiments on three of the datasets and measured macro
+F1 and P @5 to capture the global performance and good-
+ness of ranking.
+The results are presented in Table 3. We notice that the ﬁrst
+two datasets, Delicious, and MediaMill, Markov blankets
+turn out to be far more predictive than the original features
+regarding the macro F1 score. In other words, G1 labels
+are better at predicting rare items in G2. At the same time,
+features turn out to be outperforming G1 representations
+concerning P @5 metric, which means that they are better
+associated with the dominant (highly frequent) labels.
+Interestingly, we observe quite an opposite behavior of pre-
+dictiveness of features and G1 on the NUS-WIDE data.
+Features marginally outperform G1 labels in macro F1, but
+achieve twice lower P @5 score. Such behavior is poten-
+tially the consequence of the low ratio of the number of
+labels to the number of features in this dataset. Therefore,
+the labels in G1 can capture only strong correlations while
+the features possess higher discriminative power over all
+the labels.
+Nevertheless, we see that Markov blankets indeed have ad-
+ditional discriminative power on one or the other metric.
+Therefore, a clever combination of the information from
+features and G1 labels can help to overcome performance
+trade-offs. We further show that joint training of the pro-
+posed ADIOS model with the additional hidden layer can
+use this information and achieve state-of-the-art results re-
+garding both global and ranking metrics.
+The main result. We now compare ADIOS to the previ-
+ously described baselines on ﬁve datasets. To further vali-
+
+which underperformed when adaptive thresholding was applied.
+Therefore, we used FastXML as is.
+
+Data
+
+s
+u
+o
+i
+c
+i
+l
+e
+D
+
+l
+l
+i
+
+M
+
+a
+i
+d
+e
+M
+
+2
+1
+0
+2
+N
+U
+S
+
+I
+
+E
+D
+W
+-
+S
+U
+N
+
+Q
+S
+A
+o
+i
+B
+
+Model
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+maF1
+14.32
+9.37
+2.08
+11.34
+15.12
+15.47
+17.69
+
+7.00
+6.56
+2.91
+11.16
+9.71
+14.72
+16.01
+
+0.38
+0.38
+0.72
+0.56
+0.09
+0.15
+0.18
+
+7.94
+4.38
+1.87
+6.14
+14.00
+11.41
+14.14
+
+0.03
+0.03
+0.03
+0.19
+14.86
+15.91
+16.14
+
+miF1
+36.49
+36.22
+20.14
+23.13
+38.81
+38.93
+39.31
+
+57.27
+56.57
+49.58
+33.25
+59.06
+56.22
+60.01
+
+0.47
+0.47
+0.76
+0.91
+28.61
+27.29
+30.32
+
+31.60
+37.60
+28.23
+11.93
+42.09
+41.87
+41.85
+
+14.69
+14.69
+14.73
+3.80
+42.40
+43.11
+43.49
+
+P@1
+43.48
+41.85
+32.90
+68.38
+68.12
+67.81
+69.66
+
+65.31
+65.12
+73.30
+82.45
+86.93
+87.55
+88.53
+
+55.27
+55.27
+35.55
+54.42
+55.27
+54.43
+56.42
+
+37.77
+40.49
+27.75
+41.76
+51.72
+55.46
+56.39
+
+13.74
+13.80
+11.98
+19.55
+67.46
+66.97
+67.28
+
+P@5
+40.29
+39.90
+22.26
+58.58
+57.14
+58.36
+59.13
+
+43.79
+44.60
+39.73
+51.98
+55.12
+55.56
+56.12
+
+40.55
+40.55
+23.19
+39.98
+40.55
+40.21
+40.86
+
+18.88
+21.70
+18.54
+22.17
+27.53
+29.50
+29.65
+
+13.49
+13.48
+13.95
+13.68
+41.32
+40.96
+41.77
+
+P@10
+38.58
+38.90
+22.39
+49.50
+48.81
+49.26
+49.36
+
+23.62
+23.67
+20.94
+33.24
+35.47
+35.57
+35.77
+
+28.79
+28.75
+14.83
+28.07
+28.79
+28.57
+28.80
+
+11.40
+13.85
+12.37
+14.01
+17.87
+18.68
+19.71
+
+6.78
+6.77
+7.01
+9.20
+27.52
+27.46
+27.98
+
+Table 5. Performance rank of the models on different metrics av-
+eraged over all datasets.
+
+Model
+
+BR
+PLST
+MLCS
+FastXML
+MLP
+ADIOSRND
+ADIOSMBC
+
+Average performance rank on a given metric
+maF1
+P@10
+5.8
+4.0
+5.4
+5.0
+6.0
+5.4
+4.0
+3.2
+2.6
+3.6
+2.4
+2.8
+1.6
+1.2
+
+miF1
+4.6
+4.8
+6.0
+6.2
+2.2
+3.0
+1.2
+
+P@1
+5.2
+5.6
+6.0
+3.4
+2.8
+2.8
+1.2
+
+P@5
+5.4
+5.6
+6.0
+3.8
+2.8
+2.6
+1.0
+
+date the importance of learning a partition and the effective-
+ness of Algorithm 1, we also demonstrate the performance
+of an ADIOS architecture for which the partitions (G1, G2)
+
+ADIOS: Architectures Deep In Output Space
+
+Figure 2. Left two charts: Macro F1 computed on G2 labels for ADIOS and MLP on Delicious and MediaMill. Both models had the
+same number of parameters. Right two charts: Macro F1 for MLP and ADIOS trained on small subsets of Delicious and MediaMill.
+
+are created at random. We call this approach ADIOSRND
+as opposed to the model using a learned partition which
+we denote ADIOSMBC. On each dataset, ADIOSRND has
+the same architecture as the best performing ADIOSMBC
+model. All the results are shown in Table 4. This table is
+complemented by Table 5 that contains the average ranks
+of every approach over the datasets on each of the ﬁve per-
+formance measures we use. The average ranks are used
+to decide the signiﬁcance of the of the results by using a
+Bonferroni-Dunn test as suggested by Demˇsar (2006).
+First, ADIOSMBC consistently outperforms all the com-
+pared methods on all the datasets across all the performance
+measures we consider in this study.
+Indeed, it achieves
+good results both on ranking metrics and classiﬁcation ones
+while most of the other baselines are more specialized to
+one metric. For example, FastXML is particularly opti-
+mized for ranking (it is trained by minimizing nDCG);
+as a result, it achieves good P @K while having low F1-
+measures globally.
+As suggested by the results of Table 3, combining the
+soft predictions of G1 with high level hidden features to
+predict labels in G2 boosts performance even when the
+original features are supposedly more predictive of labels
+in G2. This is typically the case for the NUS-WIDE
+dataset where such combination leads to improved Macro
+F1 score. Note that to achieve such improvements; it was
+important to learn a proper approximate MBC partition
+of the labels rather than randomly assign them to G1 and
+G2 layers. Indeed, on the same NUS-WIDE dataset, for
+example, ADIOSRND has substantially lower classiﬁcation
+scores (Micro and Macro F-measures) than MLP despite
+using the same architecture as ADIOSMBC.
+In real-world multi-label applications, it is often the case
+that only a handful of target labels is of particular interest.
+In such case, one may use the rest of the labels as auxil-
+iary to form an approximate Markov blanket for the target
+labels. We compared ADIOSMBC and MLP in such sce-
+nario on Delicious and MediaMill data by varying the size
+
+of G1 layer and testing both models on G2 labels only. The
+left two charts of Figure 2 demonstrate the superiority of
+ADIOS.
+Also, as depicted in the right two plots of Figure 2,
+ADIOSMBC has a better behavior than MLP in the small
+sample setting. In particular on MediaMill, when we con-
+sider only 40% of the training data, the Macro F-1 of
+ADIOS is almost twice as good as MLP. This opens sev-
+eral perspectives regarding a better use of supervision to
+boost classiﬁcation performance when data is scarce.
+
+6. Perspectives
+As available datasets become bigger and richer in terms of
+their annotations, multi-label classiﬁcation becomes an im-
+portant class of problems to handle with modern machine
+learning approaches. The advent of deep architectures has
+mostly focused on extracting complex representations from
+input data. In this paper, we presented ADIOS, an approach
+to better learn problems with underlying unknown struc-
+tured label space. We have shown that using a factor repre-
+sentation of labels, determined by a learned Markov Blan-
+ket can result in improved performance with reduced com-
+plexity. While we have experimented with only 2 layers of
+labels, some problems can potentially beneﬁt from an even
+deeper factorization. The approach could also be useful for
+zero-shot learning when one wants to predict G2 in situ-
+ations where only G1 is observed during training. It also
+paves the way to new methods for transfer learning when
+the information for G1 is available, but the actual task of
+interest is G2.
+
+Acknowledgements
+M.C thanks Nicolas Usunier and Florent Perronnin for
+their insightful comments on the initial version of this
+manuscript. Part of this work was done while M.C. and
+M.A were at KAUST. We also thank LIP6-UPMC for ac-
+cess to its computational resources.
+
+01020304050607080SizeofG1(%)16182022242628MacroF1onG2(%)DeliciousMLPADIOS01020304050607080SizeofG1(%)681012141618202224MacroF1onG2(%)MediaMillMLPADIOS01020304050607080Trainingsetsize(%)024681012141618MacroF1(%)DeliciousMLPADIOS01020304050607080Trainingsetsize(%)246810121416MacroF1(%)MediaMillMLPADIOSADIOS: Architectures Deep In Output Space
+
+References
+Bengio, Samy, Dean, Jeff, Erhan, Dumitru, Ie, Eugene, Le, Quoc,
+Rabinovich, Andrew, Shlens, Jonathon, and Singer, Yoram.
+Using web co-occurrence statistics for improving image cat-
+egorization. arXiv preprint arXiv:1312.5697, 2013a.
+
+Bengio, Yoshua, Courville, Aaron, and Vincent, Pascal. Repre-
+sentation learning: A review and new perspectives. Pattern
+Analysis and Machine Intelligence, IEEE Transactions on, 35
+(8):1798–1828, 2013b.
+
+Caruana, Rich. Multitask learning. Machine learning, 28(1):41–
+
+75, 1997.
+
+Cisse, Moustapha M, Usunier, Nicolas, Artieres, Thierry, and
+Gallinari, Patrick. Robust bloom ﬁlters for large multilabel
+In Advances in Neural Information Pro-
+classiﬁcation tasks.
+cessing Systems, pp. 1851–1859, 2013.
+
+Dembczy´nski, Krzysztof, Waegeman, Willem, Cheng, Weiwei,
+and H¨ullermeier, Eyke. On label dependence and loss mini-
+mization in multi-label classiﬁcation. Machine Learning, 88
+(1-2):5–45, 2012.
+
+Demˇsar, Janez. Statistical comparisons of classiﬁers over multiple
+data sets. The Journal of Machine Learning Research, 7:1–30,
+2006.
+
+Deng, Jia, Dong, Wei, Socher, Richard, Li, Li-Jia, Li, Kai,
+and Fei-Fei, Li.
+Imagenet: A large-scale hierarchical image
+database. In Computer Vision and Pattern Recognition, 2009.
+CVPR 2009. IEEE Conference on, pp. 248–255. IEEE, 2009.
+
+Deng, Jia, Ding, Nan, Jia, Yangqing, Frome, Andrea, Murphy,
+Kevin, Bengio, Samy, Li, Yuan, Neven, Hartmut, and Adam,
+Hartwig. Large-scale object classiﬁcation using label relation
+graphs. In Computer Vision–ECCV 2014, pp. 48–64. Springer,
+2014.
+
+Duchi, John, Hazan, Elad, and Singer, Yoram. Adaptive subgra-
+dient methods for online learning and stochastic optimization.
+The Journal of Machine Learning Research, 12:2121–2159,
+2011.
+
+Glorot, Xavier, Bordes, Antoine, and Bengio, Yoshua. Deep
+In Proceedings of the 14th Inter-
+sparse rectiﬁer networks.
+national Conference on Artiﬁcial Intelligence and Statistics.
+JMLR W&CP Volume, volume 15, pp. 315–323, 2011.
+
+Hariharan, B., Zelnik-Manor, L., Vishwanathan, S. V. N., and
+Varma, M. Large scale max-margin multi-label classiﬁcation
+with priors. In Proceedings of the International Conference on
+Machine Learning, June 2010.
+
+Hinton, Geoffrey E, Srivastava, Nitish, Krizhevsky, Alex,
+Sutskever, Ilya, and Salakhutdinov, Ruslan R. Improving neu-
+ral networks by preventing co-adaptation of feature detectors.
+arXiv preprint arXiv:1207.0580, 2012.
+
+Hsu, Daniel, Kakade, Sham, Langford, John, and Zhang, Tong.
+Multi-label prediction via compressed sensing. In NIPS, vol-
+ume 22, pp. 772–780, 2009.
+
+Ioffe, Sergey and Szegedy, Christian. Batch normalization: Ac-
+celerating deep network training by reducing internal covariate
+shift. In Proceedings of The 32nd International Conference on
+Machine Learning, pp. 448–456, 2015.
+
+Jean, Sebastien, Cho, Kyunghyun, Memisevic, Roland, and Ben-
+gio, Yoshua. On using very large target vocabulary for neural
+machine translation. arXiv preprint arXiv:1412.2007, 2014.
+
+Jia, Yangqing, Shelhamer, Evan, Donahue, Jeff, Karayev, Sergey,
+Long, Jonathan, Girshick, Ross, Guadarrama, Sergio, and Dar-
+rell, Trevor. Caffe: Convolutional architecture for fast feature
+embedding. arXiv preprint arXiv:1408.5093, 2014.
+
+Koller, Daphne and Sahami, Mehran. Toward optimal feature se-
+lection. In 13th International Conference on Machine Learn-
+ing, 1995.
+
+Krause, Andreas and Guestrin, Carlos E. Near-optimal nonmy-
+opic value of information in graphical models. arXiv preprint
+arXiv:1207.1394, 2012.
+
+Le, Quoc V and Mikolov, Tomas. Distributed representations
+of sentences and documents. arXiv preprint arXiv:1405.4053,
+2014.
+
+Minoux, Michel. Accelerated greedy algorithms for maximiz-
+ing submodular set functions. In Optimization Techniques, pp.
+234–243. Springer, 1978.
+
+Nam, Jinseok, Kim, Jungi, Menc´ıa, Eneldo Loza, Gurevych,
+Iryna, and F¨urnkranz, Johannes. Large-scale multi-label text
+classiﬁcation—revisiting neural networks. In Machine Learn-
+ing and Knowledge Discovery in Databases, pp. 437–452.
+Springer, 2014.
+
+Olshausen, Bruno A and Field, David J. Sparse coding with an
+overcomplete basis set: A strategy employed by V1? Vision
+research, 37(23):3311–3325, 1997.
+
+Partalas,
+
+Ioannis, Kosmopoulos, Aris, Baskiotis, Nicolas,
+Artieres, Thierry, Paliouras, George, Gaussier, Eric, Androut-
+sopoulos, Ion, Amini, Massih-Reza, and Galinari, Patrick.
+Lshtc: A benchmark for large-scale text classiﬁcation. arXiv
+preprint arXiv:1503.08581, 2015.
+
+Pearl, Judea. Probabilistic reasoning in intelligent systems: net-
+
+works of plausible inference. Morgan Kaufmann, 2014.
+
+Prabhu, Yashoteja and Varma, Manik. Fastxml: a fast, accurate
+and stable tree-classiﬁer for extreme multi-label learning. In
+Proceedings of the 20th ACM SIGKDD international confer-
+ence on Knowledge discovery and data mining, pp. 263–272.
+ACM, 2014.
+
+Read, Jesse, Pfahringer, Bernhard, Holmes, Geoff, and Frank,
+Eibe. Classiﬁer chains for multi-label classiﬁcation. Machine
+learning, 85(3):333–359, 2011.
+
+Singhal, Amit.
+
+strings. Ofﬁcial Google Blog, May, 2012.
+
+Introducing the knowledge graph:
+
+things, not
+
+Srivastava, Nitish, Hinton, Geoffrey, Krizhevsky, Alex, Sutskever,
+Ilya, and Salakhutdinov, Ruslan. Dropout: A simple way to
+prevent neural networks from overﬁtting. The Journal of Ma-
+chine Learning Research, 15(1):1929–1958, 2014.
+
+Szegedy, Christian, Liu, Wei, Jia, Yangqing, Sermanet, Pierre,
+Reed, Scott, Anguelov, Dragomir, Erhan, Dumitru, Van-
+houcke, Vincent, and Rabinovich, Andrew. Going deeper with
+convolutions. In Proceedings of the IEEE Conference on Com-
+puter Vision and Pattern Recognition, pp. 1–9, 2015.
+
+ADIOS: Architectures Deep In Output Space
+
+Tai, Farbound and Lin, Hsuan-Tien. Multilabel classiﬁcation with
+principal label space transformation. Neural Computation, 24
+(9):2508–2542, 2012.
+
+Tsoumakas, Grigorios and Katakis, Ioannis. Multi-label classi-
+ﬁcation: An overview. Int J Data Warehousing and Mining,
+2007:1–13, 2007.
+
+Weston, Jason, Makadia, Ameesh, and Yee, Hector. Label parti-
+tioning for sublinear ranking. In Proceedings of the 30th In-
+ternational Conference on Machine Learning (ICML-13), pp.
+181–189, 2013.
+
+Xiao, Jianxiong, Hays, James, Ehinger, Krista A, Oliva, Aude,
+and Torralba, Antonio. Sun database: Large-scale scene recog-
+In Computer vision and pattern
+nition from abbey to zoo.
+recognition (CVPR), 2010 IEEE conference on, pp. 3485–
+3492. IEEE, 2010.
+
+Zaragoza, Julio H, Sucar, Luis Enrique, Morales, Eduardo F,
+Bielza, Concha, and Larranaga, Pedro. Bayesian chain classi-
+ﬁers for multidimensional classiﬁcation. In IJCAI, volume 11,
+pp. 2192–2197, 2011.
+
+

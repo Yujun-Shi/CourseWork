@@ -1,0 +1,1363 @@
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+Brooks Paige
+Frank Wood
+Department of Engineering Science, University of Oxford
+
+BROOKS@ROBOTS.OX.AC.UK
+FWOOD@ROBOTS.OX.AC.UK
+
+Abstract
+
+We introduce a new approach for amortizing in-
+ference in directed graphical models by learning
+heuristic approximations to stochastic inverses,
+designed speciﬁcally for use as proposal distri-
+butions in sequential Monte Carlo methods. We
+describe a procedure for constructing and learn-
+ing a structured neural network which represents
+an inverse factorization of the graphical model,
+resulting in a conditional density estimator that
+takes as input particular values of the observed
+random variables, and returns an approximation to
+the distribution of the latent variables. This recog-
+nition model can be learned ofﬂine, independent
+from any particular dataset, prior to performing
+inference. The output of these networks can be
+used as automatically-learned high-quality pro-
+posal distributions to accelerate sequential Monte
+Carlo across a diverse range of problem settings.
+
+1. Introduction
+Recently proposed methods for Bayesian inference based
+on sequential Monte Carlo (Doucet et al., 2001) have shown
+themselves to provide state-of-the art results in applications
+far broader than the traditional use of sequential Monte
+Carlo (SMC) for ﬁltering in state space models (Gordon
+et al., 1993; Pitt and Shephard, 1999), with diverse appli-
+cation to factor graphs (Naesseth et al., 2014), hierarchical
+Bayesian models (Lindsten et al., 2014), procedural gen-
+erative graphics (Ritchie et al., 2015), and general prob-
+abilistic programs (Wood et al., 2014; Todeschini et al.,
+2014). These are accompanied by complementary compu-
+tational advances, including memory-efﬁcient implementa-
+tions (Jun and Bouchard-Cˆot´e, 2014), and highly-parallel
+variants (Murray et al., 2014; Paige et al., 2014).
+All these algorithms, however, share the need for specifying
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume 48.
+Copyright 2016 by the author(s).
+
+a series of proposal distributions, used to sample candidate
+values at each stage of the algorithm. Sequential Monte
+Carlo methods perform inference progressively, iteratively
+targeting a sequence of intermediate distributions which cul-
+minates in a ﬁnal target distribution. Well-chosen proposal
+distributions for transitioning from one intermediate target
+distribution to the next can lead to sample-efﬁcient infer-
+ence, and are necessary for practical application of these
+methods to difﬁcult inference problems. Theoretically opti-
+mal proposal distributions (Doucet et al., 2000; Cornebise
+et al., 2008) are in general intractable, thus in practice im-
+plementing these algorithms requires either active (human)
+work to design an appropriate proposal distribution prior
+to sampling, or using an online estimation procedure to
+approximate the optimal proposal during inference (as in
+e.g. Van Der Merwe et al. (2000) or Cornebise et al. (2014)
+for state-space models). In many cases, a baseline proposal
+distribution which simulates from a prior distribution can be
+used, analogous to the so-called bootstrap particle ﬁlter for
+inference in state-space models; however, when confronted
+with tightly peaked likelihoods (i.e. highly informative ob-
+servations), proposing from the prior distribution may be
+arbitrarily statistically inefﬁcient (Del Moral and Murray,
+2015). Furthermore, for some choices of sequences of den-
+sities there is no natural prior distribution, or even it may
+not be available in closed form. All in all, the need to design
+appropriate proposal distributions is a real impediment to
+the automatic application of these SMC methods to new
+models and problems.
+This paper investigates how autoregressive neural network
+models for modeling probability distributions (Bengio and
+Bengio, 1999; Uria et al., 2013; Germain et al., 2015) can
+be leveraged to automate the design of model-speciﬁc pro-
+posal distributions for sequential Monte Carlo. We propose
+a method for learning proposal distributions for a given
+probabilistic generative model ofﬂine, prior to performing
+inference on any particular dataset. The learned proposals
+can then be reused as desired, allowing SMC inference to be
+performed quickly and efﬁciently for the same probabilistic
+model, but for new data — that is, for new settings of the
+observed random variables — once we have incurred the
+up-front cost of learning the proposals.
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+We thus present this work as an amortized inference proce-
+dure in the sense of Gershman and Goodman (2014), in that
+it takes a model as its input and generates an artifact which
+then can be leveraged for accelerating future inference tasks.
+Such procedures have been considered for other inference
+methods: learning idealized Gibbs samplers ofﬂine for mod-
+els in which closed-form full conditionals are not available
+(Stuhlm¨uller et al., 2013), using pre-trained neural networks
+to inform local MCMC proposal kernels (Jampani et al.,
+2015; Kulkarni et al., 2015), and learning messages for new
+factors for expectation-propagation (Heess et al., 2013). In
+the context of SMC, ofﬂine learning of high-quality proposal
+distributions provides a similar opportunity for amortizing
+runtime costs of inference, while simultaneously automating
+a currently-manual process.
+
+p(x, y) (cid:44) N(cid:89)
+
+M(cid:89)
+
+2. Preliminaries
+A directed graphical model, or Bayesian network (Pearl
+and Russell, 1998), deﬁnes a joint probability distribu-
+tion and conditional independence structure via a directed
+acyclic graph. For each xi in a set of random variables
+x1, . . . , xN , the network structure speciﬁes a conditional
+density pi(xi|PA(xi)), where PA(xi) denotes the parent
+nodes of xi. Inference tasks in Bayesian networks involve
+marking certain nodes as observed random variables, and
+characterizing the posterior distribution of the remaining
+latent nodes. The joint distribution over N latent random
+variables x and M observed random variables y is deﬁned
+as
+
+fi (xi|PA(xi))
+
+gj (yj|PA(yj)) ,
+
+(1)
+
+i=1
+
+j=1
+
+where fi and gj refer to the probability density or mass
+functions associated with the respective latent and observed
+random variables xi, yj. Posterior inference in directed
+graphical models entails using Bayes’ rule to estimate the
+posterior distribution of the latent variables x given partic-
+ular observed values y; that is, to characterize the target
+density π(x) ≡ p(x|y). In most models, exact posterior
+inference is intractable, and one must resort to either varia-
+tional or ﬁnite-sample approximations.
+
+2.1. Sequential Monte Carlo
+
+Importance sampling methods approximate expectations
+with respect to a (presumably intractable) distribution π(x)
+by weighting samples drawn from a (presumably sim-
+pler) proposal distribution q(x). In graphical models, with
+π(x) ≡ p(x|y), we deﬁne an unnormalized target density
+γ(x) ≡ p(x, y) such that π(x) = Z−1γ(x), where the
+normalizing constant Z is unknown.
+The sequential Monte Carlo algorithms we consider (Doucet
+
+et al., 2001) for inference on an N−dimensional latent
+space x1:N proceed by incrementally importance sampling
+a weighted set of K particles, with interspersed resam-
+pling steps to direct computation towards more promising
+regions of the high-dimensional space. We break the prob-
+lem of estimating the posterior distribution of x1:N into a
+series of simpler lower-dimensional problems by construct-
+ing an artiﬁcial sequence of target densities π1, . . . , πN
+(and corresponding unnormalized densities γ1, . . . , γN ) de-
+ﬁned on increasing subsets x1:n, n = 1, . . . , N, where the
+ﬁnal πN ≡ π is the full target posterior of interest. At
+each intermediate density, the importance sampling density
+qn+1(xn+1|x1:n) only needs to adequately approximate a
+low-dimensional step from x1:n to xn+1.
+Procedurally, we initialize at n = 1 by sampling K values
+of x1 from a proposal density q1(x1), and assigning each of
+these particles xk
+
+1 an associated importance weight
+γ1(xk
+1)
+q1(xk
+1)
+
+w1(xk
+1)
+j=1 w1(xj
+1)
+
+(cid:80)K
+
+, W k
+
+1 =
+
+.
+
+(2)
+
+w1(xk
+
+1) =
+
+For each subsequent n = 2, . . . , N, we ﬁrst resample the
+particles according to the normalized weights at W k
+n−1, pref-
+erentially duplicating high-weight particles and discarding
+those with low weight. To do this we draw particle ances-
+tor indices a1
+n−1 from a resampling distribution
+r(·|W 1
+n−1) corresponding to any standard re-
+sampling scheme (Douc et al., 2005). We then extend each
+particle by sampling a value for xk
+n from the proposal kernel
+qn(xk
+
+n|·), and update the importance weights
+
+n−1, . . . , W K
+
+n−1, . . . , aK
+
+wn(xk
+
+1:n) =
+
+W k
+
+n =
+
+γn−1(x
+
+γn(xk
+1:n)
+ak
+n−1
+1:n−1)qn(xk
+wn(xk
+1:n)
+j=1 wn(xj
+
+1:n)
+
+.
+
+(cid:80)K
+
+n|x
+
+ak
+n−1
+1:n−1)
+
+,
+
+(3)
+
+(4)
+
+We can approximate expectations with respect to the target
+density π(x1:N ) using the SMC estimator
+
+ˆπ(x1:K
+
+1:N ) =
+
+W k
+
+N δxk
+
+1:N
+
+(x1:N ),
+
+(5)
+
+where δ(·) is a Dirac point mass.
+
+k=1
+
+2.2. Target densities and proposal kernels
+
+The choice of incremental target densities is application-
+speciﬁc;
+innovation in SMC algorithms often involves
+proposing novel manners for constructing sequences of in-
+termediate distributions. These incremental densities do
+not necessarily need to correspond to marginal distributions
+of full target. Particularly relevant recent work directed
+towards improving SMC inference in the same class of mod-
+els we address includes the Biips ordering and arrangement
+
+K(cid:88)
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+algorithm (Todeschini et al., 2014), the divide and conquer
+approach (Lindsten et al., 2014), and heuristics for scoring
+orderings in general factor graphs (Naesseth et al., 2014;
+2015). All these methods provide a means for selecting a
+sequence of intermediate target densities — however, given
+a sequence of targets, one still must supply an appropriate
+proposal density.
+The ideal choice for this proposal in general is found by
+proposing directly from the incremental change in densities
+(Doucet et al., 2000), with
+
+. (6)
+
+πn−1(x1:n−1)
+
+γn−1(x1:n−1)
+
+πn(x1:n)
+
+∝ γn(x1:n)
+
+n (xn|x1:n−1) =
+qopt
+Using this proposal, each of the unnormalized weights in
+Equation (3) are independent of the sampled values of xk
+n. In
+practice this conditional density is nearly always intractable,
+and one must resort to approximation.
+Adaptive importance sampling methods aim to learn the op-
+timal proposal online during the course of inference, imme-
+diately prior to proposing values for the next target density.
+In both in the context of population Monte Carlo (PMC)
+(Capp´e et al., 2008) and sequential Monte Carlo (Cornebise
+et al., 2008; 2014; Gu et al., 2015), a parametric family
+q(x|λ) is proposed, with λ is a free parameter, and the adap-
+tive algorithms aim to minimize either the reverse Kullback-
+Leibler (KL) divergence or Chi-squared distance between
+the approximating family q(x|λ) and the optimal proposal
+density. This can be optimized via stochastic gradient de-
+scent (Gu et al., 2015), or for speciﬁc forms of q by online
+Monte Carlo expectation maximization, both for population
+Monte Carlo (Capp´e et al., 2008) and in state-space models
+(Cornebise et al., 2014). Note that this is the reverse of the
+KL divergence traditionally used in variational inference
+(Jordan et al., 1999), and takes the form of an expectation
+with respect to the intractable target distribution.
+
+2.3. Neural autoregressive distribution estimation
+As a general model class for q(x|·), we adapt recent ad-
+vances in ﬂexible neural network density estimators, appro-
+priate for both discrete and continuous high-dimensional
+data. We focus particularly on the use of autoregressive neu-
+ral network density estimation models (Bengio and Bengio,
+1999; Larochelle and Murray, 2011; Uria et al., 2013; Ger-
+main et al., 2015) which model high-dimensional distribu-
+tion by learning a sequence of one-dimensional conditional
+distributions; that is, learning each product term in
+
+p(x) =
+
+p(xn|x1, . . . , xn−1),
+
+(7)
+
+N(cid:89)
+
+h(x) = σw(b + (W (cid:12) Mw)x)
+ˆx = σv(c + (V (cid:12) Mv)h(x)),
+
+ﬁts an autoregressive model to binary data, with structure
+inspired by autoencoders. In its simplest form, a single-
+layer MADE model described on N−dimensional binary
+data x ∈ [0, 1]N has a hidden layer h(x) and output ˆx with
+(8)
+(9)
+where b, c, W, V are real-valued parameters to be learned,
+(cid:12) denotes elementwise multiplication, σw, σv are nonlin-
+ear functions, and Mw, Mv are ﬁxed binary masks. Criti-
+cally, the construction of the masks is such that computing
+the network output for each ˆxn requires only the inputs
+x1, . . . , xn−1, with the zeros in the masks dropping the con-
+nections. The masks are generated by assigning each unit in
+each hidden layer a number from 1, . . . , N − 1, describing
+which of the dimensions x1, . . . , xn−1 it is permitted to take
+as input; output units then are only permitted to take as input
+hidden nodes numbered lower than their output.
+With a logistic function sigmoid as σv, then ˆxn can be in-
+terpreted as p(xn|x1, . . . , xn−1), and to compute ˆxn one
+does not need supply any value as input to h(x) for the
+dimensions xn, . . . , xN . That is, if one follows all connec-
+tions “back” through the network from ˆxn to the input x,
+one would ﬁnd only themselves at x1, . . . , xn−1.
+
+3. Approach
+Our approach is two-fold. First, given a Bayesian net-
+work that acts as a generative model for our observed data
+y given latent variables x, we construct a new Bayesian
+network which acts as a generative model for our latent
+x, given observed data y. This network is constructed
+such that the joint distribution of the new “inverse model”,
+which we will refer to as ˜p(x, y) = ˜p(y)˜p(x|y), preserves
+the conditional dependence structure in the original model
+p(x, y) = p(x)p(y|x), but has a different factorization
+(Stuhlm¨uller et al., 2013).
+Unfortunately, unlike the original forward model, the inverse
+model has conditional densities which we do not in general
+know how to normalize or sample from. However, were we
+to know the full conditional density of the inverse model
+˜p(x|y), then we could directly draw samples of x given a
+particular dataset y.
+Thus second task is to learn approximations for the condi-
+
+tionals ˜p(xi|(cid:102)PA(xi)), where(cid:102)PA(xi) are parents of xi in the
+
+inverse model. To do so we employ neural density estima-
+tors and design a procedure to train these “ofﬂine”, in the
+sense that no real data is required.
+
+n=1
+
+typically with weight parameter sharing across densities.
+We choose to adapt the masked autoencoder for distribution
+estimation (MADE) model (Germain et al., 2015), which
+
+3.1. Deﬁning the inverse model
+
+We begin by constructing an inverse model ˜p(x, y) which
+admits the same distribution over all random variables as
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+w0
+
+w1
+
+w2
+
+zn
+
+tn
+
+N
+
+w0
+
+w2
+
+w1
+
+zn
+
+tn
+
+N
+
+w0
+
+ϕw
+
+w1
+
+w2
+
+zn
+
+tn
+
+N
+
+Figure 1. A non-conjugate regression model, as (left) a Bayes net representing a generative model for the data {tn}; (middle) with
+dependency structure inverted, as a generative model for the latent variables w0, w1, w2; (right) showing the explicit neural network
+structure of the learned approximation to the inverse conditional distribution ˜p(w0:2|z1:N , t1:N ). New datasets {zn, tn}N
+n=1 can be input
+directly into the joint density estimator ϕw to estimate the posterior. Note that the ordering of the latent variables w0:2 used in this
+example is chosen arbitrarily; any permutation of the latent variables would not change the overall structure of the inverse model.
+
+p(x, y), but with a different factorization. We ﬁrst note
+that the directed acyclic graph structure of p(x, y) imposes
+a partial ordering on all random variables x and y; we
+choose any single valid ordering arbitrarily, and deﬁne the
+sequences x1, . . . , xN and y1, . . . , yM such that for any
+xi, PA(xi) ⊆ {x1, . . . , xi−1} ∪ {yj}M
+j=1, and for any yj,
+PA(yj) ⊆ {y1, . . . , yj−1} ∪ {xi}N
+Our goal here is to construct as simple as possible a dis-
+tribution ˜p(x|y) whose factorization does not introduce
+any new conditional independencies not also present in
+the original generative model. To consider two extremes:
+i=1 ˜p(xi|y) which assumes
+all xi are conditionally independent given y may be at-
+tractive for computational reasons, but fails to capture all
+the structure of the posterior; whereas a fully connected
+i=1 ˜p(xi|x1:i−1, y) is guaranteed to capture all
+
+a fully factorized ˜p(x|y) ≡(cid:81)N
+˜p(x|y) ≡(cid:81)N
+
+i=1.
+
+dependencies, but may be unnecessarily complex.
+To deﬁne the approximating distribution at each xi, we
+invert the dependencies on yj, effectively running the gener-
+ative model backwards. Following the heuristic algorithm
+of Stuhlm¨uller et al. (2013), we do this by literally con-
+structing the dependency graph in reverse. Ordering the
+random variables yM , . . . , y1, xN , . . . , x1, we deﬁne a new
+
+parent set (cid:102)PA(xi) for each xi in the transformed model,
+with(cid:102)PA(xi) ⊆ {xi+1, . . . , xN , y1, . . . , yM}. In particular,
+
+if MB(xi) is the Markov blanket of the latent variable xi in
+the original probability model, then deﬁning the parent sets
+
+(cid:102)PA(xi) = MB(xi) ∩ {xi+1, . . . , xN , y1, . . . , yM}
+(cid:102)PA(yj) = MB(yj) ∩ {yj+1, . . . , yM}
+
+yields a model with the same dependency structure as
+the original model p(x, y); however, now the sequence
+is reversed such that the observed values are inputs (i.e.,
+
+(cid:102)PA(yj)∩ x = ∅). The sequence under the new model, which
+of the conditional density ˜p(x|y) =(cid:81)N
+i=1 ˜p(xi|(cid:102)PA(xi)).
+
+we will refer to as ˜p(x, y), factorizes naturally as ˜p(x, y) =
+˜p(x|y)˜p(y); particularly important to us is the factorization
+
+This algorithm produces inverse graph structures which de-
+spite not being fully connected, are guaranteed to represent
+all conditional dependencies in the original graph:
+
+˜xA ⊥⊥ ˜xB
+
+Proposition 1. Preservation of conditional dependence. Let
+xA, xB, xC be any latent or observed random variables in
+p(x) with graph structure G, and let ˜xA, ˜xB, ˜xC denote the
+corresponding random variables in the inverse model ˜p(x)
+
+with graph structure (cid:101)G, constructed via the algorithm above.
+˜xC in the inverse model (cid:101)G, they were also conditionally
+
+Then if ˜xA and ˜xB are conditionally independent given
+
+independent in the original model G; that is,
+
+(cid:12)(cid:12)˜xC ⇒ xA ⊥⊥ xB
+
+(cid:12)(cid:12)xC.
+which was not preserved in (cid:101)G, i.e. with xA ⊥(cid:54)⊥ xB
+
+Proof. Suppose we had a conditional dependence in G
+˜xA ⊥⊥ ˜xB
+added to the inverse graph prior to ˜xA, i.e. xA ≺ xB in
+G. Note that xA ⊥(cid:54)⊥ xB
+dependence between xA and xB, or, due to both xA, xB ∈
+PA(xC); in either case, xB ∈ MB(xA). Then when adding
+
+(cid:12)(cid:12)xC but
+(cid:12)(cid:12)˜xC. Without loss of generality assume ˜xB was
+(cid:12)(cid:12)xC can occur either due to a direct
+˜xB to the inverse graph (cid:101)G we are guaranteed to have ˜xB ∈
+(cid:102)PA(˜xA), in which case ˜xA ⊥(cid:54)⊥ ˜xB. (cid:3)
+
+Examples of generative models and their corresponding
+inverse models are shown in Figures 1–3. Note that as the
+topological sort of the nodes in the original generative model
+is not unique, neither is the inverse graphical model.
+
+3.2. Learning a family of approximating densities
+
+Following Capp´e et al. (2008), learning proposals for impor-
+tance sampling on π(x) in a single-dataset setting (i.e., with
+ﬁxed y) entails proposing a parametric family q(x|λ), where
+λ is a free parameter, and then choosing λ to minimize
+
+DKL(π||qλ) =
+
+π(x) log
+
+dx.
+
+(10)
+
+(cid:90)
+
+(cid:21)
+
+(cid:20) π(x)
+
+q(x|λ)
+
+This KL divergence between the true posterior distribution
+π(x) ≡ p(x|y) and proposal distribution q(x|λ) is also
+known as the relative entropy criterion, and is a preferred
+objective function in situations in which the estimation goal
+construct a high-quality weighted sample representation,
+rather than to minimize the variance of a particular expecta-
+tion (Cornebise et al., 2008).
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+α
+
+β
+
+θn
+
+tn
+
+yn
+
+N
+
+yn
+
+tn
+
+α
+
+β
+
+θn
+
+N
+
+yn
+
+tn
+
+ϕθn
+
+θn
+
+ϕαβ
+
+N
+
+α
+
+β
+
+Figure 2. A hierarchical Bayesian model. (left) A generative model for the data {xn}; (middle) with dependency structure inverted; (right)
+showing the two distinct joint neural conditional density estimators. Note in particular the inverse model still partially factorizes across
+the latent variables. The learned factor ϕθn is replicated N times in the inverse model, allowing re-use of weights, simplifying training.
+
+In an amortized inference setting, instead of learning λ ex-
+plicitly for a ﬁxed value of y, we learn a mapping from y
+to λ. More explicitly, if y ∈ Y and λ ∈ ϑ, then learning a
+deterministic mapping ϕ : Y → ϑ allows performing ap-
+proximate inference for p(x|y) with only the computational
+complexity of evaluating the function ϕ. The tradeoff is that
+the training of ϕ itself may be quite involved.
+We thus generalize the adaptive importance sampling algo-
+rithms by learning a family of distributions q(x|y), parame-
+terized by the observed data y. Suppose that λ = ϕ(η, y),
+where the function ϕ is parameterized by a set of upper-level
+parameters η. We would like a choice of η which performs
+well across all datasets y. We can frame this as minimizing
+the expected value of Eq. (10) under p(y), suggesting an
+objective function J (η) deﬁned as
+DKL(π||qλ)p(y)dy
+p(x|y) log
+
+J (η) =
+
+p(x|y)
+
+(cid:90)
+(cid:90)
+
+dxdy
+
+(cid:90)
+
+(cid:20)
+
+(cid:21)
+
+p(y)
+
+q(x|ϕ(η, y))
+=
+= Ep(x,y) [− log q(x|ϕ(η, y))] + const
+
+(11)
+
+which has a gradient
+
+∇ηJ (η) = Ep(x,y) [−∇η log q(x|ϕ(η, y))] .
+
+(12)
+
+Notice that these expectations in Equations (11) and (12)
+are with respect to the tractable joint distribution p(x, y).
+We can thus ﬁt η by stochastic gradient descent, estimating
+the expectation of the gradient ∇ηJ (η) by sampling syn-
+thetic full-data training examples {x, y} from the original
+model. This procedure can be performed entirely ofﬂine —
+we require only to be able to sample from the joint distribu-
+tion p(x, y) to generate candidate data points (effectively
+providing inﬁnite training data). In any directed graphical
+model this can be achieved by ancestral sampling, where
+in addition to sampling x we sample values of the as-yet
+unobserved variables y. Furthermore, we do not need need
+to be able to compute gradients of our model p(x, y) it-
+self — we only need the gradients of our recognition model
+q(x|ϕ(η, y)), allowing use of any differentiable representa-
+tion for q. We choose the parametric family q(x|λ) and the
+transformation ϕ such that this inner gradient in Eq. (12)
+can be computed easily.
+
+q(x|ϕ(η, y)) =
+
+We can now use the conditional independence structure in
+our inverse model ˜p(x, y) to break down q(x|λ), an approx-
+imation of ˜p(x|y), into a product of smaller conditional
+posal density q(x|ϕ(η, y)) can be decomposed as
+
+densities each approximating ˜p(xi|(cid:102)PA(xi)). The full pro-
+
+qi(xi|ϕi(ηi,(cid:102)PA(xi)))
+
+N(cid:89)
+(cid:2)−∇ηi log qi(xi|ϕi(ηi,(cid:102)PA(xi)))(cid:3) .
+with the gradient similarly decomposing as
+∇ηiJ (η) = Ep(x,y)
+random variables in {xi} ∪(cid:102)PA(xi), reducing the dimension-
+Each of these expectations requires only samples of the
+
+ality of the joint optimization problem. This factorization of
+q(x|ϕ(η, y)) does not practically reduce the expressivity of
+the approximating family, as all conditional dependencies
+in the true posterior are preserved.
+
+(13)
+
+i=1
+
+3.3. Joint conditional neural density estimation
+
+We particularly wish to construct the inverse factorization
+˜p(x|y) (and our proposal model q(·)) in such a way that we
+deal naturally with the presence of head-to-head nodes, in
+which one random variable may have a very large parent set.
+This situation is common in machine learning models: it is
+quite common to have generative models which factorize in
+the joint distribution, but have complex dependencies in the
+posterior; see for example the model in Figure 1.
+We thus choose to treat all such situations in our inverse fac-
+torization — where a sequence of variables x(cid:48) ⊆ x are fully
+dependent on one another after conditioning on a shared
+
+set of parent nodes(cid:102)PA(x(cid:48)) — as a single joint conditional
+take(cid:102)PA(x(cid:48)) as additional inputs, and constructing the masks
+
+density which we will approximate with an autoregressive
+density model. We extend MADE (Germain et al., 2015) to
+function as a conditional density estimator by allowing it to
+
+such that these additional inputs are propagated through all
+hidden layers to all outputs, even for the very ﬁrst dimension.
+As in MADE this can be achieved by labeling the hidden
+units with integers denoting which input dimensions they
+are allowed to accept. In contrast to the original MADE, we
+label hidden units with numbers from 0, . . . , N − 1, where
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+. . .
+
+. . .
+
+. . .
+
+x1
+1
+
+x2
+1
+
+x3
+1
+
+y1
+
+x1
+2
+
+x2
+2
+
+x3
+2
+
+y2
+
+x1
+3
+
+x2
+3
+
+x3
+3
+
+y3
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+x1
+1
+
+x2
+1
+
+x3
+1
+
+y1
+
+x1
+2
+
+x2
+2
+
+x3
+2
+
+y2
+
+x1
+3
+
+x2
+3
+
+x3
+3
+
+y3
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+. . .
+
+ϕ
+
+x1
+1
+
+x2
+1
+
+x3
+1
+
+y1
+
+ϕ
+
+x1
+2
+
+x2
+2
+
+x3
+2
+
+y2
+
+ϕ
+
+x1
+3
+
+x2
+3
+
+x3
+3
+
+y3
+
+. . .
+
+Figure 3. Factorial HMM. (left) The generative model consists D independent Markov models, with observed data yt depending on
+the current state of each latent HMM. (middle) An inverse model obtained by reversing the order of the generative model at each t.
+Conditioned on the previous latent states at t − 1 and the next observation yt, all latent states at each t are dependent on one another and
+must be modeled jointly. (right) The repeated structure at each t = 1, 2, . . . means that the same learned conditional density network can
+be reused at every t.
+
+hidden units labeled 0 to take as input only the dimensions
+
+in(cid:102)PA(x(cid:48)). For single-dimensional data, where N = 1, all
+
+hidden units are labeled 0 and all feed forward into the single
+output x1, recovering a standard mixture density network
+(Bishop, 1994).
+To model non-binary data, MADE can be extended by
+altering the output layer network to emit parameters of
+any univariate probability density function. We take the
+same approach by which RNADE (Uria et al., 2013) modi-
+ﬁes the binary autoregressive distribution estimator NADE
+(Larochelle and Murray, 2011) to handle real-valued data,
+with an output layer that parameterizes a univariate mixture
+of D Gaussians for each dimension xi conditioned on its
+parents. The probability of any particular xi is given by
+
+q(xi|ϕi(ηi,(cid:102)PA(xi))) =
+
+D(cid:88)
+
+αi,dN (xi|µi,d, σ2
+
+i,d)
+
+d=1
+
+where N (·) is the Gaussian probability density. This re-
+quires an output layer with 3 × D dimensions, to predict
+D each of means µi,d, standard deviations σi,d, weights
+αi,d; to enforce positivity of standard deviations we apply a
+softplus function to the raw network outputs, and a softmax
+function to ensure αi,· is a probability vector.
+
+3.4. Training the neural network
+
+Contrary to many standard settings in which one is limited
+by the amount of data present, we are armed with a sam-
+pler p(x, y) which allows us to generate effectively inﬁnite
+training data. This could be used to sample a “giant” syn-
+thetic dataset, which we then use for mini-batch training via
+gradient descent; however, then we must decide how large a
+dataset is required. Alternatively, we could sample a brand
+new set of training examples for every mini-batch, never
+re-using previous samples.
+In testing we found that a hybrid training procedure, which
+samples new synthetic datasets based on performance on
+a held-out set of synthetic validation data, appeared more
+efﬁcient than resampling a new synthetic dataset for each
+
+new gradient update. We perform mini-batch gradient up-
+dates on η using synthetic training data, while evaluating on
+the validation set. If the validation error increases, or after
+a set maximum number of steps, we draw new sets of both
+synthetic training and validation data from p(x, y).
+In all experiments we use Adam (Kingma and Ba, 2015)
+with the suggested default parameters to update learning
+rates online, and use rectiﬁed linear activation functions.
+
+4. Examples
+4.1. Inverting a single factor
+
+To illustrate the basic method for inverting factors, we con-
+sider a non-conjugate polynomial regression model, with
+global-only latent variables. The graphical model, its inver-
+sion, and the neural network structure are shown in Figure 1.
+Here we place a Laplace prior on the regression weights,
+and have Student-t likelihoods, giving us
+wd ∼ Laplace(0, 101−d)
+tn ∼ tν(w0 + w1zn + w2z2
+
+for d = 0, 1, 2;
+for n = 1, . . . , N
+
+n, 2)
+
+n=1.
+
+for ﬁxed ν = 4,  = 1, and zn ∈ (−10, 10) uniformly. The
+goal is to estimate the posterior distribution of weights for
+the constant, linear, and quadratic terms, given any possible
+collected dataset {zn, tn}N
+n=1. In the notation of the pre-
+ceding sections, we have latent variables x ≡ {w0, w1, w2}
+and observed variables y ≡ {zn, tn}N
+Note particularly that although the original graphical model
+which expressed p(y|x)p(x) factorizes into products over
+yn which are conditionally independent given x, in the
+inverse model ˜p(x|y) due to the explaining-away phe-
+nomenon all latent variables depend on all others: there
+are no latent variables which can be d-separated from the
+observed y, and all latent variables share y as parents.
+This means we ﬁt as proposal only a single joint density
+q(w0:2|z1:N , t1:N ). Examples of representative output from
+this network are shown in Figure 4. The trained network
+used here 200 hidden units in each of two hidden layers, and
+a mixture of 3 Gaussians as each output.
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+Figure 4. Representative output in the polynomial regression example. Plots show 100 samples each at 5% opacity, with the mean marked
+as a solid dashed line. These are all proposed using the same pre-trained neural network — not just the same neural network structure, but
+also identical learned weights. The MCMC posterior is generated by thinning 10000 samples by a factor 100, after 10000 samples of
+burnin. The neural network proposal yields estimated polynomial curves close to the true posterior solution, albeit slightly more diffuse.
+
+4.2. A hierarchical Bayesian model
+
+Consider as a new example a representative multilevel
+model where exact inference is intractable, a Poisson model
+for estimating failure rates of power plant pumps (George
+et al., 1993). Given N power plant pumps, each having
+operated for tn thousands of hours, we see xn failures, fol-
+lowing
+
+α ∼ Exponential(1.0),
+θn ∼ Gamma(α, β),
+
+β ∼ Gamma(0.1, 1.0),
+yn ∼ Poisson(θntn).
+
+The graphical model, an inverse factorization, and the neural
+network structure are shown in Figure 2. To generating syn-
+thetic training data, tn are sampled iid from an exponential
+distribution with mean 50.
+The repeated structure in the inverse factorization of this
+model allows us to learn a single inverse factor to represent
+the distribution ˜p(θn|tn, yn) across all n. This yields a far
+simpler learning problem than were we forced to ﬁt all of
+˜p(θ1:N|t1:N , y1:N ) jointly. Further, the repeated structure
+
+allows us to use a divide-and-conquer SMC algorithm (Lind-
+sten et al., 2014) which works particularly efﬁciently on this
+model. Each of the N replicated structures are sampled
+in parallel with independent particle sets, weighted locally,
+and resampled; once all θn are sampled, we end by sam-
+pling α and β jointly, which need both be included in order
+to evaluate the ﬁnal terms in the joint target density. We
+stress that there is no obvious baseline proposal density to
+use for a divide-and-conquer SMC algorithm, as neither the
+marginal prior nor posterior distributions over θn are avail-
+able in closed form. Any usage of this algorithm requires
+manual speciﬁcation of some proposal q(θn).
+We test our proposals on the actual power pump failure data
+analyzed in George et al. (1993). The relative convergence
+speeds of marginal likelihood estimators from importance
+sampling from prior and neural network proposals, and
+SMC with neural network proposals, are shown in Figure 5.
+To capture the wide tails of the broad gamma distributions,
+we use a mixture of 10 Gaussians here at each output node,
+and 500 hidden units in each of two hidden layers.
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+Figure 5. Convergence of marginal likelihood estimate as a func-
+tion of number of particles, for likelihood-weighted importance
+sampling, neural network importance sampling, and a divide-and-
+conquer sequential Monte Carlo algorithm with neural network
+proposals. The SMC algorithm can achieve reasonable estimates
+of the normalizing constant with as few as 5 samples. Plot shows
+mean of 10 runs; error bars show two standard deviations.
+
+Figure 6. Learned proposals reduce particle degeneracy in the fac-
+torial HMM. Here we show the number of unique ancestries which
+survive over the course of 30 time steps, running 100 particles.
+Proposing from the transition dynamics nearly immediately degen-
+erates to a single possible solution; the learned proposals increase
+the effective sample size at each stage and reduce the need for
+resampling. Plot shows mean and standard deviation over 10 runs.
+
+4.3. Factorial hidden Markov model
+
+Proposals can also be learned to approximate the optimal ﬁl-
+tering distribution in models for sequential data; we demon-
+strate here on a factorial hidden Markov model (Ghahramani
+and Jordan, 1997), where each time step has a combinatorial
+latent space. The additive model we consider is inspired by
+the model studied in Kolter and Jaakkola (2012) for disag-
+gregation of household energy usage; effective inference in
+this model is a subject of continued research. Some number
+of devices D are either in an active state, in which case each
+device i consumes µi units of energy, or it is off, in which
+case it consumes no energy. At each time step we receive a
+noisy observation of the total amount of energy consumed,
+summed across all devices. This model, whose graphical
+model structure is shown in Figure 3, can be represented as
+
+t|xi
+xi
+
+yt|x1
+
+t , . . . , xD
+
+t ∼ N(cid:0)(cid:80)D
+
+t−1 ∼ Bernoulli(θi[xi
+i=1 µixi
+
+t−1])
+
+t, σ2(cid:1),
+
+where θi represents the prior probability of devices switch-
+ing on or off at each time increment. We design a syn-
+thetic example with D = 20, meaning each time step has
+220 ≈ 100, 000 possible discrete states; the parameters µd
+are spread out from 30 to 500, with σ = 10. Each individual
+device has an initial probability 0.1 of being activated at
+t = 1, switching state at subsequent t with probability 0.05.
+As different combinations of devices can yield identical to-
+tal energy usage it is impossible to disambiguate between
+different combinations of active devices from a single ob-
+servation, meaning any successful inference algorithm must
+attempt to mix across many disconnected modes over time
+to preserve the multiple possible explanations. Synthetic
+data and example output of inference is shown in the supple-
+mental material. The effect of the learned proposals on the
+overall number of surviving particles is shown in Figure 6.
+Our proposal model uses D Bernoulli outputs in a 4-layer
+network, with 300 units per hidden layer; it takes as input
+
+the D latent states at the previous time t − 1, as well as
+the current observation yt. A separate network is used for
+1 given only the initial input y1.
+predicting the initial state xi
+
+5. Discussion
+We present this work primarily as a manner by which we
+compile away application-time inference costs when per-
+forming SMC, and automating the manual task of designing
+proposal densities. However, in some situations direct sam-
+pling from the model may provide a satisfactory approxi-
+mation even eschewing importance weighting steps; in such
+cases our approach can be viewed as a graphical-model-
+regularized algorithm for designing and training neural net-
+works with interpretable structural representations. Rather
+than learning from data, the emulator model is chosen to ap-
+proximate the speciﬁed generative model, akin to the “sleep”
+cycle of the wake-sleep algorithm (Hinton et al., 1995).
+In contrast to variational autoencoders (Kingma and Welling,
+2014), where one simultaneously learns parameters for both
+the inference network and generative model from data, we
+assume a known generative model with ﬁxed parameters
+and structured, interpretable latent variables. This provides
+robustness to bias arising from training data which comes
+from an unrepresentative sample, and also allows us to apply
+our method in situations where a sufﬁciently large supply of
+exemplar data is unavailable. However, it does require plac-
+ing trust in the generative model: in particular, it requires a
+generative model which could plausibly create the data we
+will later collect and condition on.
+Beyond these differences, our choice of DKL(π||q), the
+same minimized by EP, leads to approximations more ap-
+propriate for SMC reﬁnement than a variational Bayes ob-
+jective function; see e.g. Minka (2005) for a discussion of
+“zero-forcing” behavior, and e.g. Capp´e et al. (2008) for
+a discussion of pathological cases in learned importance
+sampling distributions.
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+Acknowledgements
+BP would like to thank both Tom Jin and Jan-Willem van de
+Meent for their helpful discussions, feedback, and ongoing
+commiseration. FW is supported under DARPA PPAML
+through the U.S. AFRL under Cooperative Agreement
+number FA8750-14-2-0006, Sub Award number 61160290-
+111668.
+
+References
+Bengio, Y. and Bengio, S. (1999). Modeling high-
+dimensional discrete data with multi-layer neural net-
+works. In Advances in Neural Information Processing
+Systems, volume 99, pages 400–406.
+
+Bishop, C. M. (1994). Mixture density networks. Technical
+
+report.
+
+Capp´e, O., Douc, R., Guillin, A., Marin, J.-M., and Robert,
+C. P. (2008). Adaptive importance sampling in general
+mixture classes. Statistics and Computing, 18(4):447–
+459.
+
+Cornebise, J., Moulines, ´E., and Olsson, J. (2008). Adaptive
+methods for sequential importance sampling with appli-
+cation to state space models. Statistics and Computing,
+18:461–480.
+
+Cornebise, J., Moulines, ´E., and Olsson, J. (2014). Adaptive
+sequential Monte Carlo by means of mixture of experts.
+Statistics and Computing, 24:317–337.
+
+Del Moral, P. and Murray, L. M. (2015). Sequential Monte
+Carlo with highly informative observations. SIAM/ASA
+Journal on Uncertainty Quantiﬁcation, 3(1):969–997.
+
+Douc, R., Capp´e, O., and Moulines, E. (2005). Comparison
+of resampling schemes for particle ﬁltering. In In 4th
+International Symposium on Image and Signal Processing
+and Analysis (ISPA), pages 64–69.
+
+Doucet, A., De Freitas, N., Gordon, N., et al. (2001). Se-
+quential Monte Carlo methods in practice. Springer New
+York.
+
+Doucet, A., Godsill, S., and Andrieu, C. (2000). On sequen-
+tial Monte Carlo sampling methods for Bayesian ﬁltering.
+Statistics and computing, 10(3):197–208.
+
+George, E. I., Makov, U., and Smith, A. (1993). Conju-
+gate likelihood distributions. Scandinavian Journal of
+Statistics, pages 147–156.
+
+Gershman, S. J. and Goodman, N. D. (2014). Amortized
+inference in probabilistic reasoning. In Proceedings of the
+Thirty-Sixth Annual Conference of the Cognitive Science
+Society.
+
+Ghahramani, Z. and Jordan, M. I. (1997). Factorial hidden
+
+Markov models. Machine learning, 29(2-3):245–273.
+
+Gordon, N. J., Salmond, D. J., and Smith, A. F. (1993).
+Novel approach to nonlinear/non-Gaussian Bayesian state
+estimation. IEE Proceedings F (Radar and Signal Pro-
+cessing), 140(2):107–113.
+
+Gu, S., Ghahramani, Z., and Turner, R. E. (2015). Neural
+adaptive sequential Monte Carlo. In Advances in Neural
+Information Processing Systems 28.
+
+Heess, N., Tarlow, D., and Winn, J. (2013). Learning to pass
+expectation propagation messages. In Advances in Neural
+Information Processing Systems 26, pages 3219–3227.
+
+Hinton, G. E., Dayan, P., Frey, B. J., and Neal, R. M. (1995).
+The “wake-sleep” algorithm for unsupervised neural net-
+works. Science, 268(5214):1158–1161.
+
+Jampani, V., Nowozin, S., Loper, M., and Gehler, P. V.
+(2015). The informed sampler: A discriminative ap-
+proach to Bayesian inference in generative computer vi-
+sion models. Computer Vision and Image Understanding,
+136:32–44.
+
+Jordan, M. I., Ghahramani, Z., Jaakkola, T. S., and Saul,
+L. K. (1999). An introduction to variational methods for
+graphical models. Machine learning, 37(2):183–233.
+
+Jun, S.-H. and Bouchard-Cˆot´e, A. (2014). Memory (and
+time) efﬁcient sequential Monte Carlo. In Proceedings of
+the 31st international conference on Machine learning,
+pages 514–522.
+
+Kingma, D. and Ba, J. (2015). Adam: A method for stochas-
+In Proceedings of the International
+
+tic optimization.
+Conference on Learning Representations (ICLR).
+
+Kingma, D. P. and Welling, M. (2014). Auto-encoding
+variational Bayes. In Proceedings of the International
+Conference on Learning Representations (ICLR).
+
+Kolter, J. Z. and Jaakkola, T. (2012). Approximate inference
+in additive factorial HMMs with application to energy
+disaggregation. In International conference on artiﬁcial
+intelligence and statistics, pages 1472–1482.
+
+Germain, M., Gregor, K., Murray, I., and Larochelle, H.
+(2015). MADE: masked autoencoder for distribution
+In Proceedings of the 32nd International
+estimation.
+Conference on Machine Learning, ICML 2015, pages
+881–889.
+
+Kulkarni, T. D., Kohli, P., Tenenbaum, J. B., and Mans-
+inghka, V. K. (2015). Picture: a probabilistic program-
+ming language for scene perception. In Proceedings of
+the IEEE Conference on Computer Vision and Pattern
+Recognition.
+
+Inference Networks for Sequential Monte Carlo in Graphical Models
+
+Wood, F., van de Meent, J. W., and Mansinghka, V. (2014).
+A new approach to probabilistic programming inference.
+In Proceedings of the 17th International conference on
+Artiﬁcial Intelligence and Statistics.
+
+Larochelle, H. and Murray, I. (2011). The neural autoregres-
+sive distribution estimator. In International Conference
+on Artiﬁcial Intelligence and Statistics, pages 29–37.
+
+Lindsten, F., Johansen, A. M., Naesseth, C. A., Kirkpatrick,
+B., Sch¨on, T. B., Aston, J., and Bouchard-Cˆot´e, A. (2014).
+Divide-and-conquer with sequential Monte Carlo. arXiv
+preprint arXiv:1406.4993.
+
+Minka, T. (2005). Divergence measures and message pass-
+
+ing. Technical report, Microsoft Research.
+
+Murray, L. M., Lee, A., and Jacob, P. E. (2014). Par-
+allel resampling in the particle ﬁlter. arXiv preprint
+arXiv:1301.4019.
+
+Naesseth, C. A., Lindsten, F., and Sch¨on, T. B. (2014). Se-
+quential Monte Carlo for graphical models. In Advances
+in Neural Information Processing Systems 27.
+
+Naesseth, C. A., Lindsten, F., and Sch¨on, T. B. (2015). To-
+wards automated sequential Monte Carlo for probabilistic
+In NIPS Workshop on Black Box
+Graphical Models.
+Learning and Inference.
+
+Paige, B., Wood, F., Doucet, A., and Teh, Y. W. (2014).
+Asynchronous anytime sequential Monte Carlo. In Ad-
+vances in Neural Information Processing Systems 27,
+pages 3410–3418.
+
+Pearl, J. and Russell, S. (1998). Bayesian networks. Com-
+
+puter Science Department, University of California.
+
+Pitt, M. K. and Shephard, N. (1999). Filtering via simula-
+tion: auxiliary particle ﬁlter. Journal of the American
+Statistical Association, 94:590–599.
+
+Ritchie, D., Mildenhall, B., Goodman, N. D., and Hanrahan,
+P. (2015). Controlling procedural modeling programs
+with stochastically-ordered sequential Monte Carlo. ACM
+Transactions on Graphics (TOG), 34(4):105.
+
+Stuhlm¨uller, A., Taylor, J., and Goodman, N. (2013). Learn-
+ing stochastic inverses. In Advances in Neural Informa-
+tion Processing Systems 26, pages 3048–3056.
+
+Todeschini, A., Caron, F., Fuentes, M., Legrand, P., and
+Del Moral, P. (2014). Biips: software for Bayesian in-
+ference with interacting particle systems. arXiv preprint
+arXiv:1412.3779.
+
+Uria, B., Murray, I., and Larochelle, H. (2013). RNADE:
+The real-valued neural autoregressive density-estimator.
+In Advances in Neural Information Processing Systems,
+pages 2175–2183.
+
+Van Der Merwe, R., Doucet, A., De Freitas, N., and Wan,
+E. (2000). The unscented particle ﬁlter. In Advances in
+Neural Information Processing Systems, pages 584–590.
+
+

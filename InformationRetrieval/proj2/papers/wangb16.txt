@@ -1,0 +1,1214 @@
+The Knowledge Gradient for Sequential Decision Making with Stochastic
+
+Binary Feedbacks
+
+Yingfei Wang
+Department of Computer Science, Princeton University, Princeton, NJ 08540
+Chu Wang
+The Program in Applied and Computational Mathematics, Princeton University, Princeton, NJ 08544
+Warren Powell
+Department of Operations Research and Financial Engineering, Princeton University, Princeton, NJ 08544
+
+POWELL@PRINCETON.EDU
+
+YINGFEI@CS.PRINCETON.EDU
+
+CHUW@MATH.PRINCETON.EDU
+
+Abstract
+
+We consider the problem of sequentially mak-
+ing decisions that are rewarded by “successes”
+and “failures” which can be predicted through
+an unknown relationship that depends on a par-
+tially controllable vector of attributes for each in-
+stance. The learner takes an active role in select-
+ing samples from the instance pool. The goal
+is to maximize the probability of success, ei-
+ther after the ofﬂine training phase or minimiz-
+ing regret in online learning. Our problem is
+motivated by real-world applications where ob-
+servations are time consuming and/or expensive.
+With the adaptation of an online Bayesian lin-
+ear classiﬁer, we develop a knowledge-gradient
+type policy to guide the experiment by maximiz-
+ing the expected value of information of labeling
+each alternative, in order to reduce the number
+of expensive physical experiments. We provide
+a ﬁnite-time analysis of the estimated error and
+demonstrate the performance of the proposed al-
+gorithm on both synthetic problems and bench-
+mark UCI datasets.
+
+1. Introduction
+There are many real-world optimization tasks where obser-
+vations are time consuming and/or expensive. One exam-
+ple arises in health services, where physicians have to make
+medical decisions (e.g. a course of drugs, surgery, and ex-
+pensive tests). Assume that a doctor faces a discrete set of
+medical choices, and that we can characterize an outcome
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+as a success (patient does not need to return for more treat-
+ment) or a failure (patient does need followup care such
+as repeated operations). Testing a medical decision may
+require several weeks to determine the outcome. This cre-
+ates a situation where experiments are time consuming and
+expensive, requiring that we learn from our decisions as
+quickly as possible. In contrast to most experimental work
+on UCB policies which tends to assume large observation
+budgets (which might ﬁt applications such as optimizing
+ad-clicks), we argue that the setting of expensive experi-
+ments represents a different type of learning challenge.
+The problem of deciding which medical decisions to evalu-
+ate can be modeled mathematically as a sequential decision
+making problem with stochastic binary outcomes. In this
+setting, we have a small budget of measurements that we
+allocate sequentially to medical decisions so that after the
+budget exhausted, we have collected information to max-
+imize our ability to choose the medical decision with the
+highest probability of success.
+Scientists can draw on an extensive body of literature on
+the classic design of experiments (DeGroot, 1970; Wether-
+ill & Glazebrook, 1986; Montgomery, 2008) whose goal is
+to decide what observations to make when ﬁtting a func-
+tion. Yet in our settings, the decisions are guided by a
+well-deﬁned utility function (that is, maximize the proba-
+bility of success). This problem also relates to active learn-
+ing (Schein & Ungar, 2007; Tong & Koller, 2002; Freund
+et al., 1997; Settles, 2010). Our model is most similar to
+membership query synthesis where the learner may request
+labels for unlabeled instances in the input space to learn a
+classiﬁer that accurately predicts the labels of new exam-
+ples. By contrast, our goal is to maximize a utility function
+such as the success of a treatment. Other relevant and yet
+different works include budgeted learning to imitate the or-
+acle’s behavior (He et al., 2012), and adaptive selection of
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+pre-trained classiﬁers (Gao & Koller, 2011).
+Another similar setting is multi-armed bandit problems
+(Auer et al., 2002; Bubeck & Cesa-Bianchi, 2012; Filippi
+et al., 2010; Mahajan et al., 2012; Chapelle & Li, 2011;
+Li et al., 2010) for cumulative regret minimization in an
+online setting. Our work will initially focus on ofﬂine
+settings such as laboratory experiments or medical trials
+where we are not punished for errors incurred during train-
+ing and only concern with the ﬁnal recommendation after
+the ofﬂine training phases. The knowledge gradient for of-
+ﬂine learning extends easily to bandit settings with the goal
+to minimize the cumulative regret (Ryzhov et al., 2012).
+There are works to address the problem we describe here by
+minimizing the simple regret. But ﬁrst, the UCB type poli-
+cies (Audibert et al., 2010) are not best suited for expen-
+sive experiments. Second, the work on simple regret min-
+imization (Hoffman et al., 2014; Hennig & Schuler, 2012)
+mainly focuses on real-valued functions.
+There is a literature on Bayesian optimization (He et al.,
+2007; Chick, 2001; Powell & Ryzhov, 2012). EGO (and re-
+lated methods such as SKO (Jones et al., 1998; Huang et al.,
+2006)) assumes a Gaussian process belief model which
+does not scale to the higher dimensional settings that we
+consider. Others assume lookup table, or low-dimensional
+parametric methods (e.g. response surface/surrogate mod-
+els (Gutmann, 2001; Jones, 2001; Regis & Shoemaker,
+2005)). The existing literature mainly focuses on real-
+valued functions and none of these methods are directly
+suitable for our problem of maximizing the probability of
+success with binary outcomes.
+We investigate a knowledge gradient policy that maximizes
+the value of information, since this approach is particularly
+well suited to problems where observations are expensive.
+After its ﬁrst appearance for ranking and selection prob-
+lems (Frazier et al., 2008), KG has been extended to vari-
+ous other belief models (e.g. (Mes et al., 2011; Negoescu
+et al., 2011; Wang et al., 2015)). Yet there is no KG vari-
+ant designed for binary classiﬁcation with parametric belief
+models. A particularly relevant work in the Bayesian op-
+timization literature is the expected improvement (EI) for
+binary outputs (Tesch et al., 2013). EI is an approximation
+of KG assuming no measurement noise (see Section 5.6 of
+(Powell & Ryzhov, 2012) and (Huang et al., 2006) for de-
+tailed explanations). In our setting with stochastic binary
+outcomes, the stochasticity is not explicitly considered by
+the EI calculation.
+The main contributions of this paper are organized as fol-
+lows. We ﬁrst rigorously establish a sound mathematical
+model for the problem of sequentially maximizing the re-
+sponse under binary outcomes in Section 2. Due to the
+sequential nature of the problem, we develop an online
+Bayesian linear classiﬁcation procedure for general link
+
+functions to recursively predict the response of each alter-
+native in Section 4. In Section 5, we design a knowledge-
+gradient type policy for stochastic binary responses to
+guide the experiment and provide a ﬁnite-time analysis on
+the estimated error. This is different from the PAC (passive)
+learning bound which relies on the i.i.d. assumption of the
+examples. Extensive demonstrations and comparisons of
+methods are demonstrated in Section 6.
+
+2. Problem Formulation
+Given a ﬁnite set of alternatives x ∈ X = {x1, . . . , xM},
+where each x is represented by a d-dimensional feature
+vector, the observation of measuring each x is a binary
+outcome y ∈ {−1, +1}/{failure, success} with some un-
+known probability of success Pr(y = +1|x). Under a lim-
+ited budget N, our goal is to choose the measurement pol-
+icy (x1, . . . , xN ) and implementation decision xN +1 that
+maximizes the probability of success Pr(y = +1|xN +1).
+We adopt probabilistic modeling for the unknown proba-
+bility of success. Under general assumptions, the posterior
+probability of class +1 can be written as a link function
+acting on a linear function of the feature vector
+
+Pr(y = +1|x) = σ(wT x),
+
+with the link function σ(a) often chosen as the logistic
+1+exp(−a) or probit function σ(a) =
+function σ(a) =
+
+1
+
+Φ(a) =(cid:82) a
+
+−∞ N (s|0, 12)ds.
+
+Adapting the concept of Gaussian processes, we start with
+a multivariate prior distribution for the unknown parame-
+ter vector w. At iteration n, we choose an alternative xn
+to measure and observe a stochastic binary outcome yn as-
+suming labels are generated independently given w. Each
+alternative can be measured more than once with poten-
+tially different outcomes. Let Dn = {(xi, yi)}n
+i=0 denote
+the previous measured data set for any n = 0, . . . , N. De-
+ﬁne the ﬁltration (F n)N
+n=0 by letting F n be the sigma-
+algebra generated by x1, y1, . . . , xn, yn. We use F n and
+Dn interchangeably. Measurement and implementation de-
+cisions xn+1 are restricted to be F n-measurable so that
+decisions may only depend on measurements made in the
+past. We use Bayes’ theorem to form a sequence of poste-
+rior predictive distributions Pr(w|Dn) for w from the prior
+and the previous measurements.
+The next lemma states the equivalence of using true prob-
+abilities and sample estimates when evaluating a policy,
+where Π is the set of policies. The proof is left in the sup-
+plementary material.
+Lemma 1. Let π ∈ Π be a policy, and xπ =
+arg maxx Pr(y = +1|x,DN ) be the implementation de-
+cision after the budget N is exhausted. Then
+Ew[Pr(y = +1|xπ, w)] = Ew[max
+
+Pr(y = +1|x,DN )].
+
+x
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+By denoting X I as an implementation policy for selecting
+an alternative after the measurement budget is exhausted,
+then X I is a mapping from the history DN to an alterna-
+tive X I (DN ). Then as a corollary of Lemma 1, we have
+(Powell & Ryzhov, 2012)
+
+E(cid:2)Pr(cid:0)y = +1|X (DN )(cid:1)(cid:3) = max
+
+Pr(y = +1|x,DN ).
+
+x
+
+maxX I
+In other words, the optimal decision at time N is to go
+with our ﬁnal set of beliefs. By the equivalence as stated in
+Lemma 1, while we want to learn the unknown true value
+maxx Pr(y = +1|x), we may write our problem’s objec-
+tive as
+
+Eπ[max
+
+Pr(y = +1|x,DN )].
+
+max
+π∈Π
+
+x
+
+(1)
+
+3. Background: Bayesian Linear Classﬁcation
+Linear classiﬁers are widely used in machine learning
+for binary classiﬁcation (Hosmer Jr & Lemeshow, 2004).
+Given a training set D = {(xi, yi)}n
+i=1 with xi a d-
+dimensional vector and yi ∈ {−1, +1}, with the as-
+(cid:81)n
+sumption that training labels are generated independently
+given w, the likelihood Pr(D|w) is deﬁned as Pr(D|w) =
+i=1 σ(yi · wT xi). The weight vector w is found by
+maximizing the likelihood of the training data Pr(D|w) or
+equivalently, minimizing the negative log likelihood:
+
+n(cid:88)
+
+i=1
+
+min
+w
+
+− log(σ(yi · wT xi)).
+
+It is well-known that regularization is required to avoid
+over-ﬁtting. Under l2 regularization, the estimate of the
+weight vector w given by:
+
+(cid:107)w(cid:107)2 − n(cid:88)
+
+i=1
+
+min
+w
+
+λ
+2
+
+log(σ(yiwT xi)).
+
+(2)
+
+It can be shown that the log-likelihood function is glob-
+ally concave in w. Numerous optimization techniques are
+available for solving it such as steepest ascent, Newton’s
+method and conjugate gradient ascent.
+In this paper, we illustrate the ideas using the logistic link
+function given its analytic simplicity, but any monotoni-
+cally increasing function σ : R (cid:55)→ [0, 1] can be used.
+
+3.1. Bayesian Setup
+
+A Bayesian approach to linear classiﬁcation models re-
+quires ﬁrst a prior distribution p(w) for the weight parame-
+ters w, from which we apply Bayes’ theorem to derive the
+posterior p(w|D) ∝ Pr(D|w)p(w). An l2-regularized lo-
+gistic regression can be interpreted as a Bayesian model
+√
+with a Gaussian prior on the weights with standard de-
+λ. Unfortunately, exact Bayesian inference
+viation 1/
+
+for linear classiﬁer is intractable. Different approximation
+methods can be used.
+In what follows, we consider the
+Laplace approximation. Laplace’s method uses a Gaussian
+approximation to the posterior. It can be obtained by ﬁnd-
+ing the mode of the posterior distribution and then ﬁtting
+a Gaussian distribution centered at that mode (see Chapter
+4.5 of (Bishop et al., 2006)). Speciﬁcally, deﬁne the loga-
+rithm of the unnormalized posterior distribution
+
+Ψ(w|m, Σ,D) = log Pr(D|w) + log Pr(w).
+
+(3)
+
+The Laplace approximation is based on a second-order
+Taylor expansion to Ψ around its MAP (maximum a poste-
+riori) solution ˆw = arg maxw Ψ(w|m, Σ,D):
+
+Ψ(w) ≈ Ψ( ˆw) − 1
+2
+
+(w − ˆw)T H(w − ˆw),
+
+(4)
+
+where H is the Hessian of the negative log posterior eval-
+uated at ˆw:
+
+H = −∇2Ψ(w)|w= ˆw.
+
+(5)
+
+The Laplace approximation results in a normal approxima-
+tion to the posterior
+
+p(w|D) ≈ N (w| ˆw, H−1).
+
+(6)
+
+4. Fast Online Bayesian Linear Classiﬁcation
+Starting from a Gaussian prior N (w|m0, Σ0), after the
+ﬁrst n observed data, the Laplace approximated posterior
+distribution is Pr(w|Dn) ≈ N (w|mn, Σn) according to
+(6). We formally deﬁne the state space S to be the cross-
+product of Rd and the space of positive semideﬁnite ma-
+trices. At each time n, our state of knowledge is thus
+Sn = (mn, Σn). Observations come one by one due to
+the sequential nature of our problem setting. After each
+new observation, if we retrain the Bayesian classiﬁer using
+all the previous data, we need to calculate the MAP solu-
+tion of (3) with D = Dn to update from Sn to Sn+1. It is
+computationally inefﬁcient even with a diagonal covariance
+matrix. It is better to extend the Bayesian linear classiﬁer
+to leverage for recursive updates with each observation.
+Here, we propose a fast and stable online updating formu-
+lation with independent normal priors (with Σ = λ−1I,
+where I is the identity matrix), which is equivalent to l2
+regularization and which also offers greater computational
+efﬁciency.
+In this recursive way of model updating, the
+Laplace approximated posterior is N (w|mn, Σn) serves
+as a prior to update the model when the next observation is
+made. By setting the batch size n = 1 in Eq. (3) and (5),
+we have the sequential Bayesian linear model for classiﬁ-
+|f = ˆwT x.
+cation as in Algorithm 1, where ˆt := ∂2 log(σ(yf ))
+It is generally assumed that log σ(·) is concave to ensure a
+unique solution of Eq. (3). It is straightforward to check
+
+∂f 2
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+Algorithm 1 Online Bayesian Linear Classiﬁcation
+
+Input: Regularization parameter λ > 0
+mj = 0, qj = λ. (Each weight wj has an independent
+prior N (mj, q−1
+for t = 1 to T do
+
+)).
+
+j
+
+Get a new point (x, y).
+Find ˆw as the maximizer of (3):
+
+(cid:80)d
+j=1 qi(wi − mi)2 + log(σ(yiwT xi)).
+
+− 1
+
+2
+
+mj = ˆwj.
+Update qi according to (5): qj ← qj − ˆtx2
+j.
+
+end for
+
+that the sigmoid functions that are commonly used for
+classiﬁcation problems, including logistic function, pro-
+bit function, complementary log-log function and log-log
+function all satisfy this assumption.
+We can tap a wide range of convex optimization algorithms
+including gradient search, conjugate gradient, and BFGS
+method (see (Wright & Nocedal, 1999) for details). But
+if we set n = 1 and Σ = λ−1I in Eq. (3), a stable and
+efﬁcient algorithm for solving
+
+arg max
+
+w
+
+− 1
+2
+
+qi(wi − mi)2 + log(σ(ywT x))
+
+(7)
+
+d(cid:88)
+
+j=1
+
+can be obtained as follows. First taking derivatives with
+respect to wi and setting ∂F
+∂wi
+
+to zero, we have
+
+qi(wi − mi) =
+
+yxiσ(cid:48)(ywT x)
+σ(ywT x)
+
+,
+
+i = 1, 2, . . . , d.
+
+Deﬁning p as p := σ(cid:48)(ywT x)
+σ(ywT x) , we have wi = mi + ypxi/qi.
+Plugging this back to the deﬁnition of p to eliminate wi’s,
+we get the equation for p:
+
+σ(cid:48)(p(cid:80)d
+σ(p(cid:80)d
+
+p =
+
+i=1 x2
+i=1 x2
+
+i /qi + ymT x)
+i /qi + ymT x)
+
+.
+
+which each choice (say, a medical decision) inﬂuences the
+success or failure of a medical outcome.
+We begin by developing the general framework for the
+knowledge gradient (KG) for ranking and selection prob-
+lems, where the performance of each alternative is repre-
+sented by a (non-parametric) lookup table model of Gaus-
+sian distribution with unknown mean and known variance.
+The goal is to adaptively allocate alternatives to measure so
+as to ﬁnd an implementation decision that has the largest
+mean after the budget is exhausted. By imposing a Gaus-
+sian prior N (µ0, Σ0) on mean values of the alternatives,
+the posterior after the ﬁrst n observations is N (µn, Σn).
+The value of a state is deﬁned as maxx µn
+x. At the nth iter-
+ation, the knowledge gradient policy chooses its (n + 1)th
+measurement to maximize the single-period expected in-
+crease in value (Frazier et al., 2008). It enjoys nice proper-
+ties, including myopic and asymptotic optimality. KG has
+been extended to various belief models (e.g. (Mes et al.,
+2011; Negoescu et al., 2011; Ryzhov et al., 2012; Wang
+et al., 2015)). The knowledge gradient can always be ex-
+tended to online problems where we need to maximize cu-
+mulative rewards (Ryzhov et al., 2012).
+Yet there is no KG variant designed for binary classiﬁcation
+with parametric models, primarily because of the complex-
+ity of dealing with nonlinear belief models. In what fol-
+lows, we ﬁrst formulate our learning problem as a Markov
+decision process and then extend the KG policy for stochas-
+tic binary outcomes.
+
+5.1. Markov Decision Process Formulation
+The state space S is the space of all possible predic-
+tive distributions q(w) for w. The transition function T :
+S × X × {−1, 1} is deﬁned as:
+
+T
+
+q(w), x, y
+
+∝ q(w)σ(ywT x).
+
+(8)
+
+(cid:18)
+
+(cid:19)
+
+Since log(σ(·)) is concave, by its derivative we know the
+function σ(cid:48)/σ is monotonically decreasing, and thus the
+right hand side of the equation decreases as p goes from 0 to
+∞. We notice that the right hand side is positive when p =
+0 and the left hand side is larger than the right hand side
+when p = σ(cid:48)(ymT x)/σ(ymT x). Hence the equation has
+a unique solution in interval [0, σ(cid:48)(ymT x)/σ(ymT x)]. A
+simple one dimensional bisection method is sufﬁcient to
+efﬁciently ﬁnd the root p∗ and thus the solution to the d-
+dimensional optimization problem (7).
+
+5. Knowledge Gradient Policy for Bayesian
+
+Linear Classiﬁcation Belief Model
+
+The transition function for updating the belief state depends
+on the belief model σ(·) and the approximation strategy.
+For example, for the online Bayesian linear classiﬁer with
+logistic function, the transition function can be deﬁned as
+follows with a degenerate state space S := Rd × (0,∞]d:
+Deﬁnition 1. The transition function T : S × X × {−1, 1}
+is deﬁned as
+
+=
+
+ˆw(m), q +p(1−p)diag(xxT )
+
+(m, q), x, y
+
+T
+,
+where ˆw(m) = arg minw Ψ(w|m, q, (x, y)), p =
+σ( ˆwT x) and diag(xxT ) is a column vector contain-
+ing the diagonal elements of xxT , so that Sn+1 =
+T (Sn, x, Y n+1).
+
+(cid:17)
+
+(cid:18)(cid:16)
+
+(cid:17)(cid:19)
+
+(cid:16)
+
+We are going to build on this framework to compute the
+knowledge gradient for a ranking and selection problem
+
+In a dynamic program, the value function is deﬁned as the
+value of the optimal policy given a particular state Sn at
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+time n. In the case of stochastic binary feedback, the ter-
+minal value function V N : S (cid:55)→ R is given by (1) as
+
+V N (s) = max
+
+x
+
+Pr(y = +1|x, s),∀s ∈ S.
+
+The value function at times n = 0, . . . , N − 1, V n is given
+recursively through Bellman’s equation:
+
+V n(s) = max
+
+x
+
+E[V n+1(T (s, x, Y n+1))|x, s], s ∈ S.
+
+Since the “curse of dimensionality” makes direct computa-
+tion of the value function intractable, in what follows, KG
+will be extended to handle Bayesian classiﬁcation models.
+
+5.2. Knowledge Gradient for Binary Responses
+
+The knowledge gradient of measuring an alternative x can
+be deﬁned as follows:
+Deﬁnition 2. The knowledge gradient of measuring an al-
+ternative x while in state s is
+
+x (s) := E[V N (T (s, x, Y )) − V N (s)|x, s].
+νKG
+
+(9)
+
+Since the outcome Y of an experiment where we made
+choice x is not known at the time of selection, the expecta-
+tion is computed conditional on the current model speciﬁed
+by s = (m, Σ). Speciﬁcally, in the case of stochastic bi-
+nary feedbacks, given a state s = (m, Σ), the label y for
+an alternative x follows from a Bernoulli distribution with
+a predictive distribution
+
+Pr(y = +1|x, s) =
+
+=
+
+Pr(y = +1|x, w)p(w|s)dw
+σ(wT x)p(w|s)dw.
+
+(10)
+
+(cid:90)
+(cid:90)
+
+We can calculate the expected value in the next state as
+
+E[V N +1(T (s, x, y))]
+
+= Pr(y = +1|x, s)V N (T (s, x, +1))
+
++Pr(y = −1|x, s) · V N (T (s, x,−1))
+x(cid:48) Pr(y = +1|x
+(cid:48)
+x(cid:48) Pr(y = +1|x
+
+= Pr(y = +1|x, s) · max
++Pr(y = −1|x, s) · max
+
+, T (s, x, +1))
+, T (s, x,−1)).
+(cid:48)
+
+(cid:90)
+
+Denoting a = wT x and δ(·) as the Dirac delta function,
+
+we have(cid:90)
+where p(a) = (cid:82) δ(a − wT x)p(w|s)dw. Since the delta
+
+σ(wT x)p(w|s)dw =
+
+function imposes a linear constraint on w and p(w|s) =
+N (w|m, Σ) is Gaussian, we can evaluate p(a) by calcu-
+lating the mean and covariance (Bishop et al., 2006):
+
+σ(a)p(a)da,
+
+µa = E[a] = mT x, σ2
+
+Thus(cid:82) σ(wT x)p(w|s)dw =(cid:82) σ(a)N (a|µa, σ2
+
+a = Var[a] = xT Σx.
+
+a)da.
+
+For the logistic link function, the convolution cannot be
+evaluated analytically. We apply the approximation σ(a) ≈
+Φ(αa) with α = π/8 (Barber & Bishop, 1998). Denoting
+κ(σ2) = (1 + πσ2/8)−1/2 , we have
+Pr(y = +1|x, s) =
+
+σ(wT x)p(w|s)dw ≈ σ(κ(σ2
+
+(cid:90)
+
+a)µa).
+
+Because of the one-step look ahead, the KG calculation can
+also beneﬁt from the online recursive update of the belief.
+We summarize the KG policy with online logistic regres-
+sion in Algorithm 2.
+
+Algorithm 2 Knowledge Gradient Policy under online
+Bayesian Logistic Regression
+
+j
+
+Input: mj, qj (Each weight wj has an independent prior
+N (mj, q−1
+))
+for x in X do
+
+(cid:80)d
+j=1 qi(wi − mi)2 − log(1 +
+
+Let Ψ(w, y) = − 1
+exp(−ywT x))
+Use one dimensional bisection method to ﬁnd
+
+2
+
+Deﬁne µ+(x(cid:48)) = ˆwT
+
+j=1 q−1
++x(cid:48), µ−(x(cid:48)) = ˆwT−x(cid:48)
+
+ˆw+ = arg maxw Ψ(w, +1)
+ˆw− = arg maxw Ψ(w,−1)
+j x2
+j
+
+µ = mT x, σ2 =(cid:80)d
+(cid:16)
+Deﬁne σ2±(x(cid:48)) = (cid:80)d
+(cid:17)−1
+˜νx = σ(κ(σ2)µ)·maxx(cid:48) σ(cid:0)κ(σ2
++(x(cid:48)))µ+(x(cid:48))(cid:1)+(cid:0)1−
+σ(κ(σ2)µ)(cid:1) · maxx(cid:48) σ(cid:0)κ(σ2−(x(cid:48)))µ−(x(cid:48))(cid:1)
+
+qj + σ( ˆwT±x)(1 −
+
+σ( ˆwT±x))x2
+j
+
+(x(cid:48)
+
+j)2
+
+j=1
+
+end for
+xKG = arg maxx ˜νx
+
+The knowledge gradient policy suggests at each time n
+selecting the alternative that maximizes νKG
+x (Sn) where
+ties are broken randomly. The knowledge gradient pol-
+icy can work with any choice of link function σ(·) and ap-
+proximation procedures by adjusting the transition function
+T (s, x,·) accordingly.
+The predictive distribution Pr(y = +1|x, s) is obtained by
+marginalizing under current belief p(w|s) = N (w|m, Σ).
+
+The knowledge gradient for ofﬂine learning extends easily
+to bandit settings (Ryzhov et al., 2012) with the goal to
+minimize the cumulative regret by selecting XKG,n at each
+time step n as:
+
+XKG,n(Sn) = arg max
+
+x
+
+Pr(y = +1|x, Sn) + (N − n)νKG
+
+x (Sn).
+
+We close this section by presenting the following ﬁnite-
+time bound on the MSE of the estimated weight for
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+Bayesian logistic regression with the proof in the supple-
+ment. Since the learner plays an active tole in selecting the
+measurements, the bound does not make the i.i.d. assump-
+tion of the examples. Without loss of generality, we assume
+(cid:107)x(cid:107)2 ≤ 1, ∀x ∈ X .
+Theorem 1. Let Dn be the n measurements produced
+by the KG policy and wn = arg maxw Ψ(w|m0, Σ0)
+with the prior distribution Pr(w∗) = N (w∗|m0, Σ0).
+Then with probability Pd(M ), the expected error of wn is
+bounded as
+
+(cid:0)Σ−1(cid:1)
+
+,
+
+Ey∼B(Dn,w∗)||wn − w∗||2 ≤ Cmin + λmin
+
+2
+
+(cid:16) 1
+
+n
+
+(cid:80)
+
+where the distribution B(Dn, w∗) is the vector on-
+Bernoulli distribution with P r(yi = +1) = σ(w∗T xi)
+of each dimension, Pd(M ) is the probability of a d-
+dimensional standard normal random variable appears
+and Cmin =
+in the ball with radius M = 1
+8
+
+i=1 σ(w∗T xi)(cid:0)1 − σ(w∗T xi)(cid:1)xi(xi)T(cid:17)
+
+λmin
+In the special case where Σ0 = λ−1I, we have λmax =
+λmin = λ and M = λ3/2
+8 . The bound holds with higher
+probability Pd(M ) with larger λ. This is natural since
+a larger λ represents a normal distribution with narrower
+bandwidth, resulting in a more concentrated w∗ around
+m0.
+
+λ2
+min√
+λmax
+
+.
+
+6. Experimental Results
+We evaluate the proposed method on both synthetic
+datasets and the UCI machine learning repository (Lich-
+man, 2013) which includes classiﬁcation problems drawn
+from settings including sonar, glass identiﬁcation, blood
+transfusion, survival, breast cancer (wpbc), planning relax
+and climate model failure. We ﬁrst analyze the behavior of
+the KG policy and then compare it to state-of-the-art learn-
+ing algorithms. On synthetic datasets, we randomly gener-
+ate a set of M d-dimensional alternatives x from [−3, 3].
+At each run, the stochastic binary labels are simulated us-
+ing a d + 1-dimensional weight vector w∗ which is sam-
+i ∼ N (0, λ). The +1
+pled from the prior distribution w∗
+label for each alternative x is generated with probability
+σ(w∗
+dxd). For each UCI dataset, we use all the
+data points as the set of alternatives with their original at-
+tributes. We then simulate their labels using a weight vector
+w∗. This weight vector could have been chosen arbitrarily,
+but it was in fact a perturbed version of the weight vector
+trained through logistic regression on the original dataset.
+
+0 +(cid:80)d
+
+j=1 w∗
+
+6.1. Behavior of the KG Policy
+
+To better understand the behavior of the KG policy, we
+provide snapshots of the KG policy at each iteration on a
+
+2-dimensional synthetic dataset and a 3-dimensional syn-
+thetic dataset in one run. Fig. 1 shows the snapshot on
+a 2-dimensional dataset with 200 alternatives. The scatter
+plots illustrate the KG values with both the color and the
+size of the point reﬂecting the KG value of each alterna-
+tive. The star denotes the true alternative with the largest
+response. The red square is the alternative with the largest
+KG value. The pink circle is the implementation decision
+(that maximizes the response under current estimation of
+w∗) if the budget is exhausted after that iteration.
+
+Figure 1. Snapshots on a 2-dimensional dataset. The scatter plots
+illustrate the KG values at 1-4 iterations from left to right, top to
+bottom. The star, the red square and pink circle indicate the true
+best alternative, the alternative to be selected and the implemen-
+tation decision, respectively.
+
+It can be seen from the ﬁgure that the KG policy ﬁnds the
+true best alternative after only three measurements, reach-
+ing out to different alternatives to improve its estimates. We
+can infer from Fig. 1 that the KG policy tends to choose
+alternatives near the boundary of the region. This crite-
+rion is natural since in order to ﬁnd the true maximum, we
+need to get enough information about w∗ and estimate well
+the probability of points near the true maximum which ap-
+pears near the boundary. On the other hand, in a logistic
+model with labeling noise, a data x with small xT x in-
+herently brings little information as pointed out in (Zhang
+& Oles, 2000). For an extreme example, when x = 0
+the label is always completely random for any w since
+Pr(y = +1|w, 0) ≡ 0.5. This is an issue when perfect
+classiﬁcation is not achievable. So it is essential to label a
+data with larger xT x that has the most potential to enhance
+its conﬁdence non-randomly.
+Fig. 2 illustrates the snapshots of the KG policy on a 3-
+dimensional synthetic dataset with 300 alternatives. It can
+
+−202−3−2−10123x1x2−202−3−2−10123x1x2−202−3−2−10123x1x2−202−3−2−10123x1x2The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+Figure 2. Snapshots on a 3-dimensional dataset. The scatter plots illustrate the KG values at 2,4,6,8,10 iterations from left to right. The
+star, the red square and pink circle indicate the best alternative, the alternative to be selected and the implementation decision.
+
+be seen that the KG policy ﬁnds the true best alternative
+after only 10 measurements. This set of plots also veri-
+ﬁes our statement that the KG policy tends to choose data
+points near the boundary of the region.
+Also depicted in Fig. 3 is the absolute class distribution er-
+ror of each alternative, which is the absolute difference be-
+tween the predictive probability of class +1 under current
+estimate and the true probability on the 2-dimensional date-
+set after 4 iterations in Fig. 3(a) and on the 3-dimensional
+dateset after 10 iterations in Fig. 3(b). We see that in both
+cases, the probability at the true maximum is well approxi-
+mated, while moderate error in the estimate is located away
+from this region of interest.
+
+(a) 2-dimensional dataset
+
+(b) 3-dimensional dataset
+
+Figure 3. Absolute error.
+
+6.2. Comparison with Other Policies
+
+Recall that our goal is to maximize the expected response
+of the implementation decision. We deﬁne the Oppor-
+tunity Cost (OC) metric as the expected response of the
+implementation decision xN +1
+:= arg maxx Pr(y =
++1|x, wN ) compared to the true maximal response under
+weight w∗:
+OC := max
+
+x∈X Pr(y = +1|x, w∗) − Pr(y = +1|xN +1, w∗).
+Note that the opportunity cost is always non-negative and
+the smaller the better. To make a fair comparison, on each
+run, all the time-N labels of all the alternatives are ran-
+domly pre-generated according to the weight vector w∗ and
+
+shared across all the competing policies. We allow each al-
+gorithm to sequentially measure N = 30 alternatives.
+We compare with the following state-of-the-art active
+learning and Bayesian optimization policies that are com-
+patible with logistic regression: Random sampling (Ran-
+dom), a myopic method that selects the most uncertain
+instance each step (MostUncertain), discriminative batch-
+mode active learning (Disc) (Guo & Schuurmans, 2008)
+with batch size equal to 1, expected improvement (EI)
+(Tesch et al., 2013) with an initial ﬁt of 5 examples and
+Thompson sampling (TS) (Chapelle & Li, 2011). Besides,
+as upper conﬁdence bounds (UCB) methods are often con-
+sidered in bandit and optimization problems, we compare
+against UCB on the latent function wT x (UCB) (Li et al.,
+2010) with α tuned to be 1. All the state transitions are
+based on the online Bayesian logistic regression framework
+developed in Section 4, while different policies provides
+different rules for measurement decisions at each iteration.
+The experimental results are shown in ﬁgure 4. In all the
+ﬁgures, the x-axis denotes the number of measured alter-
+natives and the y-axis represents the averaged opportunity
+cost averaged over 100 runs.
+It is demonstrated in Fig.
+4 that KG outperforms the
+other policies in most cases, especially in early iterations,
+without requiring a tuning parameter. As an unbiased se-
+lection procedure, random sampling is at least a consis-
+tent algorithm. Yet it is not suitable for expensive exper-
+iments where one need to learn the most in small bud-
+gets. MostUncertain and Disc perform quite well on some
+datasets while badly on others. A possible explanation is
+that the goal of active leaning is to learn a classiﬁer which
+accurately predicts the labels of new examples so their cri-
+teria are not directly related to maximize the probability of
+success aside from the intent to learn the prediction. After
+enough iterations when active learning methods presum-
+ably have the ability to achieve a good estimator of w∗,
+their performance will be enhanced. Thompson sampling
+works in general quite well as reported in other literature
+(Chapelle & Li, 2011). Yet, KG has a better performance
+especially during the early iterations. In the case when an
+
+−202−202−2−1012x1x2x3−202−202−2−1012x1x2x3−202−202−2−1012x1x2x3−202−202−2−1012x1x2x3−202−202−2−1012x1x2x3−202−3−2−10123x1x20.010.020.030.040.050.06−202−202−2−1012x1x2x30.050.10.150.2The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+(a) sonar
+
+(b) glass identiﬁcation
+
+(c) blood transfusion
+
+(d) survival
+
+(e) breast cancer (wpbc)
+
+(f) planning relax
+
+(g) climate
+
+(h) Synthetic data, d = 10
+
+(i) Synthetic data, d = 15
+
+Figure 4. Opportunity cost on UCI and synthetic datasets.
+
+experiment is expensive and only a small budget is allowed,
+the KG policy, which is designed speciﬁcally to maximize
+the response, is preferred.
+We also note that KG works better than EI in most cases,
+especially in Fig. 4(b), 4(c) and 4(e). Although both KG
+and EI work with the expected value of information, when
+EI decides which alternative to measure, it ignores the po-
+tential change of the posterior distribution resulting from
+the next (stochastic) outcome y.
+Finally, KG, EI and TS outperform the naive use of UCB
+policies on the latent function wT x due to the errors in the
+variance introduced by the nonlinear transformation. At
+each time step, the posterior of log p
+1−p is approximated
+as a Gaussian distribution. An upper conﬁdence bound
+on log p
+1−p does not translate to one on p with binary out-
+comes. In the meantime, KG, EI and TS make decisions in
+the underlying binary outcome probability space and ﬁnd
+the right balance of exploration and exploitation.
+
+7. Conclusion
+In this paper, we consider sequential decision making prob-
+lems with binary outcomes where we have to run expensive
+experiments, forcing us to learn the most from each exper-
+iment. With a small budget of measurements, the goal is
+to identify the alternative with the highest probability of
+success as quickly as possible. Due to the sequential na-
+ture of this problem, we develop a fast online Bayesian lin-
+ear classiﬁer for general response functions. We propose
+a knowledge gradient policy using Bayesian linear classiﬁ-
+cation belief models, for which we develope an approxima-
+tion method to overcome computational challenges in ﬁnd-
+ing the knowledge gradient. Other than a focus on ofﬂine
+optimization, we extend the knowledge gradient policy to
+bandit settings to minimize regret. We provide a ﬁnite-time
+analysis on the estimated error, and report the results of a
+series of experiments that demonstrate its efﬁciency.
+
+#Iterations51015202530OpportunityCost0.050.10.150.20.250.3EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.10.20.30.40.50.60.7EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost00.10.20.30.40.5EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.10.120.140.160.180.20.220.240.26EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.050.10.150.20.250.3EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.110.120.130.140.150.160.17EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.010.020.030.040.050.06EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.050.10.150.20.25EIUCBTSRandomMostUncertainDiscKG#Iterations51015202530OpportunityCost0.050.10.150.20.25EIUCBTSRandomMostUncertainDiscKGThe Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+Acknowledgements
+This research was supported in part by AFOSR grant con-
+tract FA9550-12-1-0200 for Natural Materials, Systems
+and Extremophiles and the program in Optimization and
+Discrete Mathematics.
+
+References
+Audibert, Jean-Yves, Bubeck, S´ebastien, et al. Best arm
+identiﬁcation in multi-armed bandits. COLT 2010-
+Proceedings, 2010.
+
+Auer, Peter, Cesa-Bianchi, Nicol`o, and Fischer, Paul.
+Finite-time analysis of the multiarmed bandit problem.
+Machine learning, 47(2-3):235–256, 2002.
+
+Barber, David and Bishop, Christopher M. Ensemble learn-
+ing for multi-layer networks. Advances in neural infor-
+mation processing systems, pp. 395–401, 1998.
+
+Bishop, Christopher M et al. Pattern recognition and ma-
+
+chine learning, volume 4. springer New York, 2006.
+
+Bubeck, S´ebastien and Cesa-Bianchi, Nicol`o. Regret anal-
+ysis of stochastic and nonstochastic multi-armed bandit
+problems. arXiv preprint arXiv:1204.5721, 2012.
+
+Chapelle, Olivier and Li, Lihong. An empirical evaluation
+of thompson sampling. In Advances in neural informa-
+tion processing systems, pp. 2249–2257, 2011.
+
+Chick, Stephen E. New two-stage and sequential proce-
+dures for selecting the best simulated system. Opera-
+tions Research, 49(5):732–743, 2001.
+
+DeGroot, M. H. Optimal Statistical Decisions. McGraw-
+
+Hill, 1970.
+
+Filippi, Sarah, Cappe, Olivier, Garivier, Aur´elien, and
+Szepesv´ari, Csaba. Parametric bandits: The generalized
+linear case. In Advances in Neural Information Process-
+ing Systems, pp. 586–594, 2010.
+
+Frazier, Peter I, Powell, Warren B, and Dayanik, Savas.
+A knowledge-gradient policy for sequential information
+collection. SIAM Journal on Control and Optimization,
+47(5):2410–2439, 2008.
+
+Freund, Yoav, Seung, H Sebastian, Shamir, Eli, and Tishby,
+Naftali. Selective sampling using the query by com-
+mittee algorithm. Machine learning, 28(2-3):133–168,
+1997.
+
+Guo, Yuhong and Schuurmans, Dale. Discriminative batch
+mode active learning. In Advances in neural information
+processing systems, pp. 593–600, 2008.
+
+Gutmann, H-M. A radial basis function method for global
+Journal of Global Optimization, 19(3):
+
+optimization.
+201–227, 2001.
+
+He, Donghai, Chick, Stephen E, and Chen, Chun-Hung.
+Opportunity cost and OCBA selection procedures in or-
+dinal optimization for a ﬁxed number of alternative sys-
+tems. Systems, Man, and Cybernetics, Part C: Appli-
+cations and Reviews, IEEE Transactions on, 37(5):951–
+961, 2007.
+
+He, He, Eisner, Jason, and Daume, Hal. Imitation learning
+In Advances in Neural Information Pro-
+
+by coaching.
+cessing Systems, pp. 3149–3157, 2012.
+
+Hennig, Philipp and Schuler, Christian J. Entropy search
+for information-efﬁcient global optimization. The Jour-
+nal of Machine Learning Research, 13(1):1809–1837,
+2012.
+
+Hoffman, Matthew D, Shahriari, Bobak, and de Freitas,
+Nando. On correlation and budget constraints in model-
+based bandit optimization with application to automatic
+machine learning. In AISTATS, pp. 365–374, 2014.
+
+Hosmer Jr, David W and Lemeshow, Stanley. Applied lo-
+
+gistic regression. John Wiley & Sons, 2004.
+
+Huang, Deng, Allen, Theodore T, Notz, William I, and
+Zeng, N. Global optimization of stochastic black-box
+systems via sequential kriging meta-models. Journal of
+global optimization, 34(3):441–466, 2006.
+
+Jones, Donald R. A taxonomy of global optimization meth-
+ods based on response surfaces. Journal of global opti-
+mization, 21(4):345–383, 2001.
+
+Jones, Donald R, Schonlau, Matthias,
+
+and Welch,
+William J. Efﬁcient global optimization of expensive
+black-box functions. Journal of Global optimization, 13
+(4):455–492, 1998.
+
+Li, Lihong, Chu, Wei, Langford, John, and Schapire,
+Robert E. A contextual-bandit approach to personalized
+news article recommendation. In Proceedings of the 19th
+international conference on World wide web, pp. 661–
+670. ACM, 2010.
+
+Lichman, M. UCI machine learning repository, 2013. URL
+
+http://archive.ics.uci.edu/ml.
+
+Gao, Tianshi and Koller, Daphne. Active classiﬁcation
+based on value of classiﬁer. In Advances in Neural In-
+formation Processing Systems, pp. 1062–1070, 2011.
+
+Mahajan, Dhruv Kumar, Rastogi, Rajeev, Tiwari, Charu,
+and Mitra, Adway. Logucb: an explore-exploit algo-
+rithm for comments recommendation. In Proceedings of
+
+The Knowledge Gradient for Sequential Decision Making with Stochastic Binary Feedbacks
+
+Zhang, Tong and Oles, F. The value of unlabeled data
+for classiﬁcation problems. In Proceedings of the Sev-
+enteenth International Conference on Machine Learn-
+ing,(Langley, P., ed.), pp. 1191–1198. Citeseer, 2000.
+
+the 21st ACM international conference on Information
+and knowledge management, pp. 6–15. ACM, 2012.
+
+Mes, Martijn RK, Powell, Warren B, and Frazier, Pe-
+ter I. Hierarchical knowledge gradient for sequential
+sampling. The Journal of Machine Learning Research,
+12:2931–2974, 2011.
+
+Montgomery, D. C. Design and Analysis of Experiments.
+
+John Wiley and Sons, 2008.
+
+Negoescu, Diana M, Frazier, Peter I, and Powell, War-
+ren B. The knowledge-gradient algorithm for sequenc-
+ing experiments in drug discovery. INFORMS Journal
+on Computing, 23(3):346–363, 2011.
+
+Powell, Warren B and Ryzhov, Ilya O. Optimal learning.
+
+John Wiley & Sons, 2012.
+
+Regis, Rommel G and Shoemaker, Christine A. Con-
+strained global optimization of expensive black box
+functions using radial basis functions. Journal of Global
+Optimization, 31(1):153–171, 2005.
+
+Ryzhov, Ilya O, Powell, Warren B, and Frazier, Peter I.
+The knowledge gradient algorithm for a general class of
+online learning problems. Operations Research, 60(1):
+180–195, 2012.
+
+Schein, Andrew I and Ungar, Lyle H. Active learning for
+logistic regression: an evaluation. Machine Learning, 68
+(3):235–265, 2007.
+
+Settles, Burr. Active learning literature survey. University
+
+of Wisconsin, Madison, 52(55-66):11, 2010.
+
+Tesch, Matthew, Schneider, Jeff, and Choset, Howie. Ex-
+pensive function optimization with stochastic binary out-
+comes. In Proceedings of The 30th International Confer-
+ence on Machine Learning, pp. 1283–1291, 2013.
+
+Tong, Simon and Koller, Daphne. Support vector machine
+active learning with applications to text classiﬁcation.
+The Journal of Machine Learning Research, 2:45–66,
+2002.
+
+Wang, Yingfei, Reyes, Kristofer G, Brown, Keith A,
+Mirkin, Chad A, and Powell, Warren B. Nested-batch-
+mode learning and stochastic optimization with an appli-
+cation to sequential multistage testing in materials sci-
+ence. SIAM Journal on Scientiﬁc Computing, 37(3):
+B361–B381, 2015.
+
+Wetherill, G. B. and Glazebrook, K. D. Sequential Methods
+
+in Statistics. Chapman and Hall, 1986.
+
+Wright, Stephen J and Nocedal, Jorge. Numerical opti-
+
+mization, volume 2. Springer New York, 1999.
+
+

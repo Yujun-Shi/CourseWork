@@ -1,0 +1,1567 @@
+Greedy Column Subset Selection:
+
+New Bounds and Distributed Algorithms
+
+Jason Altschuler
+Princeton University, Princeton, NJ 08544
+Aditya Bhaskara
+School of Computing, 50 S. Central Campus Drive, Salt Lake City, UT 84112
+Gang (Thomas) Fu
+Vahab Mirrokni
+Afshin Rostamizadeh
+Morteza Zadimoghaddam
+Google, 76 9th Avenue, New York, NY 10011
+
+JASONMA@PRINCETON.EDU
+
+BHASKARA@CS.UTAH.EDU
+
+THOMASFU@GOOGLE.COM
+MIRROKNI@GOOGLE.COM
+ROSTAMI@GOOGLE.COM
+ZADIM@GOOGLE.COM
+
+Abstract
+
+The problem of column subset selection has re-
+cently attracted a large body of research, with
+feature selection serving as one obvious and im-
+portant application. Among the techniques that
+have been applied to solve this problem,
+the
+greedy algorithm has been shown to be quite ef-
+fective in practice. However, theoretical guaran-
+tees on its performance have not been explored
+thoroughly, especially in a distributed setting. In
+this paper, we study the greedy algorithm for the
+column subset selection problem from a theoreti-
+cal and empirical perspective and show its effec-
+tiveness in a distributed setting. In particular, we
+provide an improved approximation guarantee
+for the greedy algorithm which we show is tight
+up to a constant factor, and present the ﬁrst dis-
+tributed implementation with provable approxi-
+mation factors. We use the idea of randomized
+composable core-sets, developed recently in the
+context of submodular maximization. Finally, we
+validate the effectiveness of this distributed algo-
+rithm via an empirical study.
+
+1. Introduction
+Recent technological advances have made it possible to
+collect unprecedented amounts of data. However, extract-
+ing patterns of information from these high-dimensional
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+massive datasets is often challenging. How do we auto-
+matically determine, among millions of measured features
+(variables), which are informative, and which are irrelevant
+or redundant? The ability to select such features from high-
+dimensional data is crucial for computers to recognize pat-
+terns in complex data in ways that are fast, accurate, and
+even human-understandable (Guyon & Elisseeff, 2003).
+An efﬁcient method for feature selection receiving increas-
+ing attention is Column Subset Selection (CSS). CSS is a
+constrained low-rank-approximation problem that seeks to
+approximate a matrix (e.g.
+instances by features matrix)
+by projecting it onto a space spanned by only a few of
+its columns (features). Formally, given a matrix A with
+n columns, and a target rank k < n, we wish to ﬁnd a size-
+k subset S of A’s columns such that each column Ai of A
+(i ∈ {1, . . . , n}) is contained as much as possible in the
+subspace span(S), in terms of the Frobenius norm:
+
+n(cid:88)
+
+arg maxS contains k of A’s columns
+
+(cid:107)proj(Ai | span(S))(cid:107)2
+
+2
+
+i=1
+
+While similar in spirit to general low-rank approximation,
+some advantages with CSS include ﬂexibility, interpretabil-
+ity and efﬁciency during inference. CSS is an unsupervised
+method and does not require labeled data, which is espe-
+cially useful when labeled data is sparse. We note, on the
+other hand, unlabeled data is often very abundant and there-
+fore scalable methods, like the one we present, are often
+needed. Furthermore, by subselecting features, as opposed
+to generating new features via an arbitrary function of the
+input features, we keep the semantic interpretation of the
+features intact. This is especially important in applications
+that require interpretable models. A third important advan-
+
+On Greedy Column Subset Selection
+
+tage is the efﬁciency of applying the solution CSS feature
+selection problem during inference. Compared to PCA or
+other methods that require a matrix-matrix multiplication
+to project input features into a reduced space during infer-
+ence time, CSS only requires selecting a subset of feature
+values from a new instance vector. This is especially useful
+for latency sensitive applications and when the projection
+matrix itself may be prohibitively large, for example in re-
+stricted memory settings.
+While there have been signiﬁcant advances in CSS (Bout-
+sidis et al., 2011; 2009; Guruswami & Sinop, 2012), most
+of the algorithms are either impractical and not applicable
+in a distributed setting for large datasets, or they do not have
+good (multiplicative 1 − ε) provable error bounds. Among
+efﬁcient algorithms studied for the CSS problem is the sim-
+ple greedy algorithm, which iteratively selects the best col-
+umn and keeps it. Recent work shows that it does well
+in practice and even in a distributed setting (Farahat et al.,
+2011; 2013) and admits a performance guarantee (C¸ ivril
+& Magdon-Ismail, 2012). However, the known guarantees
+depend on an arbitrarily large matrix-coherence parameter,
+which is unsatisfactory. Also, even though the algorithm is
+relatively fast, additional optimizations are needed to scale
+it to datasets with millions of features and instances.
+
+k
+
+k
+
+1.1. Our contributions
+Let A ∈ Rm×n be the given matrix, and let k be the target
+number of columns. Let OP Tk denote the optimal set of
+columns, i.e., one that covers the maximum Frobenius mass
+of A. Our contributions are as follows.
+Novel analysis of Greedy. For any ε > 0, we show
+that the natural greedy algorithm (Section 2), after r =
+σmin(OP Tk)ε steps, gives an objective value that is within
+a (1 − ε) factor of the optimum. We also give a match-
+ing lower bound, showing that
+σmin(OP Tk)ε is tight up to a
+constant factor. Here σmin(OP Tk) is the smallest squared
+singular value of the optimal set of columns (after scaling
+to unit vectors).
+Our result is similar in spirit to those of (C¸ ivril & Magdon-
+Ismail, 2012; Boutsidis et al., 2015), but with an important
+difference. Their bound on r depends on the least σmin(S)
+over all S of size k, while ours depends on σmin(OP Tk).
+Note that these quantities can differ signiﬁcantly. For in-
+stance, if the data has even a little bit of redundancy (e.g.
+few columns that are near duplicates), then there exist S for
+which σmin is tiny, but the optimal set of columns could be
+reasonably well-conditioned (in fact, we would expect the
+optimal set of columns to be fairly well conditioned).
+Distributed Greedy. We consider a natural distributed im-
+plementation of the greedy algorithm (Section 2). Here, we
+show that an interesting phenomenon occurs: even though
+partitioning the input does not work in general (as in core-
+
+ε + sk2
+
+set based algorithms), randomly partitioning works well.
+This is inspired by a similar result on submodular max-
+imization (Mirrokni & Zadimoghaddam, 2015). Further,
+our result implies a 2-pass streaming algorithm for the CSS
+problem in the random arrival model for the columns.
+We note that if the columns each have sparsity φ, (Boutsidis
+et al., 2016) gives an algorithm with total communication
+of O( skφ
+ε4 ). Their algorithm works for “worst case”
+partitioning of the columns into machines and is much
+more intricate than the greedy algorithm. In constrast, our
+algorithm is very simple, and for a random partitioning, the
+communication is just the ﬁrst term above, along with an
+extra σmin(OP T ) term. Thus depending on σmin and ε,
+each of the bounds could be better than the other.
+Further optimizations. We also present techniques to speed
+up the implementation of the greedy algorithm. We show
+that the recent result of (Mirzasoleiman et al., 2015) (once
+again, on submodular optimization) can be extended to the
+case of CSS, improving the running time signiﬁcantly.
+We then compare our algorithms (in accuracy and running
+times) to various well-studied CSS algorithms. (Section 6.)
+
+1.2. Related Work
+The CSS problem is one of the central problems re-
+lated to matrix approximation. Exact solution is known
+to be UG-hard (C¸ ivril, 2014), and several approximation
+methods have been proposed over the years. Techniques
+such as importance sampling (Drineas et al., 2004; Frieze
+et al., 2004), adaptive sampling (Deshpande & Vempala,
+2006), volume sampling (Deshpande et al., 2006; Desh-
+pande & Rademacher, 2010),
+leverage scores (Drineas
+et al., 2008), and projection-cost preserving sketches (Co-
+hen et al., 2015) have led to a much better understanding
+of the problem. (Guruswami & Sinop, 2012) gave the op-
+timal dependence between column sampling and low-rank
+approximation. Due to the numerous applications, much
+work has been done on the implementation side, where
+adaptive sampling and leverage scores have been shown to
+perform well. A related, extremely simple algorithm is the
+greedy algorithm, which turns out to perform well and be
+scalable (Farahat et al., 2011; 2013). This was ﬁrst ana-
+lyzed by (C¸ ivril & Magdon-Ismail, 2012), as we discussed.
+There is also substantial literature about distributed algo-
+rithms for CSS (Pi et al., 2013; Feldman et al., 2015; Co-
+hen et al., 2015; Farahat et al., 2015a;b; Boutsidis et al.,
+2016). In particular, (Farahat et al., 2015a;b) present dis-
+tributed versions of the greedy algorithm based on MapRe-
+duce. Although they do not provide theoretical guarantees,
+their experimental results are very promising.
+The idea of composable coresets has been applied explic-
+itly or implicitly to several problems (Feldman et al., 2013;
+Balcan et al., 2013; Indyk et al., 2014). Quite recently,
+
+On Greedy Column Subset Selection
+
+for some problems in which coreset methods do not work
+in general, surprising results have shown that randomized
+variants of them give good approximations (da Ponte Bar-
+bosa et al., 2015; Mirrokni & Zadimoghaddam, 2015). We
+extend this framework to the CSS problem.
+
+(cid:113)(cid:80)
+
+1.3. Background and Notation
+We use the following notation throughout the paper. The
+set of integers {1, . . . , n} is denoted by [n]. For a ma-
+trix A ∈ Rm×n, Aj denotes the jth column (Aj ∈ Rm).
+Given S ⊆ [n], A[S] denotes the submatrix of A containing
+columns indexed by S. The projection matrix ΠA projects
+onto the column span of A. Let (cid:107)A(cid:107)F denote the Frobenius
+i,j. We write σmin(A) to denote the
+norm, i.e.,
+(cid:107)Ax(cid:107)2
+minimum squared singular value, i.e., inf x:(cid:107)x(cid:107)2=1
+.
+(cid:107)x(cid:107)2
+We abuse notation slightly, and for a set of vectors V , we
+write σmin(V ) for the σmin of the matrix with columns V .
+Deﬁnition 1. Given a matrix A ∈ Rm×n and an integer
+k ≤ n, the Column Subset Selection (CSS) Problem asks
+to ﬁnd
+
+i,j A2
+
+2
+
+2
+
+arg maxS⊆[n],|S|=k(cid:107)ΠA[S]A(cid:107)2
+F ,
+
+i.e., the set of columns that best explain the full matrix A.
+
+We note that it is also common to cast this as a minimiza-
+tion problem, with the objective being (cid:107)A − ΠA[S]A(cid:107)2
+F .
+While the exact optimization problems are equivalent, ob-
+taining multiplicative approximations for the minimization
+version could be harder when the matrix is low-rank.
+For a set of vectors V and a matrix M, we denote
+
+fM (V ) = (cid:107)ΠV M(cid:107)2
+F .
+
+Also, the case when M is a single vector will be important.
+For any vector u, and a set of vectors V , we write
+
+fu(V ) = (cid:107)ΠV u(cid:107)2
+2.
+
+Remark 1. Note that fM (V ) can be viewed as the extent
+to which we can cover matrix M using vectors V . How-
+ever, unlike combinatorial covering objectives, our deﬁni-
+tion is not submodular, or even subadditive. As an example,
+consider covering the following A using its own columns.
+Here, fA({A1, A2}) = (cid:107)A(cid:107)2
+
+F > f ({A1}) + f ({A2}).
+
+ 1
+
+A =
+
+0
+
+1
+1 −1 0
+1
+0
+
+1
+
+
+
+2. Greedy Algorithm for Column Selection
+Let us state our algorithm and analysis in a slightly general
+form. Suppose we have two matrices A, B with the same
+number of rows and nA, nB columns respectively. The
+GCSS(A, B, k) problem is that of ﬁnding a subset S of
+
+columns of B, that maximizes fA(S) subject to |S| = k.
+Clearly, if B = A, we recover the CSS problem stated
+earlier. Also, note that scaling the columns of B will not
+affect the solution, so let us assume that the columns of B
+are all unit vectors. The greedy procedure iteratively picks
+columns of B as follows:
+Algorithm 1 GREEDY(A∈Rm×nA, B∈Rm×nB , k ≤ nB)
+1: S ← ∅
+2: for i = 1 : k do
+Pick column Bj that maximizes fA(S ∪ Bj)
+3:
+S ← S ∪ {Bj}
+4:
+5: end for
+6: Return S
+
+ε2
+
+Step (3) is the computationally intensive step in GREEDY
+– we need to ﬁnd the column that gives the most marginal
+gain, i.e., fA(S ∪ Bj) − fA(S). In Section 5, we describe
+different techniques to speed up the calculation of marginal
+gain, while obtaining a 1−ε approximation to the optimum
+f (·) value. Let us brieﬂy mention them here.
+Projection to reduce the number of rows. We can left-
+multiply both A and B with an r× n Gaussian random ma-
+trix. For r ≥ k log n
+, this process is well-known to preserve
+fA(·), for any k-subset of the columns of B (see (Sarlos,
+2006) or Appendix Section A.5 for details).
+Projection-cost preserving sketches. Using recent results
+from (Cohen et al., 2015), we can project each row of A
+onto a random O( k
+ε2 ) dimensional space, and then work
+with the resulting matrix. Thus we may assume that the
+number of columns in A is O( k
+ε2 ). This allows us to efﬁ-
+ciently compute fA(·).
+Lazier-than-lazy greedy. (Mirzasoleiman et al., 2015) re-
+cently proposed the ﬁrst algorithm that achieves a constant
+factor approximation for maximizing submodular func-
+tions with a linear number of marginal gain evaluations.
+We show that a similar analysis holds for GCSS, even
+though the cost function is not submodular.
+We also use some simple yet useful ideas from (Farahat
+et al., 2013) to compute the marginal gains (see Section 5).
+
+2.1. Distributed Implementation
+We also study a distributed version of the greedy algorithm,
+shown below (Algorithm 2.1). (cid:96) is the number of machines.
+
+Algorithm 2 DISTGREEDY(A, B, k, (cid:96))
+1: Randomly partition the columns of B into T1, . . . , T(cid:96)
+2: (Parallel) compute Si ← GREEDY(A, Ti,
+σmin(OP T ) )
+3: (Single machine) aggregate the Si, and compute S ←
+4: Return arg maxS(cid:48)∈{S,S1,...,S(cid:96)}fA(S(cid:48))
+
+GREEDY(A,∪(cid:96)
+
+σmin(OP T ) )
+
+i=1Si,
+
+32k
+
+12k
+
+On Greedy Column Subset Selection
+
+As mentioned in the introduction, the key here is that the
+partitioning is done randomly, in contrast to most results
+on composable summaries. We also note that machine i
+only sees columns Ti of B, but requires evaluating fA(·)
+on the full matrix A when running GREEDY.1 The way to
+implement this is again by using projection-cost preserv-
+ing sketches. (In practice, keeping a small sample of the
+columns of A works as well.) The sketch is ﬁrst passed to
+all the machines, and they all use it to evaluate fA(·).
+We now turn to the analysis of the single-machine and the
+distributed versions of the greedy algorithm.
+
+3. Peformance analysis of GREEDY
+The main result we prove is the following, which shows
+that by taking only slightly more than k columns, we are
+within a 1 − ε factor of the optimal solution of size k.
+Theorem 1. Let A ∈ Rm×nA and B ∈ Rm×nB . Let
+OP Tk be a set of columns from B that maximizes fA(S)
+subject to |S| = k. Let ε > 0 be any constant, and let
+Tr be the set of columns output by GREEDY(A, B, r), for
+r =
+
+εσmin(OP Tk) . Then we have
+
+16k
+
+fA(Tr) ≥ (1 − ε)fA(OP Tk).
+
+We show in Appendix Section A.3 that this bound is tight
+up to a constant factor, with respect to ε and σmin(OP Tk).
+Also, we note that GCSS is a harder problem than
+MAX-COVERAGE, implying that if we can choose only
+k columns, it is impossible to approximate to a ratio better
+than (1 − 1
+e ) ≈ 0.63, unless P=NP. (In practice, GREEDY
+does much better, as we will see.)
+The basic proof strategy for Theorem 1 is similar to that
+of maximizing submodular functions, namely showing that
+in every iteration, the value of f (·) increases signiﬁcantly.
+The key lemma is the following.
+Lemma 1. Let S, T be two sets of columns, with fA(S) ≥
+fA(T ). Then there exists v ∈ S such that
+
+(cid:0)fA(S) − fA(T )(cid:1)2
+
+4|S|fA(S)
+
+.
+
+fA(T ∪ v) − fA(T ) ≥ σmin(S)
+
+Theorem 1 follows easily from Lemma 1, which we show
+at the end of the section. Thus let us ﬁrst focus on prov-
+ing the lemma. Note that for submodular f, the analogous
+lemma simply has f (S)−f (T )
+on the right-hand side (RHS).
+The main ingredient in the proof of Lemma 1 is its single
+vector version:
+Lemma 2. Let S, T be two sets of columns, with fu(S) ≥
+1It is easy to construct examples in which splitting both A and
+
+|S|
+
+B fails badly.
+
+i=1
+
+(cid:0)fu(S) − fu(T )(cid:1)2
+
+fu(T ∪ vi)− fu(T )
+
+fu(T ). Suppose S = {v1, . . . , vk}. Then
+
+(cid:17) ≥ σmin(S)
+(cid:16)
+k(cid:88)
+that for any set of columns T , fA(T ) =(cid:80)
+
+Let us ﬁrst see why Lemma 2 implies Lemma 1. Observe
+j fAj (T ) (sum
+over the columns), by deﬁnition. For a column j, let us
+fAj (S)}. Now, using Lemma 2 and
+deﬁne δj = min{1,
+plugging in the deﬁnition of δj, we have
+
+fAj (T )
+
+4fu(S)
+
+.
+
+1
+
+σmin(S)
+
+k(cid:88)
+
+i=1
+
+1
+
+(cid:0)fA(T ∪ vi) − fA(T )(cid:1)
+n(cid:88)
+
+(cid:0)fAj (T ∪ vi) − fAj (T )(cid:1)
+
+σmin(S)
+
+=
+
+≥ n(cid:88)
+
+j=1
+
+4
+
+i=1
+
+j=1
+
+k(cid:88)
+(1 − δj)2fAj (S)
+n(cid:88)
+ n(cid:88)
+(cid:16) n(cid:88)
+(cid:16)
+
+(1 − δj)
+
+j=1
+
+j=1
+
+j=1
+
+4
+
+4
+
+1
+
+1
+
+fA(S)
+
+=
+
+(1 − δj)2 fAj (S)
+fA(S)
+
+≥ fA(S)
+
+=
+
+≥
+
+4fA(S)
+
+4fA(S)
+
+fAj (S)
+fA(S)
+
+max{0, fAj (S) − fAj (T )}(cid:17)2
+
+(cid:17)2
+
+fA(S) − fA(T )
+
+(1)
+
+(2)
+
+(3)
+
+(4)
+
+(5)
+
+(6)
+
+2
+
+To get (4), we used Jensen’s inequality (E[X 2] ≥ (E[X])2)
+treating fAj (S)
+fA(S) as a probability distribution over indices j.
+Thus it follows that there exists an index i for which the
+gain is at least a 1|S| factor, proving Lemma 1.
+Proof of Lemma 2. Let us ﬁrst analyze the quantity fu(T ∪
+vi) − fu(T ), for some vi ∈ S. As mentioned earlier, we
+may assume the vi are normalized. If vi ∈ span(T ), this
+quantity is 0. Thus we can assume that such vi have been
+removed from S. Now, adding vi to T gives a gain because
+of the component of vi orthogonal to T , i.e., vi − ΠT vi,
+where ΠT denotes the projector onto span(T ). Deﬁne
+
+v(cid:48)
+i =
+
+vi − ΠT vi
+(cid:107)vi − ΠT vi(cid:107) 2
+
+.
+
+By deﬁnition, span(T ∪ vi) = span(T ∪ v(cid:48)
+i). Thus the pro-
+jection of a vector u onto span(T ∪ v(cid:48)
+i(cid:105)v(cid:48)
+i,
+which is a vector whose squared length is (cid:107)ΠT u(cid:107)2 +
+(cid:104)u, v(cid:48)
+
+i) is ΠT u + (cid:104)u, v(cid:48)
+
+i(cid:105)2 = fu(T ) + (cid:104)u, v(cid:48)
+
+i(cid:105)2. This implies that
+i(cid:105)2.
+
+fu(T ∪ vi) − fu(T ) = (cid:104)u, v(cid:48)
+
+(7)
+
+On Greedy Column Subset Selection
+
+i(cid:105)2.
+
+(cid:80)
+i(cid:104)u, v(cid:48)
+maxx∈span(S),(cid:107)x(cid:107)2=1(cid:104)u, x(cid:105)2. Let x =(cid:80)k
+squared singular value, we have(cid:80)
+
+Thus, to show the lemma, we need a lower bound on
+Let us start by observing that a more
+explicit deﬁnition of fu(S) is the squared-length of
+the projection of u onto span(S),
+i.e.
+fu(S) =
+i=1 αivi be a max-
+imizer. Since (cid:107)x(cid:107)2 = 1, by the deﬁnition of the smallest
+i ≤
+σmin(S). Now,
+i α2
+decomposing x = ΠT x + x(cid:48), we have
+fu(S) = (cid:104)x, u(cid:105)2 = (cid:104)x(cid:48)+ΠT x, u(cid:105)2 = ((cid:104)x(cid:48), u(cid:105)+(cid:104)ΠT x, u(cid:105))2.
+Thus (since the worst case is when all signs align),
+
+|(cid:104)x(cid:48), u(cid:105)| ≥(cid:112)fu(S) − |(cid:104)ΠT x, u(cid:105)| ≥(cid:112)fu(S) −(cid:112)fu(T )
+
+1
+
+fu(S) − fu(T )
+
+(cid:112)fu(S) +(cid:112)fu(T )
+
+2(cid:112)fu(S)
+≥ fu(S) − fu(T )
+
+=
+
+i. Thus,
+
+. (8)
+where we have used the fact that |(cid:104)ΠT x, u(cid:105)|2 ≤ fu(T ),
+which is true from the deﬁnition of fu(T ) (and since ΠT x
+is a vector of length ≤ 1 in span(T )).
+i αivi, we have x(cid:48) = x − ΠT x =
+i, u(cid:105)(cid:1)2
+i αi(cid:107)vi − ΠT vi(cid:107)2v(cid:48)
+(cid:1)(cid:0)(cid:88)
+i, u(cid:105)2(cid:1).
+
+αi(cid:107)vi − ΠT vi(cid:107)2(cid:104)v(cid:48)
+i(cid:107)vi − ΠT vi(cid:107)2
+α2
+
+Now, because x = (cid:80)
+(cid:80)
+i αi(vi − ΠT vi) =(cid:80)
+(cid:104)x(cid:48), u(cid:105)2 =(cid:0)(cid:88)
+≤(cid:0)(cid:88)
+≤(cid:0)(cid:88)
+nally, we know that(cid:80)
+(cid:88)
+
+where we have used Cauchy-Schwartz, and then the fact
+that (cid:107)vi − ΠT vi(cid:107)2 ≤ 1 (because vi are unit vectors). Fi-
+
+σmin(S), which implies
+
+(cid:104)v(cid:48)
+i, u(cid:105)2 ≥ σmin(S)(cid:104)x(cid:48), u(cid:105)2 ≥ σmin(S)
+
+i, u(cid:105)2(cid:1)
+
+(cid:1)(cid:0)(cid:88)
+
+i ≤
+
+i α2
+
+(cid:104)v(cid:48)
+
+(cid:104)v(cid:48)
+
+α2
+i
+
+2
+
+1
+
+i
+
+i
+
+i
+
+i
+
+i
+
+(fu(S) − fu(T ))2
+
+4fu(S)
+
+i
+Combined with (7), this proves the lemma.
+
+4. Distributed Greedy Algorithm
+We will now analyze the distributed version of the greedy
+algorithm that was discussed earlier. We show that in one
+round, we will ﬁnd a set of size O(k) as before, that has
+an objective value Ω(f (OP Tk)/κ), where κ is a condition
+number (deﬁned below). We also combine this with our
+earlier ideas to say that if we perform O(κ/ε) rounds of
+DISTGREEDY, we get a (1−ε) approximation (Theorem 3).
+
+4.1. Analyzing one round
+We consider an instance of GCSS(A, B, k), and let OP T
+denote an optimum set of k columns. Let (cid:96) denote the
+number of machines available. The columns (of B) are
+partitioned across machines, such that machine i is given
+columns Ti. It runs GREEDY as explained earlier and out-
+puts Si ⊂ Ti of size k(cid:48) =
+σmin(OP T ). Finally, all the Si are
+moved to one machine and we run GREEDY on their union
+and output a set S of size k(cid:48)(cid:48) =
+σmin(OP T ). Let us deﬁne
+κ(OP T ) = σmax(OP T )
+σmin(OP T ) .
+Theorem 2. Consider running DISTGREEDY on an in-
+stance of GCSS(A, B, k). We have
+
+12k
+
+32k
+
+E[max{fA(S), max
+
+i
+
+{fA(Si)}}] ≥ f (OP T )
+8 · κ(OP T )
+
+.
+
+The key to our proof are the following deﬁnitions:
+
+i
+
+i
+
+i
+
+i , OP T N S
+
+OP T S
+OP T N S
+
+) form a partition of OP T for every i.
+
+i = {x ∈ OP T : x ∈ GREEDY(A, Ti ∪ x, k(cid:48))}
+i = {x ∈ OP T : x (cid:54)∈ GREEDY(A, Ti ∪ x, k(cid:48))}
+In other words, OP T S
+i contains all the vectors in OP T
+that would have been selected by machine i if they had
+been added to the input set Ti. By deﬁnition, the sets
+(OP T S
+Proof outline. Consider any partitioning T1, . . . , T(cid:96), and
+. Suppose one of them (say the
+consider the sets OP T N S
+ith) had a large value of fA(OP T N S
+). Then, we claim
+that fA(Si) is also large. The reason is that the greedy
+algorithm does not choose to pick the elements of OP T N S
+(by deﬁnition) – this can only happen if it ended up picking
+vectors that are “at least as good”. This is made formal
+in Lemma 3. Thus, we can restrict to the case when none
+of fA(OP T N S
+In this case, Lemma 4 shows
+that fA(OP T S
+i ) needs to be large for each i. Intuitively,
+it means that most of the vectors in OP T will, in fact, be
+picked by GREEDY (on the corresponding machines), and
+will be considered when computing S. The caveat is that
+we might be unlucky, and for every x ∈ OP T , it might
+have happened that it was sent to machine j for which it
+was not part of OP T S
+j . We show that this happens with
+low probability, and this is where the random partitioning
+is crucial (Lemma 5). This implies that either S, or one of
+the Si has a large value of fA(·).
+
+) is large.
+
+i
+
+i
+
+2 , . . . , ∆i+1 = ∆i
+
+Proof of Theorem 1. For notational convenience, let σ =
+σmin(OP Tk) and F = fA(OP Tk). Deﬁne ∆0 = F ,
+2 until ∆N ≤ εF . Note that
+∆1 = ∆0
+the gap fA(OP Tk) − fA(T0) = ∆0. We show that it takes
+at most 8kF
+iterations (i.e. additional columns selected)
+σ∆i
+2 = ∆i+1. To prove this,
+to reduce the gap from ∆i to ∆i
+we invoke Lemma 1 to see that the gap ﬁlled by 8kF
+iter-
+σ∆i
+2 = ∆i+1. Thus the
+ations is at least 8kF
+σ∆i
+total number of iterations r required to get a gap of at most
+∆N ≤ εF is:
+
+· σ ( ∆i
+2 )2
+4kF = ∆i
+
+8kF
+σ∆i
+
+=
+
+8kF
+
+σ
+
+2i−N +1
+∆N−1
+
+<
+
+16k
+εσ
+
+.
+
+i=0
+
+i=0
+
+(cid:80)N−1
+i=0 2i−N +1 < 2. Therefore, after r < 16k
+
+where the last step is due to ∆N−1 > εF and
+εσ iterations,
+we have fA(OP Tk) − fA(Tr) ≤ εfA(OP Tk). Rearrang-
+ing proves the lemma.
+
+r ≤ N−1(cid:88)
+
+N−1(cid:88)
+
+On Greedy Column Subset Selection
+
+Let us now state two lemmas, and defer their proofs to Sec-
+tions A.1 and A.2 respectively.
+Lemma 3. For Si of size k(cid:48) =
+
+σmin(OP T ) , we have
+
+32k
+
+f (Si) ≥ fA(OP T N S
+
+i
+
+2
+
+)
+
+for all i.
+
+Lemma 4. For any matrix A, and any partition (I, J) of
+OP T :
+
+fA(I) + fA(J) ≥ fA(OP T )
+2κ(OP T )
+
+.
+
+(9)
+
+i
+
+Our ﬁnal lemma is relevant when none of fA(OP T N S
+)
+i ) is large for all i (due to
+are large and, thus, fA(OP T S
+Lemma 4). In this case, Lemma 5 will imply that the ex-
+pected value of f (S) is large.
+Note that Ti is a random partition, so the Ti, the OP T S
+i ,
+, Si, and S are all random variables. However,
+OP T N S
+all of these value are ﬁxed given a partition {Ti}. In what
+follows, we will write f (·) to mean fA(·).
+Lemma 5. For a random partitioning {Ti}, and S of size
+k(cid:48)(cid:48) =
+
+σmin(OP T ) , we have
+
+12k
+
+i
+
+(cid:34)(cid:80)(cid:96)
+
+E[f (S)] ≥ 1
+2
+
+E
+
+i=1 f (OP T S
+i )
+
+(cid:96)
+
+Proof. At a high level, the intuition behind the analysis is
+that many of the vectors in OP T are selected in the ﬁrst
+phase, i.e., in ∪iSi. For an x ∈ OP T , let Ix denote the
+indicator for x ∈ ∪iSi.
+Suppose we have a partition {Ti}. Then if x had gone to
+a machine i for which x ∈ OP T S
+i , then by deﬁnition, x
+will be in Si. Now the key is to observe (see deﬁnitions)
+that the event x ∈ OP T S
+i does not depend on where x is in
+the partition! In particular, we could think of partitioning
+all the elements except x (and at this point, we know if
+x ∈ OP T S
+
+for all i), and then randomly place x. Thus
+
+i
+
+E[Ix] = E
+
+[[x ∈ OP T S
+i ]]
+
+,
+
+(11)
+
+(cid:34)
+
+(cid:96)(cid:88)
+
+i=1
+
+1
+(cid:96)
+
+the expectation in (12) is large. One lower bound on
+f (V t+1) − f (V t) is (where Ix is the indicator as above)
+
+(cid:88)
+
+1
+k
+
+x∈OP T
+
+(cid:0)f (V t ∪ x) − f (V t)(cid:1).
+
+Ix
+
+Now for every V , we can use (11) to obtain
+E[f (V t+1) − f (V t)|V t = V ]
+
+(cid:34) (cid:96)(cid:88)
+(cid:88)
+
+i=1
+
+E
+x∈OP T
+
+(cid:88)
+ (cid:96)(cid:88)
+
+E
+
+i=1
+
+x∈OP T S
+
+i
+
+≥ 1
+k(cid:96)
+
+=
+
+1
+k(cid:96)
+
+(cid:35)(cid:0)f (V ∪ x)−f (V )(cid:1)
+
+[[x ∈ OP T S
+i ]]
+
+(cid:0)f (V ∪ x) − f (V )(cid:1) .
+
+Now, using (1)-(5), we can bound the inner sum by
+(max{0, f (OP T S
+i ) − f (V )})2
+4f (OP T S
+i )
+
+σmin(OP T S
+i )
+
+.
+
+i ) ≥ σmin(OP T ) and the iden-
+Now, we use σmin(OP T S
+tity that for any two nonnegative reals a, b: (max{0, a −
+b})2/a ≥ a/2 − 2b/3. Together, these imply
+
+(cid:35)
+
+(cid:35)
+
+E[f (V t+1) − f (V t)|V t = V ]
+
+(cid:34) (cid:96)(cid:88)
+
+.
+
+(10)
+
+≥ σmin(OP T )
+
+4k(cid:96)
+
+E
+
+f (OP T S
+i )
+
+i=1
+
+2
+
+− 2f (V )
+
+3
+
+.
+
+(cid:35)
+
+2
+3
+
+and consequently: E[f (V t+1) − f (V t)] ≥ α(Q −
+E[f (V t)] for α = σmin(OP T )/4k.
+If for some t, we
+have E[f (V t)] ≥ Q, the proof is complete because f is
+monotone, and V t ⊆ S. Otherwise, E[f (V t+1) − f (V t)]
+is at least αQ/3 for each of the k(cid:48)(cid:48) = 12k/σmin(OP T ) =
+3/α values of t. We conclude that E[f (S)] should be at
+least (αQ/3)×(3/α) = Q which completes the proof.
+
+) ≥ f (OP T )
+
+i
+
+Proof of Theorem 2. If fA(OP T N S
+4κ(OP T ) for some
+i, then we are done, because Lemma 3 implies that fA(Si)
+i ) ≥
+is large enough. Otherwise, by Lemma 4, fA(OP T S
+f (OP T )
+4κ(OP T ) for all i. Now we can use Lemma 5 to conclude
+that E[fA(S)] ≥ f (OP T )
+
+8κ(OP T ), completing the proof.
+
+where [[ · ]] denotes the indicator.
+We now use this observation to analyze f (S). Consider the
+execution of the greedy algorithm on ∪iSi, and suppose V t
+denotes the set of vectors picked at the tth step (so V t has
+t vectors). The main idea is to give a lower bound on
+
+E[f (V t+1) − f (V t)],
+
+(12)
+where the expectation is over the partitioning {Ti}. Let
+us denote by Q the RHS of (10), for convenience. Now,
+the trick is to show that for any V t such that f (V t) ≤ Q,
+
+4.2. Multi-round algorithm
+We now show that repeating the above algorithm helps
+achieve a (1 − ε)-factor approximation.
+We propose a framework with r epochs for some integer
+r > 0. In each epoch t ∈ [r], we run the DISTGREEDY
+algorithm to select set St. The only thing that changes in
+different epochs is the objective function: in epoch t, the
+algorithm selects columns based on the function f t which
+is deﬁned to be: f t(V ) = fA(V ∪ S1 ∪ S2 ··· ∪ St−1) for
+any t. We note that function f 1 is indeed the same as fA.
+The ﬁnal solution is the union of solutions: ∪r
+
+t=1St.
+
+On Greedy Column Subset Selection
+
+Theorem 3. For any ε < 1, the expected value of the
+solution of the r-epoch DISTGREEDY algorithm, for r =
+O(κ(OP T )/), is at least (1 − ε)f (OP T ).
+
+The proof is provided in Section A.7 of the appendix.
+Necessity of Random Partitioning. We point out that the
+random partitioning step of our algorithm is crucial for the
+GCSS(A, B, k) problem. We adapt the instance from (In-
+dyk et al., 2014) and show that even if each machine can
+compute fA(·) exactly, and is allowed to output poly(k)
+columns, it cannot compete with the optimum. Intuitively,
+this is because the partition of the columns in B could en-
+sure that in each partition i, the best way of covering A
+involve picking some vectors Si, but the Si’s for different
+i could overlap heavily, while the global optimum should
+use different i to capture different parts of the space to be
+covered. (See Theorem 8 in Appendix A.8 for details.)
+
+5. Further optimizations for GREEDY
+We now elaborate on some of the techniques discussed
+in Section 2 for improving the running time of GREEDY.
+We ﬁrst assume that we left-multiply both A and B by
+a random Gaussian matrix of dimension r × m, for r ≈
+k log n/ε2. Working with the new instance sufﬁces for the
+purposes of (1−ε) approximation to CSS (for picking O(k)
+columns). (Details in the Appendix, Section A.5)
+
+5.1. Projection-Cost Preserving Sketches
+Marginal gain evaluations of the form fA(S ∪ v) − fA(S)
+require summing the marginal gain of v onto each column
+of A. When A has a large number of columns, this can be
+very expensive. To deal with this, we use a sketch of A
+instead of A itself. This idea has been explored in several
+recent works; we use the following notation and result:
+Deﬁnition 2 ((Cohen et al., 2015)). For a matrix A ∈
+Rm×n, A(cid:48) ∈ Rm×n(cid:48)
+is a rank-k Projection-Cost Preserv-
+ing Sketch (PCPS) with error 0 ≤ ε < 1 if for any set
+of k vectors S, we have: (1 − ε)fA(S) ≤ fA(cid:48)(S) + c ≤
+(1 + ε)fA(S) where c ≥ 0 is a constant that may depend
+on A and A(cid:48) but is independent of S.
+Theorem 4. [Theorem 12 of (Cohen et al., 2015)] Let R
+be a random matrix with n rows and n(cid:48) = O( k+log 1
+)
+columns, where each entry is set independently and uni-
+n(cid:48) . Then for any matrix A ∈ Rm×n, with
+probability at least 1 − O(δ), AR is a rank-k PCPS for A.
+
+formly to ±(cid:113) 1
+
+ε2
+
+δ
+
+Thus, we can use PCPS to sketch the matrix A to have
+roughly k/ε2 columns, and use it to compute fA(S) to a
+(1 ± ε) accuracy for any S of size ≤ k. This is also used
+in our distributed algorithm, where we send the sketch to
+every machine.
+
+5.2. Lazier-than-lazy Greedy
+The natural implementation of GREEDY requires O(nk)
+evaluations of f (·) since we compute the marginal gain of
+all n candidate columns in each of the k iterations. For sub-
+modular functions, one can do better: the recently proposed
+e−
+LAZIER-THAN-LAZY GREEDY algorithm obtains a 1− 1
+δ approximation with only a linear number O(n log(1/δ))
+of marginal gain evaluations (Mirzasoleiman et al., 2015).
+We show that a similar result holds for GCSS, even though
+our cost function f (·) is not submodular.
+The idea is as follows. Let T be the current solution set.
+To ﬁnd the next element to add to T , we draw a sized
+nB log(1/δ)
+subset uniformly at random from the columns
+in B\T . We then take from this set the column with largest
+marginal gain, add it to T , and repeat. We show this gives
+the following guarantee (details in Appendix Section A.4.)
+Theorem 5. Let A ∈ Rm×nA and B ∈ Rm×nB . Let
+OP Tk be the set of columns from B that maximizes fA(S)
+subject to |S| = k. Let ε, δ > 0 be any constants
+such that  + δ ≤ 1. Let Tr be the set of columns out-
+put by LAZIER-THAN-LAZY GREEDY(A, B, r), for r =
+εσmin(OP Tk) . Then we have:
+
+16k
+
+k
+
+E[fA(Tr)] ≥ (1 − ε − δ)fA(OP Tk)
+
+Further, this algorithm evaluates marginal gain only a lin-
+ear number 16nB log(1/δ)
+
+εσmin(OP Tk) of times.
+
+Note that this guarantee is nearly identical to our analysis of
+GREEDY in Theorem 1, except that it is in expectation. The
+proof strategy is very similar to that of Theorem 1, namely
+showing that the value of f (·) increases signiﬁcantly in ev-
+ery iteration (see Appendix Section A.4).
+Calculating marginal gain faster. We defer the discussion
+to Appendix Section A.6.
+
+6. Experimental results
+In this section we present an empirical investigation of the
+GREEDY, GREEDY++ and DISTGREEDY algorithms. Ad-
+ditionally, we will compare with several baselines:
+Random: The simplest imaginable baseline, this method
+selects columns randomly.
+2-Phase: The two-phased algorithm of (Boutsidis et al.,
+2009), which operates by ﬁrst sampling Θ(k log k)
+columns based on properties of the top-k right singular
+space of the input matrix (this requires computing a top-k
+SVD), then ﬁnally selects exactly k columns via a deter-
+ministic procedure. The overall complexity is dominated
+by the top-k SVD, which is O(min{mn2, m2n}).
+PCA: The columns of the rank-k PCA projection matrix
+will be used to serve as an upper bound on performance, as
+they explicitly minimize the Forbenius reconstruction cri-
+teria. Note this method only serves as an upper bound and
+
+On Greedy Column Subset Selection
+
+Figure 1. A comparison of reconstruction accuracy, model classiﬁcation accuracy and runtime of various column selection methods
+(with PCA proved as an upper bound). The runtime is shown plot shows the relative speedup over the naive GREEDY algorithm.
+
+does not fall into the framework of column subset selection.
+We investigate using these algorithms using two datasets,
+one with a small set of columns (mnist) that is used
+to compare both scalable and non-scalable methods, as
+well as a sparse dataset with a large number of columns
+(news20.binary) that is meant to demonstrate the scalabil-
+ity of the GREEDY core-set algorithm.2
+Finally, we are also interested in the effect of column selec-
+tion as a preprocessing step for supervised learning meth-
+ods. To that end, we will train a linear SVM model, using
+the LIBLINEAR library (Fan et al., 2008), with the subse-
+lected columns (features) and measure the effectiveness of
+the model on a held out test set. For both datasets we re-
+port test error for the best choice of regularization parame-
+ter c ∈ {10−3, . . . , 104}. We run GREEDY++ and DIST-
+GREEDY with n
+k log(10) marginal gain evaluations per iter-
+k machines
+
+ation and the distributed algorithm uses s =(cid:112) n
+
+with each machine recieving n
+
+s columns.
+
+6.1. Small scale dataset (mnist)
+We ﬁrst consider the MNIST digit recognition task, which
+is a ten-class classiﬁcation problem. There are n = 784
+input features (columns) that represent pixel values from
+the 28 × 28-pixel images. We use m = 60,000 instances to
+train with and 10,000 instances for our test set.
+From Figure 1 we see that all column sampling methods,
+apart from Random, select columns that approximately
+provide the same amount of reconstruction and are able to
+reach within 1% of the performance of PCA after sampling
+300 columns. We also see a very similar trend with respect
+to classiﬁcation accuracy. It is notable that, in practice, the
+core-set version of GREEDY incurs almost no additional
+error (apart from at the smallest values of k) when com-
+pared to the standard GREEDY algorithm.
+Finally, we also show the relative speed up of the compet-
+itive methods over the standard GREEDY algorithm.
+In
+this small dataset regime, we see that the core-set algo-
+
+2Both
+
+at:
+www.csie.ntu.edu.tw/∼cjlin/libsvmtools/datasets/multiclass.html.
+
+datasets
+
+found
+
+can
+
+be
+
+n
+500
+1000
+2500
+
+Rand
+54.9
+59.2
+67.6
+
+2-Phase
+81.8 (1.0)
+84.4 (1.0)
+87.9 (1.0)
+
+DISTGREEDY
+
+PCA
+
+80.2 (72.3)
+82.9 (16.4)
+85.5 (2.4)
+
+85.8 (1.3)
+88.6 (1.4)
+90.6 (1.7)
+
+Table 1. A comparison of the classiﬁcation accuracy of selected
+features. Also, the relative speedup over the 2-Phase algorithm
+for selecting features is shown in parentheses.
+
+rithm does not offer an improvement over the single ma-
+chine GREEDY++ and in fact the 2-Phase algorithm is the
+fastest. This is primarily due to the overhead of the dis-
+tributed core-set algorithm and the fact that it requires two
+greedy selection stages (e.g. map and reduce). Next, we
+will consider a dataset that is large enough that a distributed
+model is in fact necessary.
+
+6.2. Large scale dataset (news20.binary)
+In this section, we show that the DISTGREEDY algorithm
+can indeed scale to a dataset with a large number of
+columns. The news20.binary dataset is a binary class text
+classiﬁcation problem, where we start with n = 100,000
+sparse features (0.033% non-zero entries) that represent
+text trigrams, use m = 14,996 examples to train with and
+hold-out 5,000 examples to test with.
+We compare the classiﬁcation accuracy and column selec-
+tion runtime of the naive random method, 2-Phase algo-
+rithm as well as PCA (that serves as an upper bound on
+performance) to the DISTGREEDY algorithm. The results
+are presented in Table 1, which shows that DISTGREEDY
+and 2-Phase both perform signiﬁcantly better than ran-
+dom sampling and come relatively close to the PCA upper
+bound in terms of accuracy. However, we also ﬁnd that
+DISTGREEDY can be magnitudes of order faster than the 2-
+Phase algorithm. This is in a large part because the 2-Phase
+algorithm suffers from the bottleneck of computing a top-
+k SVD. We note that an approximate SVD method could
+be used instead, however, it was outside the scope of this
+preliminary empirical investigation.
+In conclusion, we have demonstrated that DISTGREEDY is
+able to scale to larger sized datasets while still selecting
+effective features.
+
+50100150200250300350400# selected columns0.650.700.750.800.850.900.951.00reconstructedPCARandomGREEDYGREEDY++DISTGREEDY2-Phase50100150200250300350400# selected columns0.740.760.780.800.820.840.860.880.900.92model accuracyPCARandomGREEDYGREEDY++DISTGREEDY2-Phase50100150200250300350400# selected columns406080100120140160rel. speedupGREEDY++DISTGREEDY2-PhaseOn Greedy Column Subset Selection
+
+References
+Balcan, Maria-Florina, Ehrlich, Steven, and Liang, Yingyu.
+Distributed k-means and k-median clustering on general
+communication topologies. In Advances in Neural Infor-
+mation Processing Systems 26: 27th Annual Conference
+on Neural Information Processing Systems 2013. Pro-
+ceedings of a meeting held December 5-8, 2013, Lake
+Tahoe, Nevada, United States., pp. 1995–2003, 2013.
+
+Boutsidis, C., Mahoney, M. W., and Drineas, P. An im-
+proved approximation algorithm for the column sub-
+set selection problem. In Proceedings of the Twentieth
+Annual ACM-SIAM Symposium on Discrete Algorithms,
+SODA ’09, pp. 968–977, Philadelphia, PA, USA, 2009.
+Society for Industrial and Applied Mathematics.
+
+Boutsidis, C., Drineas, P., and Magdon-Ismail, M. Near
+In Pro-
+optimal column-based matrix reconstruction.
+ceedings of the 2011 IEEE 52Nd Annual Symposium on
+Foundations of Computer Science, FOCS ’11, pp. 305–
+314, Washington, DC, USA, 2011. IEEE Computer So-
+ciety. ISBN 978-0-7695-4571-4.
+
+Boutsidis, C., Liberty, E., and Sviridenko, M. Greedy min-
+imization of weakly supermodular set functions. CoRR,
+abs/1502.06528, 2015.
+
+Boutsidis, C., Woodruff, D. P.,
+
+and Zhong, P.
+Communication-optimal distributed principal
+com-
+ponent analysis in the column-partition model. STOC
+’16 (to appear). ACM, 2016.
+
+C¸ ivril, A. Column subset selection problem is ug-hard.
+J. Comput. Syst. Sci., 80(4):849–859, June 2014. ISSN
+0022-0000.
+
+C¸ ivril, A. and Magdon-Ismail, M. Column subset selection
+via sparse approximation of svd. Theor. Comput. Sci.,
+421:1–14, March 2012. ISSN 0304-3975.
+
+Cohen, M. B., Elder, S., Musco, C., Musco, C., and Persu,
+M. Dimensionality reduction for k-means clustering and
+In Proceedings of the Forty-
+low rank approximation.
+Seventh Annual ACM on Symposium on Theory of Com-
+puting, STOC ’15, pp. 163–172, New York, NY, USA,
+2015. ACM. ISBN 978-1-4503-3536-2.
+
+Deshpande, A. and Vempala, S. Adaptive sampling
+In Proceed-
+and fast low-rank matrix approximation.
+ings of the 9th International Conference on Approxima-
+tion Algorithms for Combinatorial Optimization Prob-
+lems, and 10th International Conference on Random-
+ization and Computation, APPROX’06/RANDOM’06,
+pp. 292–303, Berlin, Heidelberg, 2006. Springer-Verlag.
+ISBN 3-540-38044-2, 978-3-540-38044-3.
+
+Deshpande, A., Rademacher, L., Vempala, S., and Wang,
+G. Matrix approximation and projective clustering via
+In Proceedings of the Seventeenth
+volume sampling.
+Annual ACM-SIAM Symposium on Discrete Algorithm,
+SODA ’06, pp. 1117–1126, Philadelphia, PA, USA,
+2006. Society for Industrial and Applied Mathematics.
+ISBN 0-89871-605-5.
+
+Drineas, P., Frieze, A., Kannan, R., Vempala, S., and Vinay,
+V. Clustering large graphs via the singular value decom-
+position. Mach. Learn., 56(1-3):9–33, June 2004. ISSN
+0885-6125.
+
+Drineas, P., Mahoney, M. W., and Muthukrishnan, S.
+Relative-error cur matrix decompositions. SIAM J. Ma-
+trix Analysis Applications, 30(2):844–881, 2008.
+
+Fan, Rong-En, Chang, Kai-Wei, Hsieh, Cho-Jui, Wang,
+Xiang-Rui, and Lin, Chih-Jen. Liblinear: A library
+for large linear classiﬁcation. The Journal of Machine
+Learning Research, 9:1871–1874, 2008.
+
+Farahat, A. K., Ghodsi, A., and Kamel, M. S. An efﬁcient
+greedy method for unsupervised feature selection.
+In
+Proceedings of the 2011 IEEE 11th International Con-
+ference on Data Mining, ICDM ’11, pp. 161–170. IEEE
+Computer Society, 2011. ISBN 978-0-7695-4408-3.
+
+Farahat, A. K., Ghodsi, A., and Kamel, M. S. A fast greedy
+algorithm for generalized column subset selection.
+In
+Advances in Neural Information Processing Systems 27,
+2013.
+
+Farahat, A. K., Elgohary, A., Ghodsi, A., and Kamel, M. S.
+Greedy column subset selection for large-scale data sets.
+Knowl. Inf. Syst., 45(1):1–34, October 2015a.
+ISSN
+0219-1377.
+
+da Ponte Barbosa, Rafael, Ene, Alina, Nguyen, Huy L., and
+Ward, Justin. The power of randomization: Distributed
+submodular maximization on massive datasets. CoRR,
+abs/1502.02606, 2015.
+
+Farahat, A. K., Elgohary, A., Ghodsi, A., and Kamel, M. S.
+Greedy column subset selection for large-scale data sets.
+Knowl. Inf. Syst., 45(1):1–34, October 2015b.
+ISSN
+0219-1377.
+
+Deshpande, A. and Rademacher, L. Efﬁcient volume sam-
+pling for row/column subset selection. In Proceedings of
+the 2010 IEEE 51st Annual Symposium on Foundations
+of Computer Science, FOCS ’10, pp. 329–338, Wash-
+ington, DC, USA, 2010. IEEE Computer Society. ISBN
+978-0-7695-4244-7.
+
+Feldman, D., Schmidt, M., and Sohler, C. Turning big data
+into tiny data: Constant-size coresets for k-means, PCA
+and projective clustering. In Proceedings of the Twenty-
+Fourth Annual ACM-SIAM Symposium on Discrete Al-
+gorithms, SODA 2013, New Orleans, Louisiana, USA,
+January 6-8, 2013, pp. 1434–1453, 2013.
+
+On Greedy Column Subset Selection
+
+Sarlos, T.
+
+Improved approximation algorithms for large
+matrices via random projections. In Proceedings of the
+47th Annual IEEE Symposium on Foundations of Com-
+puter Science, FOCS ’06, pp. 143–152, Washington,
+DC, USA, 2006. IEEE Computer Society. ISBN 0-7695-
+2720-5.
+
+Vershynin, R. Introduction to the non-asymptotic analysis
+
+of random matrices, 2010.
+
+Feldman, D., Volkov, M., and Rus, D. Dimensionality re-
+duction of massive sparse datasets using coresets. CoRR,
+abs/1503.01663, 2015.
+
+Frieze, A., Kannan, R., and Vempala, S. Fast monte-
+carlo algorithms for ﬁnding low-rank approximations. J.
+ACM, 51(6):1025–1041, November 2004. ISSN 0004-
+5411.
+
+Guruswami, V. and Sinop, A. K. Optimal column-based
+In Proceedings of the
+low-rank matrix reconstruction.
+Twenty-third Annual ACM-SIAM Symposium on Dis-
+crete Algorithms, SODA ’12, pp. 1207–1214. SIAM,
+2012.
+
+Guyon, I. and Elisseeff, A. An introduction to variable and
+feature selection. J. Mach. Learn. Res., 3:1157–1182,
+March 2003. ISSN 1532-4435.
+
+Indyk, Piotr, Mahabadi, Sepideh, Mahdian, Mohammad,
+and Mirrokni, Vahab S. Composable core-sets for di-
+In Proceedings of
+versity and coverage maximization.
+the 33rd ACM SIGMOD-SIGACT-SIGART Symposium
+on Principles of Database Systems, PODS’14, Snowbird,
+UT, USA, June 22-27, 2014, pp. 100–108, 2014.
+
+Johnson, W. and Lindenstrauss, J. Extensions of Lipschitz
+mappings into a Hilbert space. In Conference in mod-
+ern analysis and probability (New Haven, Conn., 1982),
+volume 26 of Contemporary Mathematics, pp. 189–206.
+American Mathematical Society, 1984.
+
+Mirrokni, V. and Zadimoghaddam, M. Randomized com-
+posable core-sets for distributed submodular maximiza-
+tion. In Proceedings of the Forty-Seventh Annual ACM
+on Symposium on Theory of Computing, STOC ’15, pp.
+153–162, New York, NY, USA, 2015. ACM. ISBN 978-
+1-4503-3536-2.
+
+Mirzasoleiman, B., Badanidiyuru, A., Karbasi, A.,
+Vondr´ak, J., and Krause, A. Lazier than lazy greedy.
+In Proceedings of the Twenty-Ninth AAAI Conference
+on Artiﬁcial Intelligence, January 25-30, 2015, Austin,
+Texas, USA., pp. 1812–1818, 2015.
+
+Pi, Y., Peng, H., Zhou, S., and Zhang, Z. A scalable
+approach to column-based low-rank matrix approxima-
+tion. In Proceedings of the Twenty-Third International
+Joint Conference on Artiﬁcial Intelligence, IJCAI ’13,
+pp. 1600–1606. AAAI Press, 2013. ISBN 978-1-57735-
+633-2.
+
+Rudelson, M. and Vershynin, R. Non-asymptotic theory
+of random matrices: extreme singular values. Proceed-
+ings of the International Congress of Mathematicians,
+III:1576–1602, 2010.
+
+

@@ -1,0 +1,1592 @@
+A Superlinearly-Convergent Proximal Newton-Type Method for the
+
+Optimization of Finite Sums
+
+Anton Rodomanov
+Higher School of Economics, Faculty of Computer Science, 125319, Kochnovsky Proezd, 3, Moscow, RUSSIA
+Dmitry Kropotov
+Lomonosov Moscow State University, 119991, CMC Faculty, Leninskie Gory, 1, Moscow, RUSSIA
+
+ANTON.RODOMANOV@GMAIL.COM
+
+DMITRY.KROPOTOV@GMAIL.COM
+
+Abstract
+
+We consider the problem of optimizing the
+strongly convex sum of a ﬁnite number of convex
+functions. Standard algorithms for solving this
+problem in the class of incremental/stochastic
+methods have at most a linear convergence rate.
+We propose a new incremental method whose
+convergence rate is superlinear – the Newton-
+type incremental method (NIM). The idea of the
+method is to introduce a model of the objec-
+tive with the same sum-of-functions structure and
+further update a single component of the model
+per iteration. We prove that NIM has a superlin-
+ear local convergence rate and linear global con-
+vergence rate. Experiments show that the method
+is very effective for problems with a large num-
+ber of functions and a small number of variables.
+
+1. Introduction
+In this paper we consider the following strongly convex un-
+constrained optimization problem:
+
+(cid:34)
+
+min
+x∈Rd
+
+φ(x) :=
+
+fi(x) + h(x)
+
+,
+
+(1)
+
+where all fi : Rd → R are twice continuously differen-
+tiable convex functions and h : Rd → R is convex, but not
+necessarily differentiable. We also assume that for func-
+tion h(x) we have access to some efﬁcient implementation
+of its proximal mapping
+
+proxh(x) := argmin
+y∈Rd
+
+h(y) +
+
+(cid:107)y − x(cid:107)2
+
+1
+2
+
+.
+
+(2)
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+n(cid:88)
+
+i=1
+
+1
+n
+
+(cid:20)
+
+(cid:35)
+
+(cid:21)
+
+1.
+
+A typical example of problem (1) is regularized empiri-
+cal risk minimisation for training a machine learning al-
+gorithm. In this case the variables x are the parameters of
+the model, fi(x) measures the error of the model on the ith
+training sample and h(x) is a regularizer, e.g. l1- or l1/l2-
+norm. Since the objective φ is supposed to be strongly con-
+vex, it has the unique minimizer which we denote by x∗.
+We consider the case when the number of functions n may
+be very large. In this situation for minimizing φ it is conve-
+nient to use incremental optimization methods (Bertsekas,
+2011) since the complexity of their iteration does not de-
+pend on n. Unlike classical optimization methods which
+process all the n functions at every iteration, incremental
+methods in each iteration work only with a single com-
+ponent fi
+If each incremental iteration tends to make
+reasonable progress in some “average” sense, then an in-
+cremental method may signiﬁcantly outperform its non-
+incremental counterpart (Bertsekas, 2011).
+There is a large body of work in the ﬁeld of incremental op-
+timization methods (Byrd et al., 2014; Bordes et al., 2009;
+Schraudolph et al., 2007). They all can be divided into two
+groups depending on their rate of convergence.
+The ﬁrst group contains the stochastic gradient method
+(SGD) and other methods with iterations of the form,
+xk+1 = proxh(xk − αkBk∇fik (xk)), where Bk is some
+scaling matrix. For instance, in SGD Bk is just the iden-
+tity matrix;
+in methods oBFGS and oLBFGS (Schrau-
+dolph et al., 2007),
+the matrix Bk is set to a quasi-
+Newton estimate of the inverse Hessian; in method SGD-
+QN (Bordes et al., 2009) the matrix Bk is a diagonal ma-
+trix whose entries are estimated from the secant equation;
+method SQN (Byrd et al., 2014) is an advanced version
+of oLBFGS; instead of estimating the gradient difference
+∇f (xk+1) − ∇f (xk) by subtracting two stochastic gradi-
+1Usually all the functions fi are grouped in small subsets
+called mini-batches with further processing of one mini-batch per
+incremental iteration
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+ents, SQN estimates it by multiplying a stochastic Hessian
+by the deterministic difference xk+1 − xk. Compared to
+SGD, all these methods may have better practical perfor-
+mance. However, none of them qualitatively improves on
+the rate of convergence—any method from this group has
+a slow sublinear rate of convergence, including the method
+with Bk = ∇2f (xk)−1 (Bousquet & Bottou, 2008). Al-
+though not all of these methods support proximal mapping.
+The second group contains methods such as SAG (Schmidt
+et al., 2013), IAG (Blatt et al., 2007), SVRG (Johnson &
+Zhang, 2013), FINITO (Defazio et al., 2014b), SAGA (De-
+fazio et al., 2014a), MISO (Mairal, 2015) etc. The com-
+mon property of these methods is that they use such esti-
+mates of the objective gradient ∇f (xk) whose error tends
+to zero as the iterate xk approaches the optimum x∗. As
+a result, these methods may converge with constant step
+lengths, and their rate of convergence is linear.
+Several recent works (Kolte et al., 2015; Lucchi et al., 2015;
+Moritz et al., 2015) try to incorporate a second-order in-
+formation into linear-convergent incremental methods, es-
+pecially SVRG. These methods are more robust to choice
+of parameters and may give better results for poorly con-
+ditioned problems. However, for all of them the rate of
+convergence remains linear.
+The goal of this paper is to introduce an incremen-
+tal optimization method with a fast superlinear local
+rate of convergence—the Newton-type incremental method
+(NIM). To the best of our knowledge,
+this is the ﬁrst
+method in the class of incremental methods whose rate of
+convergence is superlinear. The idea of the method is to
+consider a model of the objective with the same sum-of-
+functions structure and further update a single component
+of the model per iteration. We provide a theoretical analy-
+sis of the convergence rates of NIM, both local and global.
+Besides, we introduce and analyze inexact version of NIM
+in spirit of inexact Newton method and inexact proximal
+Newton method (Lee et al., 2012).
+In the recent work (G¨urb¨uzbalaban et al., 2015) the incre-
+mental Newton (IN) method was proposed. Despite the
+similar name, the IN method is completely different from
+NIM. This method belongs to the ﬁrst group of incremental
+methods with Bk equal to a partial sum of ∇2fi. The rate
+of convergence for IN is sublinear.
+The most closely-related method to NIM is SFO (Sohl-
+Dickstein et al., 2014). This method also uses a second-
+order model for each function fi, but, instead of the true
+Hessian ∇2fi(vk
+i ), it works with its approximation ob-
+tained with the aid of an L-BFGS-like technique. Although
+no convergence analysis of SFO is given in (Sohl-Dickstein
+et al., 2014), experiments show that SFO has a linear rate
+of convergence. This shows that the Hessian approxima-
+
+tion of SFO is not accurate enough to ensure a superlinear
+rate. Besides, SFO does not support a proximal mapping.
+The paper is organized as follows. First we introduce the
+method NIM for the general case of the strongly convex
+objective φ with arbitrary convex twice differentiable func-
+tions fi. Also we consider an inexact version of the method
+and discuss in particular a new stopping criterion for the
+inner optimization problem that is eligible for incremental
+setting. Then in section 3 we make theoretical analysis of
+the proposed method both for local and global convergence.
+For the sake of clarity all technical proofs are moved to sup-
+plementary material. The next section considers the special
+case of linear models where method NIM has sufﬁciently
+less memory and iteration costs. We conclude with experi-
+ments and some discussion.
+
+2. Method NIM
+2.1. Model of the Objective
+
+We begin the derivation of NIM by constructing a model of
+the objective φ at the current iteration k. First, we form the
+following convex quadratic model of each fi:
+
+fi(x) ≈ mi
+
+k) + ∇fi(vi
+k(x) := fi(vi
+(x − vi
+1
+2
+
+k)(cid:62)∇2fi(vi
+
+k)(cid:62)(x − vi
+
+k)+
+k)(x − vi
+k)
+
+for some point vi
+we can naturally build a model of the objective φ:
+
+k ∈ Rd. Once we have a model of each fi,
+
+φ(x) ≈ mk(x) :=
+
+1
+n
+
+mi
+
+k(x) + h(x).
+
+(3)
+
+n(cid:88)
+
+i=1
+
+In what follows we assume that the model (3) is strongly
+convex and thus has a unique minimum
+
+¯xk = argmin
+x∈Rd
+
+mk(x).
+
+(4)
+
+To obtain the new iterate xk+1, NIM ﬁrst minimizes the
+current model (3) and then makes a step in the direction of
+the found minimum:
+
+xk+1 := αk ¯xk + (1 − αk)xk,
+
+where αk ∈ (0, 1] is the step length. After the step is done,
+NIM updates the model m or, equivalently, the centers v.
+To keep the iteration complexity low, only one component
+of the full model is updated at every iteration:
+
+(cid:40)
+
+vi
+k+1 :=
+
+xk+1
+vi
+k
+
+if i = ik,
+otherwise,
+
+where ik ∈ {1, . . . , n} is the index of the component to
+update.
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+(cid:20)
+
+In what follows we will use the notion of scaled proximal
+mapping:
+
+proxH
+
+h(y) +
+
+h (x) = argmin
+y∈Rd
+
+,
+where H is some positive deﬁnite matrix and (cid:107)x(cid:107)2
+H :=
+x(cid:62)Hx. Using simple rearrangement the problem (4) for
+the model (3) can be equivalently written as follows:
+
+H
+
+(5)
+
+(cid:107)y − x(cid:107)2
+
+1
+2
+
+(cid:21)
+
+¯xk = proxHk
+
+h (H−1
+
+where we use the notation
+∇2fi(vi
+
+uk :=
+
+k)vi
+k,
+
+1
+n
+
+Hk :=
+
+1
+n
+
+∇2fi(vi
+k).
+
+n(cid:88)
+n(cid:88)
+
+i=1
+
+i=1
+
+k (uk − gk)),
+n(cid:88)
+
+gk :=
+
+1
+n
+
+i=1
+
+∇fi(vi
+
+k), (6)
+
+Note that in case n = 1 NIM becomes equivalent to proxi-
+mal Newton method (Lee et al., 2012).
+
+2.2. Model Update
+
+Since we update only one component of the full model m at
+every iteration we need not compute the sums in (6) every
+time. Instead, we keep track of the quantities Hk, uk, gk
+and update them as follows (here i denotes the index of the
+selected component at iteration k):
+
+(cid:2)∇2fi(vi
+(cid:2)∇2fi(vi
+(cid:2)∇fi(vi
+
+1
+n
+1
+n
+1
+n
+
+k)(cid:3) ,
+k)(cid:3) .
+
+k+1) − ∇2fi(vi
+
+k+1 − ∇2fi(vi
+
+k)vi
+k
+
+k+1)vi
+k+1) − ∇fi(vi
+
+(7)
+
+(cid:3) ,
+
+Hk+1 = Hk +
+
+uk+1 = uk +
+
+gk+1 = gk +
+
+k in
+In order to do this, we need to store all the centers vi
+memory. Taking into account the cost of storing Hk, uk,
+gk, the total storage cost of NIM is O(nd + d2). Note that
+we do not store the separate Hessians ∇2fi(vi
+k) in mem-
+ory because it would cost O(nd2). Therefore, to update the
+model, we need to compute the selected fi twice—once
+at the new point xk+1 and once at the previous point vi
+k.
+Below (section 4.3) we analyze the special case of the ob-
+jective φ for linear models. In this case memory costs of
+NIM can be sufﬁciently reduced.
+
+2.3. Inexact Model Minimization
+
+Unfortunately, even if the proximal mapping (2) is given in
+analytic form or can be efﬁciently estimated, the result of
+the scaled proximal mapping (5) is much harder to com-
+pute. Here we need to use a separate iterative optimization
+routine. Fortunately, there is a bunch of methods partic-
+ularly tailored to the problem (5). Some of them are in-
+tended for speciﬁc functions h(x), e.g. glmnet (Fried-
+man et al., 2010) and OWL-QN (Andrew & Gao, 2007).
+
+Others can be applied for any convex h(x) with efﬁcient
+proximal mapping (2), e.g. Fast gradient method
+(FGM) (Nesterov, 2013). In what follows we will always
+use Conjugate Gradient Method for solving (5) in
+case h(x) is l2-norm and FGM in all other cases. We will
+refer any iterative method for solving subproblem (5) as IS
+(Inexact Solver).
+In classic Newton method and proximal Newton
+method (Lee et al., 2012) it
+is common to consider
+inexact search for the next optimization direction. Since
+here we have chosen to use an iterative scheme for
+solving the subproblem (5), it seems natural to consider
+inexact solution for the inner optimization problem of
+NIM as well. However, in incremental optimization we
+do not have access to the full gradient of the function
+f, and hence we need to ﬁnd a new stopping criterion
+for inexact model minimization in NIM. This criterion,
+from the one hand, must be eligible for calculation in the
+incremental setting and, from the other hand, must provide
+the rate of convergence similar to NIM with exact model
+minimization. Now we derive such criterion using notions
+from (Nesterov, 2013) and leave its theoretical analysis to
+section 3.
+Problem (5) can be viewed as the minimization of a com-
+posite function: miny∈Rd [s(y) + h(y)], where s(y) :=
+2(cid:107)x − y(cid:107)2
+is
+H is a smooth function whose gradient
+1
+Lipschitz-continuous with constant λmax(H). Denote
+(cid:107)y − x(cid:107)2 + h(y)
+
+∇s(x)(cid:62)y +
+
+(cid:20)
+
+(cid:21)
+
+.
+
+TL(x) := argmin
+y∈Rd
+
+(8)
+Note that problem (8) can be solved exactly due to our ini-
+tial assumptions on proximal mapping (2). Now let us con-
+sider the value
+
+L
+2
+
+gL(x) := L(x − TL(x)),
+
+which is an analogue of the gradient of a smooth function.
+If h ≡ 0, then gL(x) becomes ∇s(x) and does not depend
+on L. We propose the following stopping criterion for IS:
+if x satisﬁes
+
+(cid:107)gL(x)(cid:107) ≤ min{1, (∆k)γ}∆k,
+∆k := (cid:107)¯vk − proxh (¯vk − gk)(cid:107) ,
+
+(9)
+
+(cid:80)n
+
+n
+
+i=1 vi
+
+then stop and return the point ˆxk := TL(x) as an approx-
+imate minimizer of the model mk. Here L is any number
+such that L ≥ L0 ≡ 1, ¯vk := 1
+k, gk is calculated
+using (6) and γ ∈ (0, 1] is some parameter. Particular value
+of γ determines the local rate of convergence for inexact
+NIM method (see Section 3). Note that all the quantities
+in expression (9) are accessible for NIM since TL(x) can
+be calculated for any IS, gk is calculated in an incremen-
+tal way (7) and ¯vk can also be tracked in an incremental
+way (7).
+
+Algorithm 1 NIM: a Newton-type Incremental Method
+1: Input: x0, . . . , xn−1 ∈ Rd: initial points;
+
+α > 0: step length.
+
+2: Initialize model:
+
+H ← (1/n)(cid:80)n
+u ← (1/n)(cid:80)n
+g ← (1/n)(cid:80)n
+
+i=1 ∇2fi(xi−1)
+i=1 ∇2fi(xi−1)xi−1
+i=1 ∇fi(xi−1)
+
+vi ← xi−1, i = 1, . . . , n
+
+3: for k ≥ n − 1 do
+4: Minimize model using IS with stopping crite-
+5: Make a step: xk+1 ← αˆx + (1 − α)xk
+6:
+
+rion (9): ˆx ≈ proxH
+
+h [H−1(u − g)]
+
+Update model:
+
+i ← (k + 1) mod n + 1
+H ← H + (1/n)[∇2fi(xk+1) − ∇2fi(vi)]
+u ← u + (1/n)[∇2fi(xk+1)xk+1 − ∇2fi(vi)vi]
+g ← g + (1/n)[∇fi(xk+1) − ∇fi(vi)]
+vi ← xk+1
+
+7: end for
+
+The general scheme of NIM in given in Algorithm 1.
+
+3. Convergence analysis
+3.1. Local rate of convergence
+
+n(cid:88)
+
+i=1
+
+Here we brieﬂy introduce main ideas which lead to the the-
+orem on local convergence rate for both exact and inexact
+variants of NIM. Full set of lemmas and theorems and their
+proofs are given in supplementary material.
+We assume x∗ is a solution of (1) with positive deﬁnite
+Hessian:
+
+∇2f (x∗) =
+
+1
+n
+
+∇2fi(x∗) (cid:23) µf I, µf > 0.
+
+We analyze NIM with unit step size αk ≡ 1 and cyclic or-
+der of component selection. Besides, we suppose all func-
+tions fi have Lipschitz-continuous gradients with constant
+Lf and Lipschitz-continuous Hessians with constant Mf .
+At every iteration inexact NIM makes the step xk+1 =
+ˆxk = argmin mk(x) + ek, where ek is some nonzero vec-
+tor due to the stopping criterion (9). Lemma 3 from the
+theoretical analysis in (Nesterov, 2013) connects the cur-
+rent error (cid:107)ek(cid:107) with (cid:107)gL(x)(cid:107) from the last step of IS:
+
+Lemma 1 (main estimate). Let k ≥ n − 1 be the num-
+ber of the current iteration. Assume the last n points
+xk, . . . , xk−n+1 are close enough to x∗:
+
+(cid:107)xk−i − x∗(cid:107) ≤ µf
+2Mf
+
+,
+
+i = 0, . . . , n − 1.
+
+Then for the next generated point xk+1:
+
+(cid:32)
+(cid:32)
+
+1
+n
+
+1
+n
+
+n−1(cid:88)
+n−1(cid:88)
+
+i=0
+
+i=0
+
+(cid:107)xk+1 − x∗(cid:107) ≤ Mf
+µf
+
+(cid:107)xk−i − x∗(cid:107)2
+
+E
+
+(cid:107)xk−i − x∗(cid:107)2
+
+,
+
+(cid:114)
+
+where E = 0 when the subproblem (5) is solved exactly
+and E =
+when it is solved using IS with
+stopping criterion (9).
+
+8(2+Lf )5+2γ
+
+µ3
+f
+
+(cid:33)(1+γ)/2
+
+This lemma shows that the local convergence rate of NIM
+is determined by the convergence rate of the following (re-
+current) sequence:
+
+(cid:32)
+
+1
+n
+
+n(cid:88)
+
+(cid:33)
+
+(cid:32)
+
+1
+n
+
+n(cid:88)
+
+, k ≥ n,
+
+z2
+k−i
+
+z2
+k−i
+
+i=1
+
+i=1
+
++E
+
+zk := A
+where A > 0, E ≥ 0, 0 < γ ≤ 1 are some constants.
+For the sequence {zk} it is possible to show that, being
+properly initialized close enough to zero, it converges to
+zero at a Q-superlinear rate. Thus we come to the following
+main result on the local convergence rate of NIM:
+Theorem 1 (local convergence rate). Suppose that all the
+initial points x0, . . . , xn−1 are close enough to x∗:
+i = 0, . . . , n − 1.
+
+(cid:107)xi − x∗(cid:107) ≤ R,
+
+Then the sequence of iterates {xk}k≥0, generated by NIM
+with the unit step size and cyclic order of component selec-
+tion, converges to x∗ at an R-superlinear rate, i. e. there
+exists {zk}k≥0 such that
+
+(cid:107)xk − x∗(cid:107) ≤ zk,
+
+zk+1 ≤ qkzk,
+
+k ≥ 0
+k ≥ n,
+
+where qk → 0 and
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+(cid:33)
+(cid:33)(1+γ)/2
+
++
+
+(cid:107)ek(cid:107) ≤ λ−1
+
+min(Hk)
+
+1 +
+
+Lf
+L
+
+(cid:107)gL(x)(cid:107).
+
+z0 = ··· = zn−1 := max
+0≤i≤n−1
+
+(cid:107)xi − x∗(cid:107) .
+
+Then the stopping criterion (9) guarantees
+
+(cid:107)ek(cid:107) ≤ λ−1
+
+min(Hk)(2+Lf )2+γ
+
+(cid:107)vi
+
+k − x∗(cid:107)2
+
+(cid:33)(1+γ)/2
+
+.
+
+If the subproblem (5) is solved exactly, then
+
+(cid:18)
+
+(cid:19)2(cid:98)k/n(cid:101)−1
+
+.
+
+R :=
+
+µf
+2Mf
+
+,
+
+qk :=
+
+1 − 3
+4n
+
+(cid:18)
+
+(cid:19)
+
+(cid:32)
+
+n(cid:88)
+
+i=1
+
+1
+n
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+Otherwise, if it is solved inexactly using IS with termina-
+tion condition (9), then
+
+(cid:33)1/(2γ) ,
+
+ µf
+
+2Mf
+
+(cid:32)
+(cid:19)(1+γ)(cid:98)k/n(cid:101)/2
+
+,
+
+µ3
+f
+
+.
+
+R := min
+
+(cid:18)
+
+qk :=
+
+1 − 7
+16n
+
+128(2 + Lf )5+2γ
+
+3.2. Global convergence
+Theorem 2 (global rate of convergence). Suppose that the
+gradients ∇fi, i = 1, . . . , n, are Lipschitz-continuous. Let
+{xk}k≥0 be the sequence of iterates generated by NIM with
+a constant step length αk ≡ α, where α is small enough,
+and cyclic order of component selection. Then for any ini-
+tialization of xi, i = 0, . . . , n − 1, the sequence {xk} con-
+verges to x∗ at a linear rate:
+(cid:107)xk − x∗(cid:107)2 ≤ const·ck (cid:107)x0 − x∗(cid:107)2 ,
+where c ∈ (0, 1).
+
+k = 0, 1, . . . ,
+
+The details are given in supplementary material.
+
+4. Implementation details
+4.1. Model initialization
+
+One way to initialize the model is to set all the initial points
+equal: x1 = ··· = xn−1 = x0. However, this approach
+is quite ineffective because the method will not make any
+progress during the computation of the initial values for H,
+u and g (which takes a full pass over all the functions). A
+better strategy is to perform n − 1 iterations of any other
+incremental method (such as SGD) from x0 to obtain the
+points x1, . . . , xn−1 and build up the quantities H, u and
+g during the process. Another possibility is to start from
+H = 0, u = 0, g = 0 and then perform n − 1 iterations of
+the main loop of NIM but without subtracting the quantities
+∇2fi(vi), ∇2fi(vi)vi, ∇fi(vi) during the model updates.
+In our experiments we use the third strategy.
+
+4.2. Order of component selection
+
+We have experimented with two standard strategies of
+choosing the component ik to update: 1) cyclic when
+ik = (k mod n) + 1, and 2) randomized when at every
+iteration ik ∈ {1, . . . , n} is chosen uniformly at random.
+In all our experiments we observed that NIM always con-
+verges faster under the cyclic order. This result differs NIM
+from many other incremental methods where the random-
+ized order usually works better (see also the discussion in
+Section 5.2 of (Defazio, 2014)).
+It is possible to prove that in case of randomized order NIM
+convergence rate cannot be faster than linear. For this let us
+
+consider a particular function φ(x):
+(cid:107)x(cid:107)2 +
+
+φ(x) =
+
+fi(x) =
+
+n(cid:88)
+
+1
+n
+
+f1(x) =
+
+1
+2
+
+i=1
+
+(cid:107)x(cid:107)2 +
+
+n
+3
+
+(cid:107)x(cid:107)3,
+
+1
+2
+
+1
+3
+(cid:107)x(cid:107)3, fi(x) =
+
+(cid:107)x(cid:107)2, i > 1.
+
+1
+2
+
+Using NIM with randomized order for this function leads
+to the following lower bound:
+
+(cid:18)
+
+(cid:19)k
+
+E[(cid:107)xk+1(cid:107)] ≥ 1
+3
+
+1 − 1
+n
+
+E[(cid:107)v1
+
+0(cid:107)2]
+
+(10)
+
+(cid:107)xk+1(cid:107) ≤ (cid:107)v1
+
+proving that NIM can have at most a linear convergence
+rate. Meanwhile using NIM with cyclic order for this func-
+tion gives the following upper bound:
+k(cid:107)2,
+
+(11)
+that is equivalent to Q-quadratic convergence w.r.t epochs
+and R-superlinear convergence w.r.t. iterations. Details of
+derivations (10) and (11) are given in supplementary ma-
+terial.
+In case of random order some components of the
+model mk(x) may not be updated for a reasonable amount
+of time. This may lead to quite inaccurate models that spoil
+the convergence rate of NIM.
+
+4.3. Linear models
+
+i x), where φi
+
+In many machine learning problems the functions fi
+have the following linearly-parameterized form: fi(x) :=
+: R → R is a univariate function
+φi(a(cid:62)
+and ai ∈ Rd is some known vector. In this case, by ex-
+ploiting the structure of the functions fi, we can substan-
+tially reduce the storage cost of NIM. Namely, denoting
+k := a(cid:62)
+i vi
+νi
+
+k, we can rewrite (7) as follows:
+
+(cid:2)φ(cid:48)(cid:48)
+(cid:2)φ(cid:48)(cid:48)
+(cid:2)φ(cid:48)
+
+1
+n
+1
+n
+1
+n
+
+i (νi
+
+k)(cid:3) aia(cid:62)
+k)(cid:3) ai.
+(cid:80)n
+
+Hk+1 = Hk +
+
+k+1) − φ(cid:48)(cid:48)
+
+i (νi
+
+i (νi
+k+1 − φ(cid:48)(cid:48)
+
+i ,
+
+(cid:3) ai,
+
+i(νi
+
+i(νi
+
+i (νi
+
+k)νi
+k
+
+gk+1 = gk +
+
+uk+1 = uk +
+
+k, we need to store only
+k. This reduces the memory requirements of
+
+k+1)νi
+k+1) − φ(cid:48)
+Thus, instead of storing n vectors vi
+n scalars νi
+NIM from O(nd + d2) to O(n + d2).
+k. Cal-
+The stopping criterion (9) in IS uses ¯vk = 1
+i=1 vi
+n
+culating this value requires storage of all vectors vi
+k.
+In
+order to reduce the memory cost in this case we use xk
+instead of ¯vk in the stopping criterion (9). In practice we
+found that this stopping criterion works well.
+
+5. Experiments
+We compare the empirical performance of NIM with that of
+several other methods for solving (1) on the binary logistic
+regression problem.
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+Figure 1. Empirical performance of different optimization methods w.r.t. epochs. Left: dataset a9a, right: dataset covtype.
+
+We use the following methods in our comparison:
+
+• NIM: the proposed method NIM (the version for lin-
+ear models with the unit step size and cyclic order of
+component selection).
+
+• SGD: a stochastic (proximal) gradient method (with
+step size αk = n/(10k)) as a representative of sublin-
+early convergent incremental methods.
+
+• SAG: a proximal variant of the stochastic average gra-
+dient method of (Schmidt et al., 2013) (the version
+for linear models with constant step size α = 1/L,
+where L is the analytically calculated Lipschitz con-
+stant) as a representative of linearly convergent incre-
+mental methods.
+
+• Newton: an (inexact) proximal Newton method (Lee
+et al., 2012) (with the unit step size and true Hessian)
+as a non-incremental version of NIM.
+
+When the objective is smooth, i.e. h(x) is continuously
+differentiable, we also consider the following methods:
+
+• L-BFGS: the limited-memory BFGS method (Liu &
+
+Nocedal, 1989) (with the history of size 10).
+
+• SFO: the sum of functions optimizer (Sohl-Dickstein
+
+et al., 2014) (with default parameters).
+
+All the methods except SFO are implemented in C++; for
+SFO we use its public implementation in Python2.
+As training data, we use 6 datasets (a9a, covtype, protein,
+SUSY, mnist8m) including 2 datasets with n of order of
+several millions. These datasets can be obtained from the
+2SFO operates with (1) through big mini-batches, thus SFO
+python implementation may be fast enough due to fast vector op-
+erations in numpy
+
+LIBSVM website3 and from Pascal Large Scale Learning
+Challenge 20084. To binarize the original mnist8m dataset,
+we group digits with labels 0, 1, 2, 3, 4 into the ﬁrst class,
+and other digits into the second class.
+We set the regularization coefﬁcient λ to 1/n and run all
+methods from x0 = 0.
+
+5.1. (cid:96)2-regularized logistic regression
+In this case our optimization problem is as follows:
+
+min
+x∈Rd
+
+1
+n
+
+ln(1 + exp(a(cid:62)
+
+i x)) +
+
+(cid:107)x(cid:107)2
+2 .
+
+λ
+2
+
+(12)
+
+n(cid:88)
+
+i=1
+
+This problem corresponds to (1) with
+
+fi(x) := ln(1 + exp(a(cid:62)
+
+i x)),
+
+h(x) :=
+
+(cid:107)x(cid:107)2
+2 .
+
+λ
+2
+
+Since h(x) is a quadratic function we use here for IS a con-
+jugate gradient method.
+Figure 1 shows empirical performance of different methods
+w.r.t. iterations (epochs) on two datasets. From this ﬁgure it
+is clear that superlinearly-convergent methods (NIM, New-
+ton) outperform others by far in terms of number of itera-
+tions. We observe the similar picture on all other datasets,
+so due to the lack of space we do not include these results
+into the paper. Also it should be noted that for NIM only
+5 epochs was enough for convergence with very high accu-
+racy in all datasets in our experiments. Besides, the average
+number of IS iterations was in the interval [1.25, 2]. These
+observations give us a good preliminary estimation for the
+total amount of time needed for solving a particular prob-
+lem using NIM.
+We have experimented with different mini-batch sizes for
+NIM and SAG. Bigger mini-batches usually increase the
+
+3http://www.csie.ntu.edu.tw/˜cjlin/
+
+libsvmtools/datasets/
+
+4http://largescale.ml.tu-berlin.de/about/
+
+01020304050Epoch10-1010-910-810-710-610-510-410-310-210-1100Residual in functiona9a (n=32561, d=123)NIMSAGNewtonLBFGSSFOSGD01020304050Epoch10-1010-910-810-710-610-510-410-310-210-1100Residual in functioncovtype (n=581012, d=54)NIMSAGNewtonLBFGSSFOSGDA Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+Table 1. Calculation time of different methods for the problem (12). In the ﬁrst column optimization accuracy is shown. Symbol ,,—“
+means that the corresponding calculation time sufﬁciently exceeds the calculation time for NIM with accuracy 10−10.
+
+a9a (n=32561, d=123)
+
+covtype (n=581012, d=54)
+
+protein (n=145751, d=74)
+
+Res NIM SAG Newton LBFGS SFO NIM SAG Newton LBFGS SFO NIM SAG Newton LBFGS SFO
+10−1
+.03s
+.66s
+10−2
+.13s
+.93s
+10−4
+1.99s
+.96s
+10−6
+4.52s 1.55s
+10−8
+5.94s 2.01s
+10−10
+— 7.45s 2.49s
+
+.04s
+.54s
+.84s
+.19s
+.05s
+.25s
+1.77s
+.51s
+1.78s
+.10s
+.86s 2.45s 3.09s
+10.73s 3.80s
+.43s
+1.11s 1.57s 1.49s 4.12s 4.57s
+31.84s 6.81s
+1.82s 2.18s 1.92s 5.90s 6.52s — 9.86s
+2.61s 2.81s 2.12s 9.97s 8.84s — 12.44s .77s —
+
+.01s
+.31s
+.02s
+.56s
+.15s
+.81s
+.24s
+.93s
+.31s 1.46s 1.04s
+.34s 2.38s 1.04s
+
+.02s
+.66s
+.15s
+.04s
+1.32s
+.33s
+.41s 3.38s
+2.16s
+.59s 14.26s 2.43s
+.71s — 2.67s
+
+.01s
+.05s
+.19s
+.66s
+
+.03s
+.08s
+.98s
+
+.33s
+.96s
+
+SUSY (n=5000000, d=18)
+
+alpha (n=500000, d=500)
+
+mnist8m (n=8100000, d=784)
+Res NIM SAG Newton LBFGS NIM SAG Newton LBFGS NIM SAG Newton LBFGS
+10−1
+57.68s 34.91s 47.8m 1.1m
+.09s 2.71s 2.48s
+1.91s 1.36s
+10−2
+13.37s 6.72s
+.13s 3.84s 4.30s
+1.6m 2.1m 1.4h
+5.2m
+10−4 1.36s 1.3m 11.33s
+36.65s 36.04s 3.4m 58.35s 16.7m 7.1m —
+1.6h
+10−5 2.78s 1.9m 14.43s
+46.66s 1.0m 3.6m 1.4m 26.7m 1.0h —
+—
+10−6 3.95s 2.2m 16.71s
+53.92s 1.5m 4.0m 1.9m 33.5m —
+—
+—
+10−8 5.30s 2.6m 19.41s
+1.0m 2.7m 4.1m 2.8m 46.0m —
+—
+—
+10−10 5.95s 3.4m 20.80s
+1.2m 4.3m 4.7m 3.4m 53.3m —
+—
+—
+
+1.78s
+2.52s
+2.60s
+4.09s
+5.26s
+8.43s
+9.01s
+
+1.6m 4.01s
+2.6m 17.68s
+
+number of iterations needed for convergence since the
+model mk(x) in NIM and similar model for SAG are up-
+dated less often w.r.t.
+iterations. However, bigger mini-
+batches may lead to faster convergence w.r.t.
+time since
+the scaled proximal mapping (5) is computed less often.
+For the problem (12) the optimal mini-batch size for SAG
+is 10, while for NIM the optimal mini-batch size is 100.
+With these mini-batch sizes the calculation time needed for
+model update and for the scaled proximal mapping (5) are
+comparable.
+Table 1 shows the calculation time of different methods
+for the problem (12). Since SGD requires a huge num-
+ber of iterations for convergence with high accuracy, it is
+not shown in the table. We also do not show SFO results
+for big datasets because its Python implementation is quite
+slow in this case.
+Table 1 shows that NIM converges faster than other meth-
+ods in almost all the cases. Here high iteration cost for NIM
+(at best O(d2)) is compensated with very small number of
+iterations required for convergence. However, this is true
+only for datasets with relatively small d. Higher values of
+d lead to much higher iteration cost and prohibitive mem-
+ory cost.
+
+5.2. (cid:96)1-regularized logistic regression
+We consider the following optimization problem:
+
+n(cid:88)
+
+i=1
+
+min
+x∈Rd
+
+1
+n
+
+ln(1 + exp(a(cid:62)
+
+i x)) + λ(cid:107)x(cid:107)1 .
+
+(13)
+
+In this case
+
+fi(x) := ln(1 + exp(a(cid:62)
+
+i x)),
+
+h(x) := λ(cid:107)x(cid:107)1 .
+
+Since h(x) is a non-differentiable function we use here
+FGM method for IS.
+Methods L-BFGS and SFO do not support a proximal op-
+erator. Therefore we excluded them from experiments for
+the problem (13).
+Concerning the number of iterations for the problem (13)
+empirical performance of different methods is quite similar
+to the previous case of l2-regularizer. Again superlinearly-
+convergent methods (NIM, Newton) require much less it-
+erations for convergence with high accuracy in comparison
+with other methods. However, here the average number of
+FGM iterations lies in rather big interval. Hence predic-
+tion for the total amount of time needed for NIM becomes
+a more challenging problem.
+Also we have experimented with different mini-batch sizes
+for NIM and SAG. Here the scaled proximal mapping (5)
+requires more calculation time comparing to the case of l2-
+regularizer. As a result, the optimal mini-batch size for
+NIM is 5000, while for SAG the optimal mini-batch size
+remains equal to 10.
+Table 2 shows the calculation time of different methods for
+the problem (13). Here we see that for the problem (13)
+NIM as before converges faster than other methods in al-
+most all the cases.
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+Table 2. Calculation time of different methods for the problem (13). In the ﬁrst column optimization accuracy is shown. Symbol ,,—“
+means that the corresponding calculation time sufﬁciently exceeds the calculation time for NIM with accuracy 10−10.
+
+a9a
+
+covtype
+
+protein
+
+alpha
+
+mnist8m
+
+Res NIM SAG Newton NIM SAG Newton NIM SAG Newton NIM SAG Newton NIM SAG Newton
+10−1
+26.76s 1.31s
+1.1m 15.7m 33.62s 53.6m
+10−3
+55.56s 17.26s 2.3m 46.9m 4.0m 2.5h
+10−4
+7.3m 3.1h
+1.1m 35.51s 2.5m 1.0h
+10−5
+1.3m 1.0m 2.9m 1.2h
+1.4h —
+10−6
+1.3m 1.5m 3.1m 1.5h —
+—
+10−8
+1.5m 2.9m 3.5m 2.3h —
+—
+10−10
+1.6m 4.8m 4.5m 3.4h —
+—
+
+.04s
+.42s
+.66s
+1.00s
+.48s
+.85s 2.48s 2.07s
+1.51s 3.67s
+2.87s
+1.09s — 2.79s
+2.20s 4.49s
+4.55s
+1.22s — 3.07s
+4.03s 6.47s
+6.53s
+1.36s — 3.49s
+4.89s 11.07s 8.24s
+5.64s 21.03s 9.95s
+1.59s — 3.96s
+5.97s 29.65s 10.86s 1.74s — 4.42s
+
+.12s
+
+.03s
+.13s
+.22s
+.64s
+.95s
+
+.46s
+.12s
+1.24s
+.38s
+1.40s
+.44s
+.49s
+1.51s
+.55s
+1.63s
+.63s 2.26s 1.78s
+.69s 4.09s 1.97s
+
+6. Discussion
+In case n = 1 the proposed method NIM reduces to the
+proximal Newton method (Lee et al., 2012) and with addi-
+tional condition h(x) ≡ 0 reduces to the classical Newton
+method. For the class of strongly convex functions with
+Lipschitz-continuous Hessians these methods are known to
+have local quadratic convergence and their inexact versions
+are known to have local superlinear convergence for proper
+choice of the forcing sequence ηk. Also these methods are
+globally convergent for small enough step size. Theorems 1
+and 2 show that the same results are true for the proposed
+incremental version of Newton method. Moreover, con-
+vergence radius R for NIM is almost the same as that for
+classical Newton (Nesterov, 2004), in particular, it does not
+depend on number of functions n. These facts support NIM
+to be a proper extension of Newton-like methods in incre-
+mental setting.
+From global convergence perspective, theorem 2 suggests
+taking a step size proportional to (µf /Lf )3. Unfortunately,
+for practical purposes this value is usually too small. How-
+ever, this result should be considered mostly as a qualita-
+tive one (the method is globally convergent with a linear
+rate). In practice, NIM successfully converges with much
+larger step sizes (for example, unity step size is uniformly
+appropriate for logistic regression). The reasons for such
+a small step size in the theorem are the following. The
+standard global convergence analysis of the classical New-
+ton method (in terms of µ and L) tells us that the step size
+should be of order µ/L in comparison with 1/L for the
+classical gradient method (see e.g. (Boyd & Vandenberghe,
+2004)). The problem here is that the analysis does not
+use the fact that the matrix in the method is the Hessian;
+it only considers some matrix with eigenvalues bounded
+between µ and L. As soon as the true Hessian is consid-
+ered (like in cubic regularization from (Nesterov & Polyak,
+2006)) Newton method becomes more effective in compar-
+ison with gradient method even in the ﬁrst stage of opti-
+mization (far from solution). Our analysis of NIMs global
+
+convergence is based on IAG analysis from (Gurbuzbala-
+ban et al., 2015), and we use only some scaling matrix with
+bounded eigenvalues instead of a true average estimate for
+the Hessian. As a result, we get a step size of several orders
+less than one for IAG, which in turn is less than step size
+for SAG. Hence, a small step size for NIM global conver-
+gence is mostly an issue of the current theoretical analysis
+than a reﬂection of a true NIM behavior.
+Although in all our experiments with logistic regression
+NIM with unit step length always converged starting from
+x0 = 0, in other settings a step size adaptation were vital
+for convergence. However, in incremental situation a step
+size adaptation procedure is a challenging problem, since
+we do not have access to the true objective φ and thus can-
+not use the Armijo condition or trust-region approach. The
+possible way-out here is to consider a cubic regularization
+in model mk(x) similar to (Nesterov & Polyak, 2006). In
+this case the model mk(x) becomes a strict upper bound
+for the objective φ, and hence the algorithm with unit step
+size becomes globally-convergent. Moreover, cubic regu-
+larization gives possibility to solve problems (1) with non-
+convex objective. We refer this as one of directions for
+future research.
+
+7. Acknowledgments
+This work was supported by RFBR project No. 15-31-
+20596 (mol-a-ved) and by Microsoft: Moscow State Uni-
+versity Joint Research Center (RPD 1053945).
+
+References
+Andrew, G. and Gao, J. Scalable training of L1-regularized log-
+linear models. In Ghahramani, Zoubin (ed.), Proceedings of the
+24th Annual International Conference on Machine Learning
+(ICML 2007), pp. 33–40. Omnipress, 2007.
+
+Bertsekas, Dimitri P. Incremental gradient, subgradient, and prox-
+imal methods for convex optimization: A survey. Optimization
+for Machine Learning, 2010:1–38, 2011.
+
+A Superlinearly-Convergent Proximal Newton-type Method for the Optimization of Finite Sums
+
+Blatt, Doron, Hero, Alfred O, and Gauchman, Hillel. A con-
+vergent incremental gradient method with a constant step size.
+SIAM Journal on Optimization, 18(1):29–51, 2007.
+
+Mairal, Julien. Incremental majorization-minimization optimiza-
+tion with application to large-scale machine learning. SIAM
+Journal on Optimization, 25(2):829–855, 2015.
+
+Bordes, Antoine, Bottou, L´eon, and Gallinari, Patrick. SGD-QN:
+Careful quasi-newton stochastic gradient descent. The Journal
+of Machine Learning Research, 10:1737–1754, 2009.
+
+Moritz, F., Nishihara, R., and Jordan, M. A linearly-convergent
+stochastic l-bfgs algorithm. arXiv preprint arXiv:1508.02087,
+2015.
+
+Nesterov, Y.
+
+Introductory Lectures on Convex Optimization.
+
+Springer, 2004.
+
+Nesterov, Y. Gradient methods for minimizing composite func-
+tions. Mathematical Programming, V.140(1), pp. 125–161,
+2013.
+
+Nesterov, Y. and Polyak, B.T. Cubic regularization of newton
+method and its global performance. Mathematical Program-
+ming, V.108(1), pp. 177–205, 2006.
+
+Schmidt, Mark, Roux, Nicolas Le, and Bach, Francis. Minimizing
+ﬁnite sums with the stochastic average gradient. arXiv preprint
+arXiv:1309.2388, 2013.
+
+Schraudolph, Nicol N, Yu, Jin, and G¨unter, Simon. A stochastic
+In In-
+quasi-newton method for online convex optimization.
+ternational Conference on Artiﬁcial Intelligence and Statistics,
+pp. 436–443, 2007.
+
+Sohl-Dickstein,
+
+Jascha, Poole, Ben, and Ganguli, Surya.
+large-scale optimization by unifying stochastic gra-
+Fast
+In Proceedings of
+dient and quasi-Newton methods.
+the 31th International Conference on Machine Learning,
+ICML 2014, Beijing, China, 21-26 June 2014, pp. 604–
+612, 2014. URL http://jmlr.org/proceedings/
+papers/v32/sohl-dicksteinb14.html.
+
+Bousquet, Olivier and Bottou, L´eon. The tradeoffs of large scale
+In Advances in neural information processing sys-
+
+learning.
+tems, pp. 161–168, 2008.
+
+Boyd, S. and Vandenberghe, L. Convex Optimization. Cambridge
+
+Univesity Press, 2004.
+
+Byrd, Richard H, Hansen, SL, Nocedal, Jorge, and Singer, Yoram.
+A stochastic quasi-newton method for large-scale optimization.
+arXiv preprint arXiv:1401.7020, 2014.
+
+Defazio, Aaron. New Optimisation Methods for Machine Learn-
+PhD thesis, Australian National University, 2014.
+
+ing.
+http://www.aarondefazio.com/pubs.html.
+
+Defazio, Aaron, Bach, Francis, and Lacoste-Julien, Simon. Saga:
+A fast incremental gradient method with support for non-
+strongly convex composite objectives. In Advances in Neural
+Information Processing Systems, pp. 1646–1654, 2014a.
+
+Defazio, Aaron J, Caetano, Tib´erio S, and Domke, Justin. Finito:
+A faster, permutable incremental gradient method for big data
+problems. In Proceedings of 31st International Conference on
+Machine Learning, 2014b.
+
+Friedman, J., Hastie, T., and Tibshirani, R. Regularization paths
+for generalized linear models via coordinate descent. Journal
+of Statistical Software, Vol. 33(1), 2010. URL http://www.
+stanford.edu/˜hastie/Papers/glmnet.pdf.
+
+Gurbuzbalaban, M., Ozdaglar, A., and Parrilo, P. On the con-
+vergence rate of incremental aggregated gradient algorithms.
+arXiv preprint arXiv:1506.02081, 2015.
+
+G¨urb¨uzbalaban, Mert, Ozdaglar, Asuman, and Parrilo, Pablo. A
+globally convergent incremental newton method. Mathemati-
+cal Programming, 151(1):283–313, 2015.
+
+Johnson, Rie and Zhang, Tong. Accelerating stochastic gradient
+In Advances in
+
+descent using predictive variance reduction.
+Neural Information Processing Systems, pp. 315–323, 2013.
+
+Kolte, R., Erdoglu, M., and Oezguer, A. Accelerating svrg via
+second-order information. NIPS Workshop on Optimization for
+Machine Learning, 2015.
+
+Lee, Jason D, Sun, Yuekai, and Saunders, Michael. Proximal
+newton-type methods for convex optimization. In Pereira, F.,
+Burges, C.J.C., Bottou, L., and Weinberger, K.Q. (eds.), Ad-
+vances in Neural Information Processing Systems 25, pp. 827–
+835. Curran Associates, Inc., 2012.
+
+Liu, Dong C and Nocedal, Jorge. On the limited memory BFGS
+method for large scale optimization. Mathematical program-
+ming, 45(1-3):503–528, 1989.
+
+Lucchi, A., McWilliams, B., and Hofmann, T. A variance reduced
+stochastic newton method. arXiv preprint arXiv:1503.08316,
+2015.
+
+

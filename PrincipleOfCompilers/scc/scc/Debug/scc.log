@@ -1,0 +1,20 @@
+﻿  myparser.cpp
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.h(83): warning C4018: “<”: 有符号/无符号不匹配
+  mylexer.cpp
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.h(83): warning C4018: “<”: 有符号/无符号不匹配
+  正在生成代码...
+  正在编译...
+  GrammarTree.cpp
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.h(83): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(40): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(62): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(82): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(97): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(298): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(530): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(583): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(812): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(843): warning C4018: “<”: 有符号/无符号不匹配
+d:\coursestudying\cs164\homework_solution\scc\scc\grammartree.cpp(861): warning C4018: “<”: 有符号/无符号不匹配
+  正在生成代码...
+  scc.vcxproj -> D:\CourseStudying\cs164\Homework_Solution\scc\Debug\scc.exe

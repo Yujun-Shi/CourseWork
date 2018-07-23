@@ -1,0 +1,1553 @@
+Near Optimal Behavior via Approximate State Abstraction
+
+David Abel†
+D. Ellis Hershkowitz†
+Michael L. Littman
+Brown University, 115 Waterman Street, Providence, RI 02906
+
+DAVID ABEL@BROWN.EDU
+DAVID HERSHKOWITZ@BROWN.EDU
+MICHAEL LITTMAN@BROWN.EDU
+
+Abstract
+
+The combinatorial explosion that plagues plan-
+ning and reinforcement learning (RL) algorithms
+can be moderated using state abstraction. Pro-
+hibitively large task representations can be con-
+densed such that essential information is pre-
+served, and consequently, solutions are tractably
+computable. However, exact abstractions, which
+treat only fully-identical situations as equivalent,
+fail to present opportunities for abstraction in en-
+vironments where no two situations are exactly
+alike. In this work, we investigate approximate
+state abstractions, which treat nearly-identical
+situations as equivalent. We present theoretical
+guarantees of the quality of behaviors derived
+from four types of approximate abstractions. Ad-
+ditionally, we empirically demonstrate that ap-
+proximate abstractions lead to reduction in task
+complexity and bounded loss of optimality of be-
+havior in a variety of environments.
+
+1. Introduction
+Abstraction plays a fundamental role in learning. Through
+abstraction, intelligent agents may reason about only the
+salient features of their environment while ignoring what
+is irrelevant. Consequently, agents are able to solve con-
+siderably more complex problems than they would be able
+to without the use of abstraction. However, exact abstrac-
+tions, which treat only fully-identical situations as equiv-
+alent, require complete knowledge that is computationally
+intractable to obtain. Furthermore, often no two situations
+are identical, so exact abstractions are often ineffective.
+To overcome these issues, we investigate approximate ab-
+stractions that enable agents to treat sufﬁciently similar sit-
+uations as identical. This work characterizes the impact
+of equating “sufﬁciently similar” states in the context of
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+planning and RL in Markov Decision Processes (MDPs).
+The remainder of our introduction contextualizes these in-
+tuitions in MDPs.
+Solving for optimal behavior in MDPs in a planning setting
+is known to be P-Complete in the size of the state space (Pa-
+padimitriou & Tsitsiklis, 1987; Littman et al., 1995). Simi-
+larly, many RL algorithms for solving MDPs are known to
+require a number of samples polynomial in the size of the
+state space (Strehl et al., 2009). Although polynomial run-
+time or sample complexity may seem like a reasonable con-
+straint, the size of the state space of an MDP grows super-
+polynomially with the number of variables that characterize
+the domain - a result of Bellman’s curse of dimensional-
+ity. Thus, solutions polynomial in state space size are often
+ineffective for sufﬁciently complex tasks. For instance, a
+robot involved in a pick-and-place task might be able to
+employ planning algorithms to solve for how to manipulate
+some objects into a desired conﬁguration in time polyno-
+mial in the number of states, but the number of states it
+must consider grows exponentially with the number of ob-
+jects with which it is working (Abel et al., 2015).
+Thus, a key research agenda for planning and RL is lever-
+aging abstraction to reduce large state spaces (Andre &
+Russell, 2002; Jong & Stone, 2005; Dietterich, 2000; Bean
+et al., 2011). This agenda has given rise to methods that
+reduce ground MDPs with large state spaces to abstract
+MDPs with smaller state spaces by aggregating states ac-
+cording to some notion of equality or similarity.
+In the
+context of MDPs, we understand exact abstractions as those
+that aggregate states with equal values of particular quan-
+tities, for example, optimal Q-values. Existing work has
+characterized how exact abstractions can fully maintain op-
+timality in MDPs (Li et al., 2006; Dean & Givan, 1997).
+The thesis of this work is that performing approximate ab-
+straction in MDPs by relaxing the state-aggregation criteria
+from equality to similarity achieves polynomially bounded
+error in the resulting behavior while offering three beneﬁts.
+First, approximate abstractions employ the sort of knowl-
+
+†The ﬁrst two authors contributed equally.
+
+Near Optimal Behavior via Approximate State Abstraction
+
+edge that we expect a planning or learning algorithm to
+compute without fully solving the MDP. In contrast, ex-
+act abstractions often require solving for optimal behavior,
+thereby defeating the purpose of abstraction. Second, be-
+cause of their relaxed criteria, approximate abstractions can
+achieve greater degrees of compression than exact abstrac-
+tions. This difference is particularly important in environ-
+ments where no two states are identical. Third, because the
+state-aggregation criteria are relaxed to near equality, ap-
+proximate abstractions are able to tune the aggressiveness
+of abstraction by adjusting what they consider sufﬁciently
+similar states.
+We support this thesis by describing four different types
+of approximate abstraction functions that preserve near-
+optimal behavior by aggregating states on different crite-
+
+ria: (cid:101)φQ∗,ε, on similar optimal Q-values, (cid:101)φmodel,ε, on simi-
+larity of rewards and transitions, (cid:101)φbolt,ε, on similarity of a
+Boltzmann distribution over optimal Q-values, and(cid:101)φmult,ε,
+
+on similarity of a multinomial distribution over optimal Q-
+values. Furthermore, we empirically demonstrate the rela-
+tionship between the degree of compression and error in-
+curred on a variety of MDPs.
+
+2. MDPs and Sequential Decision Making
+An MDP is a problem representation for sequential
+decision making agents,
+represented by a ﬁve-tuple:
+(cid:104)S,A,T ,R, γ(cid:105). Here, S is a ﬁnite state space; A is a ﬁnite
+set of actions available to the agent; T denotes T (s, a, s(cid:48)),
+the probability of an agent transitioning to state s(cid:48) ∈ S af-
+ter applying action a ∈ A in state s ∈ S; R(s, a) denotes
+the reward received by the agent for executing action a in
+state s; γ ∈ [0, 1] is a discount factor that determines how
+much the agent prefers future rewards over immediate re-
+wards. We assume without loss of generality that the range
+of all reward functions is normalized to [0, 1]. The solution
+to an MDP is called a policy, denoted π : S (cid:55)→ A.
+The objective of an agent is to solve for the policy that max-
+imizes its expected discounted reward from any state, de-
+noted π∗. We denote the expected discounted reward for
+following policy π from state s as the value of the state
+under that policy, V π(s). We similarly denote the expected
+discounted reward for taking action a ∈ A and then follow-
+ing policy π from state s forever after as Qπ(s, a), deﬁned
+by the Bellman Equation as:
+
+(cid:88)
+
+Qπ(s, a) = R(s, a) + γ
+
+T (s, a, s(cid:48))Qπ(s(cid:48), π(s(cid:48))). (1)
+
+s(cid:48)
+
+We let RMAX denote the maximum reward (which is 1),
+and QMAX denote the maximum Q value, which is RMAX
+1−γ .
+The value function deﬁned under a given policy, denoted
+
+V π(s), is deﬁned as:
+
+V π(s) = Qπ(s, π(s)).
+
+(2)
+
+Lastly, we denote the value and Q functions under the opti-
+mal policy as V ∗ or V π∗
+, respectively. For
+further background, see Kaelbling et al. (1996).
+
+and Q∗ or Qπ∗
+
+3. Related Work
+Several other projects have addressed similar topics.
+
+3.1. Approximate State Abstraction
+
+Dean et al. (1997) leverage the notion of bisimulation to
+investigate partitioning an MDP’s state space into clusters
+of states whose transition model and reward function are
+within ε of each other. They develop an algorithm called
+Interval Value Iteration (IVI) that converges to the cor-
+rect bounds on a family of abstract MDPs called Bounded
+MDPs.
+Several approaches build on Dean et al. (1997). Ferns
+et al. (2004; 2006) investigated state similarity metrics for
+MDPs; they bounded the value difference of ground states
+and abstract states for several bisimulation metrics that in-
+duce an abstract MDP. This differs from our work which
+develops a theory of abstraction that bounds the subopti-
+mality of applying the optimal policy of an abstract MDP
+to its ground MDP, covering four types of state abstraction,
+one of which closely parallels bisimulation. Even-Dar &
+Mansour (2003) analyzed different distance metrics used in
+identifying state space partitions subject to ε-similarity. Or-
+tner (2013) developed an algorithm for learning partitions
+in an online setting by taking advantage of the conﬁdence
+bounds for T and R provided by UCRL (Auer et al., 2009).
+
+3.2. Speciﬁc Abstraction Algorithms
+
+Many previous works have targeted the creation of algo-
+rithms that enable state abstraction for MDPs. Andre &
+Russell (2002) investigated a method for state abstraction
+in hierarchical reinforcement learning leveraging a pro-
+gramming language called ALISP that promotes the notion
+of safe state abstraction. Agents programmed using ALISP
+can ignore irrelevant parts of the state, achieving abstrac-
+tions that maintain optimality. Dietterich (2000) devel-
+oped MAXQ, a framework for composing tasks into an ab-
+stracted hierarchy where state aggregation can be applied.
+Jong & Stone (2005) introduced a method called policy-
+irrelevance in which agents identify (online) which state
+variables may be safely abstracted away in a factored-state
+MDP. For a more complete survey of algorithms that lever-
+age state abstraction in past reinforcement-learning papers,
+see Li et al. (2006).
+
+Near Optimal Behavior via Approximate State Abstraction
+
+3.3. Exact Abstraction Framework
+
+Li et al. (2006) developed a framework for exact state ab-
+straction in MDPs. In particular, the authors deﬁned ﬁve
+types of state-aggregation functions, inspired by existing
+methods for state aggregation in MDPs. We generalize two
+of these ﬁve types, φQ∗ and φmodel, to the approximate ab-
+straction case. Our generalizations are equivalent to theirs
+when exact criteria are used (i.e. ε = 0). Additionally,
+when exact criteria are used our bounds indicate that no
+value is lost, which is one of core results of Li et al. (2006).
+
+4. Abstraction Notation
+We build upon the notation used by Li et al. (2006), who
+introduced a unifying theoretical framework for state ab-
+straction in MDPs.
+Deﬁnition 1 (MG, MA): We understand an abstrac-
+tion as a mapping from the state space of a ground MDP,
+MG,
+to that of an abstract MDP, MA, using a state-
+aggregation scheme. Consequently, this mapping induces
+an abstract MDP. Let MG = (cid:104)SG,A,TG,RG, γ(cid:105) and
+MA = (cid:104)SA,A,TA,RA, γ(cid:105).
+Deﬁnition 2 (SA, φ): The states in the abstract MDP are
+constructed by applying a state-aggregation function, φ, to
+the states in the ground MDP, SA. More speciﬁcally, φ
+maps a state in the ground MDP to a state in the abstract
+MDP:
+
+SA = {φ(s) | s ∈ SG}.
+
+(3)
+Deﬁnition 3 (G): Given a φ, each ground state has asso-
+ciated with it the ground states with which it is aggregated.
+Similarly, each abstract state has its constituent ground
+states. We let G be the function that retrieves these states:
+
+(cid:40){g ∈ SG | φ(g) = φ(s)},
+
+{g ∈ SG | φ(g) = s},
+
+G(s) =
+
+if s ∈ SG,
+if s ∈ SA.
+
+(4)
+
+The abstract reward function and abstract transition dynam-
+ics for each abstract state are a weighted combination of the
+rewards and transitions for each ground state in the abstract
+state.
+Deﬁnition 4 (ω(s)): We refer to the weight associated
+with a ground state, s ∈ SG by ω(s). The only restriction
+placed on the weighting scheme is that it induces a prob-
+ability distribution on the ground states of each abstract
+state:
+
+ = 1 AND ω(s) ∈ [0, 1].
+
+∀s ∈ SG
+
+ω(s)
+
+ (cid:88)
+
+s∈G(s)
+
+(5)
+Deﬁnition 5 (RA): The abstract reward function RA :
+SA × A (cid:55)→ [0, 1] is a weighted sum of the rewards of each
+
+of the ground states that map to the same abstract state:
+
+RA(s, a) =
+
+RG(g, a)ω(g).
+
+(6)
+
+(cid:88)
+
+g∈G(s)
+
+Deﬁnition 6 (TA): The abstract transition function TA :
+SA × A × SA (cid:55)→ [0, 1] is a weighted sum of the transitions
+of each of the ground states that map to the same abstract
+state:
+
+TA(s, a, s(cid:48)) =
+
+TG(g, a, g(cid:48))ω(g).
+
+(7)
+
+(cid:88)
+
+(cid:88)
+
+g∈G(s)
+
+g(cid:48)∈G(s(cid:48))
+
+5. Approximate State Abstraction
+Here, we introduce our formal analysis of approximate
+state abstraction, including results bounding the error as-
+sociated with these abstraction methods. In particular, we
+demonstrate that abstractions based on approximate Q∗
+similarity (5.1), approximate model similarity (5.2), and
+approximate similarity between distributions over Q∗, for
+both Boltzmann (5.3) and multinomial (5.4) distributions
+induce abstract MDPs for which the optimal policy has
+bounded error in the ground MDP.
+We ﬁrst introduce some additional notation.
+A : SA → A and π∗
+Deﬁnition 7 (π∗
+G :
+SG → A stand for the optimal policies in the abstract and
+ground MDPs, respectively.
+
+G): We let π∗
+
+A, π∗
+
+We are interested in how the optimal policy in the abstract
+MDP performs in the ground MDP. As such, we formally
+deﬁne the policy in the ground MDP derived from optimal
+behavior in the abstract MDP:
+Deﬁnition 8 (πGA): Given a state s ∈ SG and a state
+aggregation function, φ,
+
+πGA(s) = π∗
+
+A(φ(s)).
+
+(8)
+
+We now deﬁne types of abstraction based on functions of
+state–action pairs.
+
+of approximate state-aggregation function that satisﬁes the
+following for any two ground states s1 and s2:
+
+Deﬁnition 9 ((cid:101)φf,ε): Given a function f : SG × A → R
+and a ﬁxed non-negative ε ∈ R, we deﬁne (cid:101)φf,ε as a type
+(cid:101)φf,ε(s1) = (cid:101)φf,ε(s2) → ∀a |f (s1, a) − f (s2, a)| ≤ ε. (9)
+That is, when (cid:101)φf,ε aggregates states, all aggregated states
+
+have values of f within ε of each other for all actions.
+Deﬁnition 10 (QG, VG): Let QG = Qπ∗
+and VG = V π∗
+optimal value functions in the ground MDP.
+
+G : SG × A → R
+G : SG → R denote the optimal Q and
+
+Near Optimal Behavior via Approximate State Abstraction
+
+RT (s, a) =
+
+TT (s, a, s(cid:48)) =
+
+(cid:40)RG(s, a)
+
+(cid:80)
+
+RA(s, a)
+TG(s, a, s(cid:48))
+
+g∈G(s)
+TA(s, a, s(cid:48))
+
+if T = 0
+o/w
+
+[TG(g, a, s(cid:48))ω(g)]
+
+The Q-value of state s in ST for action a is:
+
+if T = 0
+if T = 1
+
+o/w
+
+if T = 0
+if T = 1
+
+(14)
+
+Deﬁnition 11 (QA, VA): Let QA = Qπ∗
+and VA = V π∗
+optimal value functions in the abstract MDP.
+
+A : SA × A → R
+A : SA → R stand for the optimal Q and
+
+We now introduce our main result.
+Theorem 1. There exist at least four types of approximate
+
+state-aggregation functions, (cid:101)φQ∗,ε, (cid:101)φmodel,ε, (cid:101)φbolt,ε and
+(cid:101)φmult,ε, for which the optimal policy in the abstract MDP,
+
+applied to the ground MDP, has suboptimality bounded
+polynomially in ε:
+∀s∈SGV π∗
+
+G (s) ≤ poly (ε) .
+
+G (s) − V πGA
+
+(10)
+
+G
+
+We prove this theorem in the following sections by proving
+polynomial bounds on the error of each individual approx-
+imate state-aggregation function type.
+
+5.1. Optimal Q Function: (cid:101)φQ∗,ε
+
+We consider an approximate version of Li et al. (2006)’s
+φQ∗.
+In our abstraction, states are aggregated together
+when their optimal Q-values are within ε.
+
+Deﬁnition 12 ((cid:101)φQ∗,ε): An approximate Q function ab-
+(cid:101)φQ∗,ε(s1) = (cid:101)φQ∗,ε(s2) → ∀a |QG(s1, a) − QG(s2, a)| ≤ ε.
+Lemma 1. When a(cid:101)φQ∗,ε type abstraction is used to create
+
+straction has the same form as Equation 9:
+
+(11)
+
+the abstract MDP:
+∀s∈SG V π∗
+
+G (s) − V πGA
+
+G (s) ≤
+
+G
+
+2ε
+
+(1 − γ)2 .
+
+(12)
+
+Proof of Lemma 1: We ﬁrst demonstrate that Q-values in
+the abstract MDP are close to Q-values in the ground MDP
+(Claim 1). We next leverage Claim 1 to demonstrate that
+the optimal action in the abstract MDP is nearly optimal
+in the ground MDP (Claim 2). Lastly, we use Claim 2 to
+conclude Lemma 1 (Claim 3).
+Claim 1. Optimal Q-values in the abstract MDP closely
+resemble optimal Q-values in the ground MDP:
+
+∀sG∈SG,a|QG(sG, a) − QA((cid:101)φQ∗,ε(sG), a)| ≤ ε
+
+1 − γ
+
+.
+(13)
+
+Consider a non-Markovian decision process of the same
+form as an MDP, MT = (cid:104)ST ,AG,RT ,TT , γ(cid:105), parame-
+terized by integer an T , such that for the ﬁrst T time steps
+the reward function, transition dynamics and state space are
+those of the abstract MDP, MA, and after T time steps the
+reward function, transition dynamics and state spaces are
+those of MG. Thus,
+
+(cid:40)SG if T = 0
+
+SA o/w
+
+ST =
+
+QG(s, a)
+
+
+
+(cid:80)
+(cid:88)
+
+(cid:48)∈SA
+
+sA
+
+QT (s, a) =
+
+[QG(g, a)ω(g)]
+
+g∈G(s)
+RA(s, a) + σT−1(s, a) o/w
+
+where:
+
+σT−1(s, a) = γ
+
+TA(s, a, sA
+
+(cid:48)) max
+
+a(cid:48) QT−1(sA
+
+(cid:48), a(cid:48)).
+
+We proceed by induction on T to show that:
+
+∀T,sG∈SG,a|QT (sT , a) − QG(sG, a)| ≤ T−1(cid:88)
+where sT = sG if T = 0 and sT = (cid:101)φQ∗,ε(sG) otherwise.
+
+εγt,
+
+t=0
+
+(15)
+
+Base Case: T = 0
+When T = 0, QT = QG, so this base case trivially follows.
+Base Case: T = 1
+By deﬁnition of QT , we have that Q1 is
+
+Q1(s, a) =
+
+[QG(g, a)ω(g)] .
+
+(cid:88)
+
+g∈G(s)
+
+Since all co-aggregated states have Q-values within ε of
+one another and ω(g) induces a convex combination,
+
+Q1(sT , a) ≤ εγt + ε + QG(sG, a).
+
+∴ |Q1(sT , a) − QG(sG, a)| ≤ 1(cid:88)
+
+εγt.
+
+(16)
+
+Inductive Case: T > 1
+
+t=0
+
+t=0
+
+εγt.
+
+We assume as our inductive hypothesis that:
+
+∀sG∈SG,a|QT−1(sT , a) − QG(sG, a)| ≤ T−2(cid:88)
+but arbitrary action a. Since T > 1, sT is (cid:101)φQ∗,ε(sG). By
+RG(g, a) + γ
+ .
+
+Consider a ﬁxed but arbitrary state, sG ∈ SG, and ﬁxed
+deﬁnition of QT (sT , a), RA, TA:
+ω(g) ×
+
+(cid:88)
+(cid:88)
+
+TG(g, a, g(cid:48)) max
+
+a(cid:48) QT−1(g(cid:48), a(cid:48))
+
+QT (sT , a) =
+
+g∈G(sT )
+
+g(cid:48)∈SG
+
+Near Optimal Behavior via Approximate State Abstraction
+
+Applying our inductive hypothesis yields:
+
+(cid:20)
+
+ω(g) ×
+
+RG(g, a) +
+
+QT (sT , a) ≤ (cid:88)
+
+g∈G(sT )
+
+(cid:88)
+
+γ
+
+g(cid:48)∈SG
+
+TG(g, a, g(cid:48)) max
+
+a(cid:48) (QG(g(cid:48), a(cid:48)) +
+
+For t > 0, the value of this policy for sG ∈ SG in the
+ground MDP is:
+
+V πA,t
+G (sG) =
+
+RG(s, πA,t(sG))+ γ
+
+(cid:21)
+
+εγt)
+
+.
+
+T−2(cid:88)
+
+t=0
+
+(cid:88)
+
+(cid:48)∈SG
+
+sG
+
+For t = 0, V πA,t
+We now show by induction on t that
+
+G (sG) is simply VG(sG).
+
+TG(sG, a, sG
+
+(cid:48))V πA,t−1
+
+G
+
+(cid:48)).
+
+(sG
+
+Since all aggregated states have Q-values within ε of one
+another:
+
+QT (sT , a) ≤ γ
+
+εγt + ε + QG(sG, a).
+
+∀t,sG∈Sg VG(sG) ≤ V πA,t
+
+G (sG) +
+
+T−2(cid:88)
+
+t(cid:88)
+
+i=0
+
+γi 2ε
+1 − γ
+
+.
+
+(22)
+
+VG(sG) ≤ QG(sG, a∗
+
+A) +
+
+2ε
+1 − γ
+
+.
+
+(17)
+
+γ
+
+Base case: t = 0
+By deﬁnition, when t = 0, V πA,t
+trivially holds in this case.
+Inductive case: t > 0
+Consider a ﬁxed but arbitrary state sG ∈ SG. We assume
+for our inductive hypothesis that
+
+= VG, so our bound
+
+G
+
+VG(sG) ≤ V πA,t−1
+
+G
+
+(sG) +
+
+By deﬁnition,
+
+V πA,t
+G (sG) = RG(s, πA,t(sG))+
+
+TG(sG, a, sG
+
+t−1(cid:88)
+
+i=0
+
+γi 2ε
+1 − γ
+
+.
+
+(23)
+
+(cid:48))V πA,t−1
+
+G
+
+(cid:48)).
+
+(sG
+
+Applying our inductive hypothesis yields:
+
+G (sG) ≥ RG(sG, πA,t(sG)) +
+(cid:88)
+V πA,t
+TG(sG, πA,t(sG), sG
+
+VG(sG
+
+(cid:48))
+
+(cid:32)
+
+(cid:48)) − t−1(cid:88)
+
+i=0
+
+γi 2ε
+1 − γ
+
+(cid:33)
+
+.
+
+(cid:48)
+
+sG
+
+(cid:88)
+
+g(cid:48)
+
+t−1(cid:88)
+t−1(cid:88)
+
+i=0
+
+t=0
+
+t=0 εγt → ε
+
+∞, (cid:80)T−1
+and its corresponding abstract state sA = (cid:101)φQ∗,ε(sG). Let
+
+Since sG is arbitrary we conclude Equation 15. As T →
+1−γ by the sum of inﬁnite geometric
+series and QT → QA. Thus, Equation 15 yields Claim 1.
+Claim 2. Consider a ﬁxed but arbitrary state, sG ∈ SG
+a∗
+G stand for the optimal action in sG, and a∗
+optimal action in sA:
+a∗
+G = arg max
+
+a∗
+A = arg max
+
+A stand for the
+
+QG(sG, a),
+
+QA(sA, a).
+
+a
+
+a
+
+The optimal action in the abstract MDP has a Q-value in
+the ground MDP that is nearly optimal:
+
+By Claim 1,
+
+VG(sG) = QG(sG, a∗
+
+G) ≤ QA(sA, a∗
+
+G) +
+
+ε
+1 − γ
+
+.
+
+(18)
+
+γ
+
+By the deﬁnition of a∗
+
+QA(sA, a∗
+
+G) +
+
+A, we know that
+≤ QA(sA, a∗
+ε
+1 − γ
+
+A) +
+
+Lastly, again by Claim 1, we know
+
+QA(sA, a∗
+
+A) +
+
+ε
+1 − γ
+
+≤ QG(sg, a∗
+
+A) +
+
+2ε
+1 − γ
+
+.
+
+(20)
+
+Therefore, Equation 17 follows.
+Claim 3. Lemma 1 follows from Claim 2.
+
+Consider the policy for MG of following the optimal ab-
+stract policy π∗
+A for t steps and then following the optimal
+ground policy π∗
+G in MG:
+
+(cid:40)
+
+π∗
+G(s)
+πGA(s)
+
+ε
+1 − γ
+
+.
+
+(19)
+
+Therefore,
+
+G (sG) ≥ −γ
+V πA,t
+
+i=0
+Applying Claim 2 yields:
+
+γi 2ε
+1 − γ
+
++ QG(sG, πA,t(sG)).
+
+G (sG) ≥ −γ
+V πA,t
+
+γi 2ε
+1 − γ
+
+− 2ε
+1 − γ
+
++ VG(sG)
+
+∴ VG(sG) ≤ V πA,t
+
+G (sG) +
+
+γi 2ε
+1 − γ
+
+.
+
+t(cid:88)
+
+i=0
+
+Since sG was arbitrary, we conclude that our bound holds
+for all states in SG for the inductive case. Thus, from our
+base case and induction, we conclude that
+
+t(cid:88)
+
+i=0
+
+πA,t(s) =
+
+if t = 0
+if t > 0
+
+(21)
+
+∀t,sG∈Sg V π∗
+
+G (sG) ≤ V πA,t
+
+G
+
+G (sG) +
+
+γi 2ε
+1 − γ
+
+.
+
+(24)
+
+(1−γ)2 by the sum
+of inﬁnite geometric series and πA,t(s) → πGA. Thus, we
+conclude Lemma 1.
+
+i=0 γi 2ε
+
+Near Optimal Behavior via Approximate State Abstraction
+1−γ → 2ε
+
+5.3. Boltzmann over Optimal Q:(cid:101)φbolt,ε
+Here, we introduce (cid:101)φbolt,ε, which aggregates states with
+
+Note that as t → ∞,(cid:80)t
+5.2. Model Similarity: (cid:101)φmodel,ε
+
+∀a
+
+stractions that, for ﬁxed ε, satisﬁes:
+
+similar Boltzmann distributions on Q-values. This fam-
+ily of abstractions is appealing as Boltzmman distribu-
+tions balance exploration and exploitation (Sutton & Barto,
+1998). We ﬁnd this type particularly interesting for abstrac-
+
+when Q-value ratios are similar but their magnitudes are
+different.
+
+tion purposes as, unlike (cid:101)φQ∗,ε, it allows for aggregation
+Deﬁnition 14 ((cid:101)φbolt,ε): We let (cid:101)φbolt,ε deﬁne a type of ab-
+(cid:101)φbolt,ε(s1) = (cid:101)φbolt,ε(s2) →
+(cid:12)(cid:12)(cid:12)(cid:12) ≤ ε.
+(cid:12)(cid:12)(cid:12)(cid:12) eQG(s1,a)
+(cid:80)
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) ≤ k × ε.
+(cid:101)φbolt,ε type, for some non-negative constant k ∈ R:
+(cid:16) |A|
+(cid:17)
+∀s∈SGV π∗
+
+We also assume that the difference in normalizing terms is
+bounded by some non-negative constant, k ∈ R, of ε:
+
+Lemma 3. When SA is created using a function of the
+
+eQG(s1,b) −(cid:88)
+
+− eQG(s2,a)
+b eQG(s2,b)
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:88)
+
+G (s) ≤ 2ε
+
+G (s) − V πGA
+
+b eQG(s1,b)
+
+1−γ + kε + k
+(1 − γ)2
+
+eQG(s2,b)
+
+(cid:80)
+
+. (29)
+
+(27)
+
+(28)
+
+G
+
+b
+
+b
+
+We use the approximation for ex, with δ error:
+
+ex = 1 + x + δ ≈ 1 + x.
+
+(30)
+
+We let δ1 denote the error in approximating eQG(s1,a) and
+δ2 denote the error in approximating eQG(s2,a).
+Proof Sketch of Lemma 3:
+By the approximation in Equation 30 and the assumption
+in Equation 28:
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) 1 + QG(s1, a) + δ1
+(cid:80)
+Either (cid:80)
+(cid:80)
+
+j eQG(s1,aj ) − kε.
+
+j eQG(s1,aj )
+
+j eQG(s1,aj ) ± kε is (cid:80)
+
+(cid:80)
+− 1 + QG(s2, a) + δ2
+j eQG(s1,aj ) ± kε
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) ≤ ε (31)
+
+j eQG(s1,aj ) + kε, or
+
+First suppose the former. It follows by algebra that:
+
+(cid:80)
+
+(cid:80)
+
+− ε ≤ 1 + QG(s1, a) + δ1
+
+j eQG(s1,aj )
+
+− 1 + QG(s2, a) + δ2
+j eQG(s1,aj ) + kε
+
+≤ ε
+(32)
+
+abstraction that, for ﬁxed ε, satisﬁes:
+
+∀a |RG(s1, a) − RG(s2, a)| ≤ ε AND
+
+Now, consider an approximate version of Li et al. (2006)’s
+φmodel, where states are aggregated together when their re-
+wards and transitions are within ε.
+
+Deﬁnition 13 ((cid:101)φmodel,ε): We let (cid:101)φmodel,ε deﬁne a type of
+(cid:101)φmodel,ε(s1) = (cid:101)φmodel,ε(s2) →
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) ≤ ε.
+∀sA∈SA
+Lemma 2. When SA is created using a(cid:101)φmodel,ε type:
+G (s) ≤ 2ε + 2γ((|SG| − 1)ε)
+∀s∈SG V π∗
+
+(cid:48)) − TG(s2, a, sG
+
+G (s) − V πGA
+
+[TG(s1, a, sG
+
+(cid:88)
+
+(cid:48)∈G(sA)
+
+(cid:48))]
+
+sG
+
+G
+
+(1 − γ)3
+
+(25)
+
+.
+(26)
+
+Proof of Lemma 2:
+Let B be the maximum Q-value difference between any
+
+pair of ground states in the same abstract state for(cid:101)φmodel,ε:
+
+B = max
+
+sA,s1,s2,a
+
+|QG(s1, a) − QG(s2, a)|,
+
+where sA ∈ SA and s1, s2 ∈ G(sA). Since difference of
+rewards is bounded by ε:
+
+(cid:88)
+
+(cid:20)
+
+(cid:88)
+
+sA∈SA
+
+(cid:48)∈G(sA)
+
+sG
+
+B ≤ ε + γ
+
+(TG(s1, a, sG
+
+(cid:48)) −
+
+(cid:21)
+
+TG(s2, a, sG
+
+By similarity of transitions under(cid:101)φmodel,ε:
+
+(cid:48))) max
+
+a(cid:48) QG(sG
+
+(cid:48), a(cid:48))
+
+.
+
+B ≤ ε + γQMAX
+
+ε ≤ ε + γ|SG|εQMAX.
+
+(cid:88)
+
+sA∈SA
+
+Since QMAX = RMAX
+
+1−γ , and we deﬁned RMAX = 1:
+B ≤ ε + γ(|SG| − 1)ε
+
+.
+
+1 − γ
+
+Since the Q-values of ground states grouped under(cid:101)φmodel,ε
+are strictly less than B, we can understand(cid:101)φmodel,ε as a type
+of(cid:101)φQ∗,B. Applying Lemma 1 yields Lemma 2.
+
+Near Optimal Behavior via Approximate State Abstraction
+
+ − δ1 + δ2 ≤
+
+(cid:88)
+
+j
+
+kε +
+(cid:80)
+
+− ε
+
+(cid:32)
+
+kε
+
+1 + QG(s1, a) + δ1
+
+j eQG(s1,aj )
+
+eQG(s1,aj )
+
+(cid:33)
+kε +
+
+ε
+
+(cid:88)
+
+j
+
++ QG(s1, a) − QG(s2, a) ≤
+
+eQG(s1,aj )
+
+ − δ1 + δ2
+(cid:19)
+
+(cid:18) |A|
+(cid:17)
+
+A similar equation follows if we suppose the latter and
+combining these equations gives us:
+|QG(s1, a) − QG(s2, a)| ≤ ε
+
+Consequently, we can consider (cid:101)φbolt,ε as a of the (cid:101)φQ∗,B
+5.4. Multinomial over Optimal Q:(cid:101)φmult,ε
+
+type, where B = ε
+lows from Lemma 1.
+
+. Lemma 3 then fol-
+
+(cid:16) |A|
+
+1−γ + kε + k
+
+1 − γ
+
++ kε + k
+
+. (33)
+
+∀a
+
+(cid:80)
+
+b QG(s1, b)
+
+straction that, for ﬁxed ε, satisﬁes
+
+− QG(s1, a)
+b QG(s1, b)
+
+We consider approximate abstractions derived from a
+multinomial distribution over Q∗ for similar reasons to the
+Boltzmann distribution. Additionally, the multinomial dis-
+tribution is appealing for its simplicity.
+
+Deﬁnition 15 ((cid:101)φmult,ε): We let (cid:101)φmult,ε deﬁne a type of ab-
+(cid:101)φmult,ε(s1) = (cid:101)φmult,ε(s2) →
+(cid:12)(cid:12)(cid:12)(cid:12) ≤ ε.
+(cid:12)(cid:12)(cid:12)(cid:12) QG(s1, a)
+(cid:80)
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) ≤ k × ε.
+QG(s1, ai) −(cid:88)
+(cid:101)φmult,ε type, for some non-negative constant k ∈ R:
+∀s∈SM V π∗
+
+We also assume that the difference in normalizing terms is
+bounded by some non-negative constant, k ∈ R, of ε:
+
+Lemma 4. When SA is created using a function of the
+
+2ε|A|
+1−γ + kε2 + k
+
+G (s) − V πGA
+
+G (s) ≤
+
+(cid:88)
+
+QG(s2, aj)
+
+(34)
+
+.
+
+(36)
+
+(35)
+
+i
+
+j
+
+G
+
+(1 − γ)2
+
+Proof Sketch of Lemma 4 The proof follows an identical
+strategy to that of Lemma 3, but without ex ≈ 1 + x.
+
+6. Example Domains
+We apply approximate abstraction to four example
+domains—NChain, Taxi, Mineﬁeld and Random. These
+domains were selected for their diversity—NChain is rela-
+tively simple, Taxi is goal-based and hierarchical in nature,
+
+Mineﬁeld is stochastic, and Random MDP has many near-
+optimal policies.
+Our code base1 provides implementations for abstracting
+arbitrary MDPs as well as visualizing and evaluating the
+resulting abstract MDPs. We use the graph-visualization
+library GraphStream (Pign´e et al., 2008) and the planning
+and RL library, BURLAP2. For all experiments, we set γ to
+0.95.
+NChain is a simple MDP investigated in the Bayesian
+RL literature due to the interesting exploration problem it
+poses (Dearden et al., 1998). In our implementation, we set
+N = 10, normalized rewards between 0 and 1, and used a
+slip probability of 0.2.
+Taxi has long been studied by the hierarchical RL liter-
+ature (Dietterich, 2000). The agent, operating in a Grid
+World style domain (Russell & Norvig, 1995), may move
+left, right, up, and down, as well as pick up a passenger and
+drop off a passenger. The goal is achieved when the agent
+has taken all passengers to their destinations.
+Mineﬁeld is a test problem we are introducing that uses the
+Grid World dynamics of Russell & Norvig (1995) with slip
+probability of x. The reward function is such that moving
+up in the top row of the grid receives 1.0 reward; all other
+transitions receive 0.2 reward, except for transitions to a
+random set of κ states (which may include the top row)
+that receive 0 reward. (These are the states with “mines” in
+them.) We set N = 10, M = 4, ε = 0.5, κ = 5, x = 0.01.
+In the Random MDP domain we consider, there are 100
+states and 3 actions. For each state, each action transitions
+to one of two randomly selected states with probability 0.5.
+
+7. Empirical Results
+
+proofs in Section 5 demonstrate, the other three functions
+
+We ran experiments on the (cid:101)φQ∗,ε type aggregation func-
+tions. We provide results for only (cid:101)φQ∗,ε because, as our
+are reducible to particular (cid:101)φQ∗,ε functions. For the pur-
+that satisﬁed the (cid:101)φQ∗,ε criteria. Since this approach rep-
+
+pose of illustrating what kinds of approximations are pos-
+sible we built each abstraction by ﬁrst solving the MDP,
+then greedily aggregating ground states into abstract states
+
+resents an order-dependent approximation to the maximum
+amount of abstraction possible, we randomized the order in
+which states were considered across trials. Every ground
+state is equally weighted in its abstract state.
+For each domain, we report two quantities as a function of
+epsilon with 95% conﬁdence bars. First, we compare the
+number of states in the abstract MDP for different values
+
+1github.com/david-abel/state_abstraction
+2http://burlap.cs.brown.edu/
+
+Near Optimal Behavior via Approximate State Abstraction
+
+(a) NChain
+
+(b) Mineﬁeld
+
+(c) Taxi
+
+(d) Random
+
+(e) NChain
+
+(f) Mineﬁeld
+
+(g) Taxi
+
+(h) Random
+
+Figure 1. ε vs. Num States and ε vs. Abstract Policy Value
+
+of ε, shown in the top row of Figure 1. The smaller the
+number of abstract states, the smaller the state space of the
+MDP that the agent must plan over. Second, we report the
+value under the abstract policy of the initial ground state,
+also shown in the bottom row of Figure 1. In the Taxi and
+Random domains, 200 trials were run for each data point,
+whereas 20 trials were sufﬁcient in Mineﬁeld and NChain.
+Our empirical results corroborate our thesis—approximate
+state abstractions can decrease state space size while re-
+taining bounded error. In both NChain and Mineﬁeld, we
+observe that, as ε increases from 0, the number of states
+that must be planned over is reduced, and optimal behavior
+is either fully maintained (NChain) or very nearly main-
+tained (Mineﬁeld). Similarly for Taxi, when ε is between
+.02 and .025, we observe a reduction in the number of states
+in the abstract MDP while value is fully maintained. After
+.025, increased reduction in state space size comes at a cost
+of value. Lastly, as ε is increased in the Random domain,
+there is a smooth reduction in the number of abstract states
+with a corresponding cost in the value of the derived pol-
+icy. When ε = 0, there is no reduction in state space size
+whatsoever (the ground MDP has 100 states), because no
+two states have identical optimal Q-values.
+Our experimental results also highlight a noteworthy char-
+acteristic of approximate state abstraction in goal-based
+MDPs. Taxi exhibits relative stability in state space size
+and behavior for ε up to .02, at which point both fall off
+dramatically. We attribute the sudden fall off of these quan-
+tities to the goal-based nature of the domain; once infor-
+mation critical for achieving optimal behavior is lost in
+the state aggregation, solving the goal—and so acquiring
+any reward—is impossible. Conversely, in the Random do-
+
+main, a great deal of near optimal policies are available to
+the agent. Thus, even as the information for optimal behav-
+ior is lost, there are many near optimal policies available to
+the agent that remain available.
+
+8. Conclusion
+Approximate abstraction in MDPs offers considerable ad-
+vantages over exact abstraction. In this work, we proved
+bounds for the value lost when behaving according to the
+optimal policy of the abstract MDP. We also empirically
+demonstrate that approximate abstractions can reduce state
+space size with minor loss in the quality of the behavior.
+There are many directions for future work. First, we are
+interested in extending the approach of Ortner (2013) by
+learning the approximate abstraction functions introduced
+in this paper online in the planning or RL setting. While
+our work presents several sufﬁcient conditions for achiev-
+ing bounded error of learned behavior with approximate
+abstractions, we hope to investigate what conditions are
+strictly necessary for an approximate abstraction to achieve
+bounded error. In the future, we are interested in character-
+izing the relationship between temporal abstractions, such
+as options (Sutton et al., 1999), and approximate abstrac-
+tions. Lastly, we are interested in understanding the rela-
+tionship between various approximate abstractions and the
+information theoretical limitations on the degree of abstrac-
+tion achievable in MDPs.
+
+0.000.020.040.060.080.10Epsilon0102030405060Num Abstract StatesEpsilon vs. Num Abstract StatesNum. Ground StatesNum. Abstract States0.000.050.100.150.20Epsilon010203040Num Abstract StatesEpsilon vs. Num Abstract StatesNum. Ground StatesNum. Abstract States0.0000.0050.0100.0150.0200.0250.0300.035Epsilon0100200300400500600700Num Abstract StatesEpsilon vs. Num Abstract StatesNum. Ground StatesNum. Abstract States0.00.10.20.30.4Epsilon020406080100120Num Abstract StatesEpsilon vs. Num Abstract StatesNum. Ground StatesNum. Abstract States0.000.020.040.060.080.10Epsilon01234Value of Abstract PolicyEpsilon vs. Value of Abstract PolicyVal. Optimal PolicyVal. Random PolicyVal. Abstract Policy0.000.050.100.150.20Epsilon02468101214Value of Abstract PolicyEpsilon vs. Value of Abstract PolicyVal. Optimal PolicyVal. Random PolicyVal. Abstract Policy0.0000.0050.0100.0150.0200.0250.0300.035Epsilon0.00.10.20.30.40.5Value of Abstract PolicyEpsilon vs. Value of Abstract PolicyVal. Optimal PolicyVal. Random PolicyVal. Abstract Policy0.00.10.20.30.4Epsilon0246810Value of Abstract PolicyEpsilon vs. Value of Abstract PolicyVal. Optimal PolicyVal. Random PolicyVal. Abstract PolicyNear Optimal Behavior via Approximate State Abstraction
+
+Li, Lihong, Walsh, Thomas J, and Littman, Michael L. To-
+wards a uniﬁed theory of state abstraction for mdps. In
+ISAIM, 2006.
+
+Littman, Michael L, Dean, Thomas L, and Kaelbling,
+Leslie Pack. On the complexity of solving Markov de-
+cision problems. In Proceedings of the Eleventh Confer-
+ence on Uncertainty in Artiﬁcial Intelligence, pp. 394–
+402. Morgan Kaufmann Publishers Inc., 1995.
+
+Ortner, Ronald. Adaptive aggregation for reinforcement
+learning in average reward Markov decision processes.
+Annals of Operations Research, 208(1):321–336, 2013.
+
+Papadimitriou, Christos H and Tsitsiklis, John N. The com-
+plexity of Markov decision processes. Mathematics of
+Operations Research, 12(3):441–450, 1987.
+
+Pign´e, Yoann, Dutot, Antoine, Guinand, Fr´ed´eric, and
+Olivier, Damien. Graphstream: A tool for bridging
+the gap between complex systems and dynamic graphs.
+CoRR, abs/0803.2093, 2008.
+
+Russell, Stuart and Norvig, Peter. Artiﬁcial Intelligence
+A Modern Approach. Prentice-Hall, Englewood Cliffs,
+1995.
+
+Strehl, Alexander L, Li, Lihong, and Littman, Michael L.
+Reinforcement learning in ﬁnite MDPs: PAC analysis.
+Journal of Machine Learning Research, 10:2413–2444,
+2009.
+
+Sutton, Richard S and Barto, Andrew G. Reinforcement
+
+Learning: An Introduction. MIT Press, 1998.
+
+Sutton, Richard S, Precup, Doina, and Singh, Satinder. Be-
+tween MDPs and semi-MDPs: A framework for tempo-
+ral abstraction in reinforcement learning. Artiﬁcial Intel-
+ligence, 112(1):181–211, 1999.
+
+References
+Abel, David, Hershkowitz, David Ellis, Barth-Maron,
+Gabriel, Brawner, Stephen, O’Farrell, Kevin, Mac-
+Glashan, James, and Tellex, Stefanie. Goal-based action
+priors. In ICAPS, pp. 306–314, 2015.
+
+Andre, David and Russell, Stuart J.
+
+for programmable reinforcement learning agents.
+AAAI/IAAI, pp. 119–125, 2002.
+
+State abstraction
+In
+
+Auer, Peter, Jaksch, Thomas, and Ortner, Ronald. Near-
+optimal regret bounds for reinforcement learning. In Ad-
+vances in Neural Information Processing Systems, pp.
+89–96, 2009.
+
+Bean, James C, Birge, John R, and Smith, Robert L. Dy-
+namic programming aggregation. Operations Research,
+35(2):215–220, 2011.
+
+Dean, Thomas and Givan, Robert. Model minimization in
+markov decision processes. In AAAI/IAAI, pp. 106–111,
+1997.
+
+Dean, Thomas, Givan, Robert, and Leach, Sonia. Model
+reduction techniques for computing approximately op-
+timal solutions for markov decision processes. In Pro-
+ceedings of the Thirteenth Conference on Uncertainty in
+Artiﬁcial Intelligence, pp. 124–131. Morgan Kaufmann
+Publishers Inc., 1997.
+
+Dearden, Richard, Friedman, Nir, and Russell, Stuart.
+Bayesian Q-learning. In AAAI/IAAI, pp. 761–768, 1998.
+
+Dietterich, Thomas G. Hierarchical reinforcement learning
+with the maxq value function decomposition. J. Artif.
+Intell. Res.(JAIR), 13:227–303, 2000.
+
+Even-Dar, Eyal and Mansour, Yishay. Approximate equiv-
+alence of Markov decision processes. In Learning The-
+ory and Kernel Machines, pp. 581–594. Springer, 2003.
+
+Ferns, Norm, Panangaden, Prakash, and Precup, Doina.
+In Pro-
+Metrics for ﬁnite markov decision processes.
+ceedings of the 20th conference on Uncertainty in artiﬁ-
+cial intelligence, pp. 162–169. AUAI Press, 2004.
+
+Ferns, Norman, Castro, Pablo Samuel, Precup, Doina, and
+Panangaden, Prakash. Methods for computing state sim-
+ilarity in markov decision processes. Proceedings of the
+22nd conference on Uncertainty in artiﬁcial intelligence,
+2006.
+
+Jong, Nicholas K and Stone, Peter. State abstraction dis-
+covery from irrelevant state variables. In IJCAI, pp. 752–
+757, 2005.
+
+Kaelbling, Leslie Pack, Littman, Michael L, and Moore,
+Andrew W. Reinforcement learning: A survey. Journal
+of Artiﬁcial Intelligence Research, pp. 237–285, 1996.
+
+

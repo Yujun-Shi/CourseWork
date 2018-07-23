@@ -1,0 +1,955 @@
+Slice Sampling on Hamiltonian Trajectories
+
+Benjamin Bloem-Reddy
+John P. Cunningham
+Department of Statistics, Columbia University
+
+REDDY@STAT.COLUMBIA.EDU
+JPC2181@COLUMBIA.EDU
+
+Abstract
+
+Hamiltonian Monte Carlo and slice sampling
+are amongst the most widely used and stud-
+ied classes of Markov Chain Monte Carlo sam-
+plers. We connect these two methods and present
+Hamiltonian slice sampling, which allows slice
+sampling to be carried out along Hamiltonian
+trajectories, or transformations thereof. Hamil-
+tonian slice sampling clariﬁes a class of model
+priors that induce closed-form slice samplers.
+More pragmatically, inheriting properties of slice
+samplers, it offers advantages over Hamiltonian
+Monte Carlo, in that it has fewer tunable hyper-
+parameters and does not require gradient infor-
+mation. We demonstrate the utility of Hamil-
+tonian slice sampling out of the box on prob-
+lems ranging from Gaussian process regression
+to Pitman-Yor based mixture models.
+
+1. Introduction
+After decades of work in approximate inference and nu-
+merical integration, Markov Chain Monte Carlo (MCMC)
+techniques remain the gold standard for working with in-
+throughout statistics and
+tractable probabilistic models,
+machine learning. Of course,
+this gold standard also
+comes with sometimes severe computational requirements,
+which has spurred many developments for increasing the
+efﬁcacy of MCMC. Accordingly, numerous MCMC algo-
+rithms have been proposed in different ﬁelds and with dif-
+ferent motivations, and perhaps as a result the similarities
+between some popular methods have not been highlighted
+or exploited. Here we consider two important classes of
+MCMC methods: Hamiltonian Monte Carlo (HMC) (Neal,
+2011) and slice sampling (Neal, 2003).
+HMC considers the (negative log) probability of the in-
+tractable distribution as the potential energy of a Hamil-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+tonian system, and samples a new point from the distribu-
+tion by simulating a dynamical trajectory from the current
+sample point. With careful tuning, HMC exhibits favorable
+mixing properties in many situations, particularly in high
+dimensions, due to its ability to take large steps in sam-
+ple space if the dynamics are simulated for long enough.
+Proper tuning of HMC parameters can be difﬁcult, and
+there has been much interest in automating it; examples in-
+clude Wang et al. (2013); Hoffman & Gelman (2014). Fur-
+thermore, better mixing rates associated with longer trajec-
+tories can be computationally expensive because each sim-
+ulation step requires an evaluation or numerical approxi-
+mation of the gradient of the distribution.
+Similar in objective but different in approach is slice sam-
+pling, which attempts to sample uniformly from the volume
+under the target density. Slice sampling has been employed
+successfully in a wide range of inference problems, in large
+part because of its ﬂexibility and relative ease of tuning
+(very few if any tunable parameters). Although efﬁciently
+slice sampling from univariate distributions is straightfor-
+ward, in higher dimensions it is more difﬁcult. Previous ap-
+proaches include slice sampling each dimension individu-
+ally, amongst others. One particularly successful approach
+is to generate a curve, parameterized by a single scalar
+value, through the high-dimensional sample space. Ellip-
+tical slice sampling (ESS) (Murray et al., 2010) is one such
+approach, generating ellipses parameterized by θ ∈ [0, 2π].
+As we show in section 2.2, ESS is a special case of our
+proposed sampling algorithm.
+In this paper, we explore the connections between HMC
+and slice sampling by observing that the elliptical trajectory
+used in ESS is the Hamiltonian ﬂow of a Gaussian poten-
+tial. This observation is perhaps not surprising – indeed it
+appears at least implicitly in Neal (2011); Pakman & Panin-
+ski (2013); Strathmann et al. (2015) – but here we leverage
+that observation in a way not previously considered. To wit,
+this connection between HMC and ESS suggests that we
+might perform slice sampling along more general Hamil-
+tonian trajectories, a method we introduce under the name
+Hamiltonian slice sampling (HSS). HSS is of theoretical in-
+terest, allowing us to consider model priors that will induce
+
+Slice Sampling on Hamiltonian Trajectories
+
+simple closed form slice samplers. Perhaps more impor-
+tantly, HSS is of practical utility. As the conceptual off-
+spring of HMC and slice sampling, it inherits the relatively
+small amount of required tuning from ESS and the ability
+to take large steps in sample space from HMC techniques.
+In particular, we offer the following contributions:
+
+• We clarify the link between two popular classes of
+
+MCMC techniques.
+
+• We introduce Hamiltonian slice sampling, a general
+sampler for target distributions that factor into two
+components (e.g., a prior and likelihood), where the
+prior factorizes or can be transformed so as to factor-
+ize, and all dependence structure in the target distri-
+bution is induced by the likelihood or the intermediate
+transformation.
+
+• We show that the prior can be either of a form which
+induces analytical Hamiltonian trajectories, or more
+generally, of a form such that we can derive such a tra-
+jectory via a measure preserving transformation. No-
+table members of this class include Gaussian process
+and stick-breaking priors.
+
+• We demonstrate the usefulness of HSS on a range of
+
+models, both parametric and nonparametric.
+
+We ﬁrst review HMC and ESS to establish notation and a
+conceptual framework. We then introduce HSS generally,
+followed by a speciﬁc version based on a transformation to
+the unit interval. Finally, we demonstrate the effectiveness
+and ﬂexibility of HSS on two different popular probabilistic
+models.
+
+2. Sampling via Hamiltonian dynamics
+We are interested in the problem of generating samples of
+a random variable f from an intractable distribution π∗(f ),
+either directly or via a measure preserving transformation
+r−1(q) = f. For clarity, we use f to denote the quantity
+of interest in its natural space as deﬁned by the distribution
+π∗, and q denotes the transformed quantity of interest in
+Hamiltonian phase space, as described in detail below. We
+defer further discussion of the map r(·) until section 2.4,
+but note that in typical implementations of HMC and ESS,
+r(·) is the indentity map, i.e. f = q.
+
+2.1. Hamiltonian Monte Carlo
+
+HMC generates MCMC samples from a target dis-
+tribution, often an intractable posterior distribution,
+π∗(q) := 1
+Z ˜π(q), with normalizing constant Z, by simu-
+lating the Hamiltonian dynamics of a particle in the poten-
+tial U (q) = − log ˜π(q). We are free to specify a distribu-
+tion for the particle’s starting momentum p, given which
+
+the system evolves deterministically in an augmented state
+space (q, p) according to Hamilton’s equations.
+In par-
+ticular, at the i-th sampling iteration of HMC, the initial
+conditions of the system are q0 = q(i−1), the previous
+sample, and p0, which in most implementations is sam-
+pled from N (0, M ). M is a “mass” matrix that may be
+used to express a priori beliefs about the scaling and depen-
+dence of the different dimensions, and for models with high
+dependence between sampling dimensions, M can greatly
+affect sampling efﬁciency. An active area of research is
+investigating how to adapt M for increased sampling efﬁ-
+ciency; for example Girolami & Calderhead (2011); Betan-
+court et al. (2016). For simplicity, in this work we assume
+throughout that M is set ahead of time and remains ﬁxed.
+The resulting Hamiltonian is
+
+H(q, p) = − log ˜π(q) +
+
+pT M−1p.
+
+1
+2
+
+(1)
+
+When solved exactly, Hamilton’s equations generate
+Metropolis-Hastings (MH) proposals that are accepted with
+probability 1.
+In most situations of interest, Hamilton’s
+equations do not have an analytic solution, so HMC is of-
+ten performed using a numerical integrator, e.g. Störmer-
+Verlet, which is sensitive to tuning and can be computation-
+ally expensive due to evaluation or numerical approxima-
+tion of the gradient at each step. See Neal (2011) for more
+details.
+
+2.2. Univariate and Elliptical Slice Sampling
+
+Univariate slice sampling (Neal, 2003) generates samples
+uniformly from the area beneath a density p(x), such that
+the resulting samples are distributed according to p(x).
+It proceeds as follows: given a sample x0, a threshold
+h ∼ U(0, p(x0)) is sampled; the next sample x1 is then
+sampled uniformly from the slice S := {x : p(x) > h}.
+When S is not known in closed form, a proxy slice S(cid:48) can
+be randomly constructed from operations that leave the uni-
+form distribution on S invariant. In this paper, we use the
+stepping out and shrinkage procedure, with parameters w,
+the width, and m, the step out limit, from Neal (2003).
+ESS (Murray et al., 2010) is a popular sampling algorithm
+for latent Gaussian models, e.g., Markov random ﬁeld or
+Gaussian process (GP) models. For a latent multivariate
+Gaussian f ∈ Rd with prior π(f ) = N (f|0, Σ), ESS gen-
+erates MCMC transitions f → f(cid:48) by sampling an auxiliary
+variable ν ∼ N (0, Σ) and slice sampling the likelihood
+supported on the ellipse deﬁned by
+f(cid:48) = f cos θ + ν sin θ,
+
+θ ∈ [0, 2π].
+
+(2)
+
+Noting the fact that the solutions to Hamilton’s equations in
+an elliptical potential are ellipses, we may reinterpret ESS.
+The Hamiltonian induced by ˜π(q) ∝ N (q|0, Σ) and mo-
+
+Slice Sampling on Hamiltonian Trajectories
+
+1
+2
+
+pT M−1p.
+
+mentum distribution p ∼ N (0, M ) is
+1
+2
+
+qT Σ−1q +
+
+H(q, p) =
+
+t ∈ (−∞,∞),
+
+q(t) = q(0) cos t + Σp(0) sin t,
+
+(3)
+When M = Σ−1, Hamilton’s equations yield the trajectory
+(4)
+which is an ellipse. Letting r(·) be the identity map, and
+q(0) be the value of f from the previous iteration of an
+MCMC sampler, the trajectories of possible sample values
+given by (2) and (4) are distributionally equivalent with
+θ = t mod 2π because ν d= Σp(0) = M−1p(0). The
+ESS variable ν thus takes on the interpretation of the ini-
+tial velocity of the particle. Accordingly, we have clariﬁed
+the link between HMC and ESS. The natural next question
+is what this observation offers in terms of a more general
+sampling strategy.
+
+2.3. Hamiltonian Slice Sampling
+
+Using the connection between HMC and ESS, we pro-
+pose the sampling algorithm given in Algorithm 1, called
+Hamiltonian slice sampling (HSS). The idea of HSS is
+the same as ESS: use the prior distribution to generate an
+analytic curve through sample space, then slice sample on
+the curve according to the likelihood in order to generate a
+sample from the posterior distribution. In the special distri-
+butions for which Hamilton’s equations have analytic solu-
+tions and the resulting trajectories can be computed exactly,
+e.g. the multivariate Gaussian distribution, the trajectories
+have a single parameter, t ∈ (−∞,∞). This simple param-
+eterization is crucial: it enables us to use univariate slice
+sampling methods (Neal, 2003) in higher dimensions. The
+advantage of univariate slice sampling techniques is that
+they require little tuning; the slice width adapts to the dis-
+tribution and sampler performance does not depend greatly
+on the sampler parameters.
+We include in the Supplementary Materials some examples
+of distributions for which Hamilton’s equations have ana-
+lytical solutions. However, these special cases are in the
+minority, and most distributions do not admit analytic solu-
+tions. In such a case, a measure preserving transformation
+to a distribution that does have analytic solutions is nec-
+essary. Let r(·) denote such a transformation. We defer
+elaboration on speciﬁc transformations until the following
+section, but it is sufﬁcient for r(·) to be differentiable and
+one-to-one. In particular, we will make extensive use of the
+inverse function r−1(·).
+We next show that Algorithm 1 is a valid MCMC sampler
+Z L(D|f ) π(f ). The
+for a target distribution π∗(f|D) = 1
+proof of validity is conceptually so similar to ESS that the
+proof in Murray et al. (2010) nearly sufﬁces. For complete-
+ness, we here show that the dynamics used to generate new
+
+Algorithm 1 Hamiltonian slice sampling
+
+Input: Current state f; differentiable, one-to-one trans-
+formation q := r(f ) with Jacobian J(r−1(q))
+Output: A new state f(cid:48).
+If f is drawn from π∗, the
+marginal distribution of f(cid:48) is also π∗.
+1: Sample momentum for each component of q:
+
+p ∼ N (0, M )
+
+2: Obtain analytic solution q(cid:48)(t) to Hamilton’s equations,
+
+where p0 = p and q(cid:48)
+
+0 = q
+
+3: Set slice sampling threshold:
+
+u ∼U[0, 1]
+
+log h ← log L(D|f ) − log |J(r−1(q))| + log u
+
+4: Slice sample along r−1(q(cid:48)(t)) for t∗ ∈ (−∞,∞), us-
+
+ing the methods of (Neal, 2003) and threshold h on:
+log π∗(f(cid:48)|f ,p,D, u, t) ∝
+
+log L(D|f(cid:48)(t)) − log |J(r−1(q(t)))| (5)
+
+5: return f(cid:48)(t∗) = r−1(q(cid:48)(t∗))
+
+states are reversible, and as such, π∗ is a stationary distribu-
+tion of the Markov chain deﬁned by Algorithm 1. Further-
+more, the sampler has non-zero probability of transitioning
+to any region that has non-zero probability under π∗. Taken
+together, these facts clarify that the sampler will converge
+to a unique stationary distribution that yields samples of f
+that are marginally distributed according to the target π∗.
+Consider the joint distribution of the random variables
+in Algorithm 1 (suppressing hyperparameters for simplicity
+and denoting by {tk} the sequence of variables produced
+by the univariate slice sampling algorithm):
+
+p(f , p,h,{tk}) = π∗(f|D) p(p) p(h|f ,D) p({tk}|f , p, h)
+(6)
+L(D|f ) π(f ) p(p) p(h|f ,D) p({tk}|f , p, h)
+(7)
+
+1
+Z
+
+=
+
+for a differentiable,
+
+one-
+Now,
+remembering that
+transformation r(·),
+f = r−1(q),
+to-one
+with Jacobian J(·),
+the density of q is given by
+˜π(q) = π(r−1(q))|J(r−1(q))|.
+Combining this with
+the density of the slice sampling threshold variable implied
+
+such that
+
+by step 3 of Algorithm 1, p(h|f ,D) =
+
+|J(r−1(q))|
+
+L(D|f )
+
+, we have
+
+Slice Sampling on Hamiltonian Trajectories
+
+p(f , p,h,{tk})
+
+=
+
+1
+Z
+
+L(D|f ) π(r−1(q)) · |J(r−1(q))|
+|J(r−1(q))| . . .
+× p(p) p(h|f ,D) p({tk}|f , p, h)
+
+∝ ˜π(q) p(p) p({tk}|q, p, h)
+
+(8)
+(9)
+
+Exact Hamiltonian dynamics for (q, p) are reversible,
+keeping constant the factor ˜π(q) p(p), and they yield a
+trajectory in q-space parameterized by t that can be trans-
+formed into f-space as f (t) = r−1(q(t)). Given the Hamil-
+tonian trajectory, the univariate slice sampling methods,
+the step-out and shrinkage procedures from Neal
+e.g.
+(2003) can be applied to f (t); these, too, are reversible. We
+therefore have p(f , p, h,{tk}) = p(f(cid:48), p(cid:48), h,{t(cid:48)
+k}) for any
+f(cid:48) generated by starting at f, which concludes the proof of
+validity for HSS.
+
+2.4. HSS via the Probability Integral Transformation
+
+The multivariate Gaussian distribution is a special case for
+which Hamilton’s equations can be solved analytically, as
+demonstrated by ESS. This fact forms the basis for Pak-
+man & Paninski (2013; 2014). The univariate uniform and
+exponential distributions also have analytic solutions.
+In
+the remainder of the paper, we focus on transformations
+of uniform random variables; see the Supplementary Ma-
+terials for details on the exponential distribution and a few
+related transformations.
+Hamiltonian dynamics under
+the uniform distribution
+q ∼ U[0, 1] are the extremely simple billiard ball dynamics:
+the particle moves back and forth across the unit interval at
+constant speed ˙q0 = p0/m, reﬂecting off the boundaries of
+the interval. The relevant quantities are the initial reﬂection
+time,
+
+R0 =
+
+|1{ ˙q0 > 0} − q0|
+
+˙q0
+
+,
+
+(10)
+
+where ˙q0 is the initial velocity, and the period of a full
+traversal of the unit interval,
+
+T =
+
+1
+˙q0
+
+=
+
+m
+p0
+
+.
+
+(11)
+
+These simple dynamics can be used to construct analytic
+curves on which to slice sample for any continuous prior
+with computable inverse cumulative distribution function
+(CDF). In particular, for a random variable f with CDF
+G(f ) and density g(f ), the distribution of q := G(f ) is
+U[0, 1]. The dynamics on the unit interval yield the trajec-
+tory q(t); the resulting curve is f (t) = G−1(q(t)). In this
+case the Jacobian is 1/g(f ), so the slice sampling target
+
+Figure 1. Example trajectories from HSS (top) and ESS (bottom).
+Yellow dots are starting points, blue dots are end points of Hamil-
+tonian trajectories. Top left: Uniform trajectory in two indepen-
+dent dimensions. Top right: The resulting bivariate normal HSS
+trajectory via the probability integral transformation. Bottom left:
+Elliptical trajectory in two dimensions. The green dot in is ν from
+ESS. Bottom right: Transformation of the elliptical trajectory to
+the unit square.
+
+in Equation 5 of Algorithm 1 is exactly proportional to the
+posterior.
+Although f (t) is not a Hamiltonian ﬂow in sample space,
+it is a measure preserving transformation of a Hamiltonian
+ﬂow in the unit hypercube, and so preserves sampling va-
+lidity. For the remainder of the paper, we use transforma-
+tions to uniform random variables, and we refer to the re-
+sulting sampler as HSS. We note, however that it is only
+one instantiation of the general class of Hamiltonian slice
+sampling methods: any suitable transformation would pro-
+duce different resulting dynamics in sample space.
+Using this or any other transformation in Algorithm 1 gen-
+erates curves through sample space only using information
+from the prior and the transformation. A useful line of in-
+quiry is whether we can adapt the transformation or the
+prior to sample more efﬁciently. The problem of choos-
+ing or adapting to a prior that better captures the poste-
+rior geometry of the sample space is shared by all sam-
+plers based on Hamiltonian dynamics, including ESS and
+HMC. The issue is explored in depth in Girolami & Calder-
+head (2011); Betancourt et al. (2016). A possible approach
+to making the prior more ﬂexible is via a pseudo-prior, as
+in Nishihara et al. (2014); Fagan et al. (2016). We do not
+explore such an approach here, but note that a pseudo-prior
+could be incorporated easily in Algorithm 1.
+The basic requirement that must be satisﬁed in order to
+make our method applicable is that some component of the
+
+x1x2x1x2x1x2x1x2Slice Sampling on Hamiltonian Trajectories
+
+target distribution can be expressed as a collection of con-
+ditionally independent variables. This is often the case in
+hierarchical Baysian models, as in section 3.2. As a sim-
+ple example, whitening a collection of multivariate Gaus-
+sian random variables induces independence, enabling the
+simulation of independent uniform dynamics. An example
+of such dynamics on the unit square, along with the result-
+ing trajectory in two-dimensional Gaussian space, is shown
+in Figure 1. For comparison, Figure 1 also shows an exam-
+ple ESS trajectory from the same distribution, along with
+its transformation to the unit square.
+In principle, the HSS trajectory has access to different, pos-
+sibly larger, regions of the sample space, as it is not con-
+strained to a closed elliptical curve.
+It also spends rela-
+tively more time in regions of higher prior probability, as
+the particle’s velocity in the original space is inversely pro-
+˙f (t) = ˙q0/g(f ), as
+portional to the the prior density, i.e.
+will be illustrated in section 3.2. This behavior also sug-
+gests that if the prior is sharply concentrated on some re-
+gion, the sampler may get stuck. In order to avoid patholo-
+gies, relatively ﬂat priors should be used. If the prior hyper-
+parameters are also to be sampled, it should be done such
+that they make small moves relative to the parameters sam-
+pled by HSS. See Neal (2011, section 5.4.5) for discussion
+on this point in the context of HMC.
+
+2.5. Related Work
+
+HSS slice samples on a trajectory calculated using Hamil-
+tonian dynamics. A similar idea underlies the No U-Turn
+Sampler (NUTS) (Hoffman & Gelman, 2014), which slice
+samples from the discrete set of states generated by the nu-
+merical simulation of Hamiltonian dynamics induced by
+the posterior distribution of interest. Other methods of mul-
+tivariate slice sampling include those given in Neal (2003).
+Most often, each variable is slice sampled separately, which
+can lead to the same convergence problems as Gibbs sam-
+pling when the variables are highly dependent. Murray
+et al. (2010) review other sampling methods for latent GP
+models, of which HSS is another example. In so much as
+we derived HSS by noticing connections between existing
+methods, other commonalities may indeed exist.
+ESS also ﬁts into the framework of the preconditioned
+Crank-Nicholson (pCN) proposals studied in, e.g., Cotter
+et al. (2013). As those authors point out, the pCN pro-
+posal is a generalization of a random walk in the sample
+space, where “the target measure is deﬁned with respect to
+a Gaussian.” HSS also ﬁts in this framework, with the tar-
+get measure π∗ deﬁned with respect to non-Gaussian den-
+sities. ESS and HSS, like pCN, are dimension-free meth-
+ods; their statistical efﬁciency is independent of the dimen-
+sion of the sample space (Hairer et al., 2014). However,
+as more data is observed, and the posterior moves further
+
+Figure 2. Effective number of samples for ESS and HSS from 105
+iterations after 104 burn in on GP regression, averaged across
+50 experiments. σp denotes the standard deviation of the normal
+distribution from which the Hamiltonian momentum variable p
+is sampled. Top: Effective samples. Middle: Evaluation time.
+Bottom: Number of likelihood evaluations.
+
+from the prior, sampler performance may degrade – hence
+the motivation for adaptive techniques such as Nishihara
+et al. (2014); Fagan et al. (2016). Extending HSS to in-
+clude pseudo-priors or Metropolis-adjusted Langevin-type
+variations, as in Cotter et al. (2013), is an interesting direc-
+tion for future work.
+
+3. Experiments
+In order to test the effectiveness and ﬂexibility of HSS,
+we performed experiments on two very different models.
+The ﬁrst is latent GP regression on synthetic data, which
+allows us to make a direct comparison between HSS and
+ESS. The second is a non-parametric mixture of Gaussians
+with a stick-breaking prior, which demonstrates the ﬂexi-
+bility of HSS. In both, we use the step-out and shrinkage
+slice sampling methods. See Neal (2003) for details.
+3.1. GP Regression
+We consider the standard GP regression model. We as-
+sume a latent GP f over an input space X . Noisy Gaussian
+observations y = {y1, ..., yn} are observed at locations
+{x1, ..., xn}, and observations are conditionally indepen-
+i=1 N (yi|f (xi), σ2
+y),
+where σ2
+y is the variance of the observation noise. Al-
+though the posterior is conjugate and can be sampled in
+closed form, the simplicity of the model allows us to test
+the performance of HSS against that of ESS on a model for
+which ESS is ideally suited, forming a highly conservative
+
+dent with likelihood L(D|f ) :=(cid:81)n
+
+x2907x359x164EﬀectiveSamples01ESSσp=0.1σp=0.25x134x140x142CPUTime(s)024Dimension1510LhoodEvals(M)01Slice Sampling on Hamiltonian Trajectories
+
+baseline. Furthermore, we perform experiments in an in-
+creasing number of input dimensions, which lends insight
+to the scaling behavior of HSS.
+Following Murray et al. (2010), we generated synthetic
+datasets with input dimension D from one to ten, each with
+n = 200 observations and inputs xi drawn uniformly from
+the D-dimensional unit hypercube. Using the covariance
+function
+
+terms of a stick-breaking prior (Ishwaran & James, 2001).
+The collection of independent stick breaks is amenable to
+sampling with HSS, which we embed in a Gibbs sampler
+for the overall model.
+For observations Yi and parameters 0 ≤ α < 1 and
+θ > −α, the model can be written as follows:
+
+Vk|α, θ ind∼ Beta(1 − α, θ + kα), k = 1, 2, . . .
+
+(cid:18)
+
+(cid:19)
+
+,
+
+Σij = σ2
+
+f exp
+
+2(cid:96)2||xi − xj||2
+− 1
+
+2
+
+y = 0.32.
+
+the latent GP was drawn f ∼ N (0, Σ), with (cid:96) = 1 and
+f = 1. Finally, observations yi were drawn with noise
+σ2
+variance σ2
+Slice sampling parameters for HSS were set at w = 0.5
+and m = 8. Momentum variables were sampled i.i.d.
+p), with σp ∈ {0.1, 0.25}. We note that exper-
+pi ∼ N (0, σ2
+iments were also performed with larger values of σp, but
+results are qualitatively similar. The HSS generated good
+posterior samples without any tuning of the parameters and
+it required very little tuning to achieve better efﬁciency.
+Results for D ∈ {1, 5, 10} are shown in Figure 2 (other
+dimensions are not shown for compactness). A commonly
+used measure of sample quality is the effective number of
+samples estimated from the log-likelihood, shown in the
+top panel using the R-CODA package (Plummer et al.,
+2006).
+In low dimensions, ESS is clearly more efﬁcient
+than HSS. As the dimension increases, however, the perfor-
+mance gap closes; for D = 10, HSS samples nearly as ef-
+ﬁciently as ESS. Again, this model is such that ESS should
+work well, and the fact that HSS quickly approaches its per-
+formance is encouraging. The computational time, shown
+in the second panel, is longer for HSS primarily due to the
+evaluation of the normal inverse CDF required to evalu-
+ate the likelihood. The number of likelihood evaluations is
+shown in the third panel. As it demonstrates, HSS requires
+relatively fewer slice sampling steps in higher dimensions,
+leading to fewer likelihood evaluations.
+HSS is also easily applied to other latent GP models such
+as the log-Gaussian Cox process model or GP classiﬁca-
+tion. In simple experiments (not shown), we have found
+implementation and tuning to be straightforward. Accord-
+ingly, even in situations where we anticipate good perfor-
+mance from ESS, HSS is a competitive alternative.
+
+3.2. Mixture Models with Stick-breaking Priors
+
+To demonstrate the ﬂexibility of HSS, we investigate its
+performance on a markedly different type of model from
+GP regression. In particular, we test HSS on a widely used
+class of Bayesian nonparametric mixture models based on
+the Pitman-Yor (PY) process, which may be formulated in
+
+˜Pk = Vk
+
+(1 − Vj),
+
+k−1(cid:89)
+∞(cid:88)
+
+j=1
+
+iid∼ ν(·),
+
+φk
+
+Zi|{Vk} iid∼
+
+˜Pkδk(·)
+
+k=1
+
+Yi|Zi,{φk} ind∼ F (·|φZi).
+
+(12)
+
+When α = 0, this is the ubiquitous Dirichlet Process (DP)
+mixture model. PY models have been used in a variety of
+applications, but in many cases sampling remains difﬁcult,
+particularly when the posterior distribution of the random
+
+measure µ∗(·) :=(cid:80)∞
+
+˜Pkδk(·) is of interest.
+
+k=1
+
+Two classes of samplers currently exist for sampling from
+PY mixture models. The so-called marginal class for DPs
+and certain other random measures (Favaro & Teh, 2013),
+marginalizes out the random measure µ∗. Marginal sam-
+plers are attractively simple and are widely used, but they
+do not allow direct inference of the random measure. A
+second class of samplers, the so-called conditional sam-
+plers, relies on a deterministic or probabilistic truncation
+of the random measure. Examples are Ishwaran & James
+(2001) and Kalli et al. (2011). Conditional samplers are
+often computationally inefﬁcient, especially when the dis-
+tribution of random weights { ˜Pk)} has heavy tails, as is the
+case when α > 0. Their inefﬁciency stems from having to
+represent an inﬁnite object in a ﬁnite amount of time and
+memory; either the truncation is a poor approximation, or
+the truncation has to occur at a very large k, which is com-
+putationally expensive.
+In order to sample from the posterior efﬁciently, we em-
+bed HSS in a hybrid conditional-marginal blocked Gibbs
+sampler that alternates between sampling the individual
+cluster assignments Zi|Yi, Z−i,{Vk},{φk} and sampling
+all of the random measure parameters {Vk},{φk}|{Zi} si-
+multaneously with HSS. In order to overcome the issues
+of the conditional sampler while still representing the en-
+tire random measure, we use a hybrid approach similar to
+that of Lomeli et al. (2015); only the weights of the “oc-
+cupied” clusters are stored in memory; the weight of the
+unoccupied clusters is accumulated and used in the updates
+Zi|Yi, Z−i,{Vk},{φk}, via a modiﬁcation of the ReUse al-
+gorithm of Favaro & Teh (2013).
+
+Slice Sampling on Hamiltonian Trajectories
+
+Figure 3. Top: Trajectories on the simplex used by HSS (left) and HMC (right) to generate two samples of stick weights Vk from a toy
+version of the model described in section 3.2, with K = 3. The contours of the posterior are shown, and order of the samples is indicated
+by the number on the sample point. Bottom: The trajectories for V1 and V2 corresponding to the ﬁrst sample. (V3 is ﬁxed at 1.) The
+width of the trajectory (top) and shading (bottom) in the HSS plots is proportional to the inverse of the particle’s velocity, and represents
+the probability mass placed by the slice sampler, which samples uniformly on the slice in t, on the corresponding part of sample space.
+
+For comparison, we also used HMC to update the cluster
+parameters. HMC uses the gradient of the posterior and
+so should be expected to generate good posterior samples,
+if properly tuned. Figure 3 compares the behavior of HSS
+and HMC trajectories on the simplex in a toy example. To
+quatitatively compare HSS with HMC in a real data setting,
+we ﬁt a simple one-dimensional Gaussian mixture model
+with a Gaussian prior on the cluster means, and a Gamma
+prior on the cluster precisions using the galaxy dataset, with
+n = 82 observations, that was also used in Favaro & Teh
+(2013); Lomeli et al. (2015).
+In order to sample from the posterior distribution, we ran
+experiments with HSS or HMC embedded in the hybrid
+Gibbs sampler, ﬁxing the hyperparameters at α = 0.3 and
+θ = 1. HSS was relatively easy to tune to achieve good
+convergence and mixing, with slice sampling parameters
+w = 1, and m = ∞. The different groups of latent vari-
+ables in the model had very different scaling, and we found
+that σp = 0.1 and setting the mass equal to mv = 1 for
+the {Vk}, and mn = mγ = 10 for the cluster means and
+precisions worked well. So as to compare the computa-
+tion time between similar effective sample sizes (see sec-
+tion 3.3 below), we set the HMC parameters to achieve an
+acceptance ratio near 1, which required simulation steps of
+
+size  ∈ [5 × 10−5, 15 × 10−5], sampled uniformly from
+that range for each sampling iteration. We ran HMC with
+L ∈ {60, 150} steps for comparison. The results, displayed
+in Figure 4, show the relative efﬁciency of HSS; it achieves
+more effective samples per unit of computation time.
+We note that HMC’s performance improves, as measured
+by effective sample size, with larger simulation step sizes.
+However, larger simulation steps result in a non-trivial pro-
+portion of rejected HMC proposals, making impossible di-
+rect comparison with HSS due to the issue discussed in the
+following section. We also observed that the performance
+of HSS degraded with increasing sample size, because the
+posterior looks less like the prior, and the discussion in sec-
+tion 2.5 suggests. This behavior indicates that the use of a
+pseudo-prior would be beneﬁcial in many situations.
+
+3.3. Effective Sample Size in BNP Mixture Models
+
+It is worth noting that the effective sample size (in log-joint
+probability) achieved by HSS in our experiments for the
+PY model are an order of magnitude lower than those re-
+ported by Favaro & Teh (2013); Lomeli et al. (2015), who
+calculated effective samples of K∗, the number of occupied
+clusters. While conducting preliminary tuning runs of the
+
+0.90.80.70.60.50.40.30.20.100.90.80.70.60.50.40.30.20.100.90.80.70.60.50.40.30.20.10˜P1˜P2˜P30120.90.80.70.60.50.40.30.20.100.90.80.70.60.50.40.30.20.100.90.80.70.60.50.40.30.20.10˜P1˜P2˜P3012t-4-202468V101t00.050.10.150.20.25V101t-4-202468V201t00.050.10.150.20.25V201Slice Sampling on Hamiltonian Trajectories
+
+in reasonable dimensionality we showed HSS performed
+competitively. The latter PY case is where we expect HMC
+to be more competitive (and where ESS does not apply).
+Here we found that HSS had a similar effective sample size
+but outperformed even carefully tuned HMC in terms of
+computational burden. As speed, scaling, and generality
+are always critical with MCMC methods, these results sug-
+gest HSS is a viable method for future study and applica-
+tion.
+
+Acknowledgements
+We thank Francois Fagan and Jalaj Bhandari for useful dis-
+cussions, and for pointing out an error in an earlier draft;
+and anonymous referees for helpful suggestions. JPC is
+supported by funding from the Sloan Foundation and the
+McKnight Foundation.
+
+References
+Betancourt, M. J., Byrne, Simon, Livingstone, Samuel, and
+Girolami, Mark. The Geometric Foundations of Hamil-
+tonian Monte Carlo. Bernoulli, (to appear), 2016.
+
+Cotter, S. L., Roberts, G. O., Stuart, A. M., and White, D.
+MCMC Methods for Functions: Modifying Old Algo-
+rithms to Make Them Faster. Statist. Sci., 28(3):424–
+446, 2013.
+
+Fagan, Francois, Bhandari, Jalaj, and Cunningham, John P.
+Elliptical Slice Sampling with Expectation Propagation.
+In Proceedings of the 32nd Conference on Uncertainty
+in Artiﬁcial Intelligence, volume (To appear), 2016.
+
+Favaro, Stefano and Teh, Yee Whye. MCMC for Normal-
+ized Random Measure Mixture Models. Statist. Sci., 28
+(3):335–359, 2013.
+
+Girolami, Mark and Calderhead, Ben. Riemann manifold
+Langevin and Hamiltonian Monte Carlo methods. Jour-
+nal of the Royal Statistical Society: Series B (Statistical
+Methodology), 73(2):123–214, 2011. ISSN 1467-9868.
+
+Hairer, Martin, Stuart, Andrew M., and Vollmer, Sebas-
+tian J. Spectral gaps for a Metropolis–Hastings algo-
+rithm in inﬁnite dimensions. Ann. Appl. Probab., 24(6):
+2455–2490, 2014.
+
+Hoffman, Matthew D. and Gelman, Andrew. The No-
+U-Turn Sampler: Adaptively Setting Path Lengths in
+Hamiltonian Monte Carlo. Journal of Machine Learn-
+ing Research, 15:1593–1623, 2014.
+
+Ishwaran, Hemant and James, Lancelot F. Gibbs Sampling
+Methods for Stick-Breaking Priors. Journal of the Amer-
+ican Statistical Association, 96(453):161–173, 2001.
+
+Figure 4. Effective number of samples per minute of run time for
+HSS and HMC from 105 samples taken at intervals of 20 inter-
+ations, after 104 burn in iterations on the PY model, averaged
+across 10 experiments. L is the number of simulation steps used
+by HMC at each sampling iteration.
+
+HMC sampler, we observed something odd: if the HMC
+simulations were not properly tuned, and thus almost every
+proposed HMC move was rejected, the resulting effective
+sample size in K∗ was of the order of those previously re-
+ported. Further experiments in which we artiﬁcially limited
+HMC and HSS to take small steps produced the same ef-
+fect: samplng efﬁciency, as measured either by K∗ or log-
+joint probability, beneﬁts from small (or no) changes in the
+cluster parameters. It seems that when the parameter clus-
+ters do a suboptimal job of explaining the data, the cluster
+assignment step destroys many of the clusters and creates
+new ones, sampling new parameters for each. This often
+happens when the parameter update step produces small or
+no changes to the cluster parameters. The result is steps
+in sample space that appear nearly independent, and corre-
+spondingly a large effective sample size, despite the unde-
+sireably small moves of the parameter updates. This under-
+scores the importance of better measures of sample quality,
+especially for complicated latent variable models.
+
+4. Discussion
+Recognizing a link between two popular sampling meth-
+ods, HMC and slice sampling, we have proposed Hamil-
+tonian slice sampling, a general slice sampling algorithm
+based on analytic Hamiltonian trajectories. We described
+conditions under which analytic (possibly transformed)
+Hamiltonian trajectories can be guaranteed, and we demon-
+strated the simplicity and usefulness of HSS on two very
+different models: Gaussian process regression and mix-
+ture modeling with a stick-breaking prior. The former GP
+case is where ESS is particularly expected to perform, and
+
+HSSHMC,L=60HMC,L=150Eﬀ.Samples(JLL)perRunTime(min)00.511.5Slice Sampling on Hamiltonian Trajectories
+
+Kalli, Maria, Grifﬁn, Jim E., and Walker, Stephen G. Slice
+sampling mixture models. Statistics and Computing, 21
+(1):93–105, 2011.
+
+Lomeli, Maria, Favaro, Stefano, and Teh, Yee Whye. A hy-
+brid sampler for Poisson-Kingman mixture models. In
+Cortes, C., Lawrence, N.D., Lee, D.D., Sugiyama, M.,
+Garnett, R., and Garnett, R. (eds.), Advances in Neu-
+ral Information Processing Systems 28, pp. 2152–2160.
+Curran Associates, Inc., 2015.
+
+Murray, Iain, Adams, Ryan P., and MacKay, David J.C. El-
+liptical slice sampling. JMLR: W&CP, 9:541–548, 2010.
+
+Neal, Radford M. Slice sampling. Ann. Statist., 31(3):705–
+
+767, 2003.
+
+Neal, Radford M. Handbook of Markov Chain Monte
+Carlo, chapter 5: MCMC using Hamiltonian dynamics,
+pp. 113–162. Chapman and Hall/CRC, 2011.
+
+Nishihara, Robert, Murray, Iain, and Adams, Ryan P. Par-
+allel MCMC with Generalized Elliptical Slice Sampling.
+Journal of Machine Learning Research, 15:2087–2112,
+2014.
+
+Pakman, Ari and Paninski, Liam. Auxiliary-variable Ex-
+act Hamiltonian Monte Carlo Samplers for Binary Dis-
+tributions.
+In Burges, C.J.C., Bottou, L., Welling, M.,
+Ghahramani, Z., and Weinberger, K.Q. (eds.), Advances
+in Neural Information Processing Systems 26, pp. 2490–
+2498. Curran Associates, Inc., 2013.
+
+Pakman, Ari and Paninski, Liam. Exact Hamiltonian
+Monte Carlo for Truncated Multivariate Gaussians.
+Journal of Computational and Graphical Statistics, 23
+(2):518–542, 2014.
+
+Plummer, Martyn, Best, Nicky, Cowles, Kate, and Vines,
+Karen. CODA: Convergence Diagnosis and Output
+Analysis for MCMC. R News, 6(1):7–11, 2006.
+
+Strathmann, Heiko, Sejdinovic, Dino, Livingstone,
+Samuel, Szabo, Zoltan, and Gretton, Arthur. Gradient-
+free Hamiltonian Monte Carlo with Efﬁcient Kernel Ex-
+ponential Families. In Cortes, C., Lawrence, N.D., Lee,
+D.D., Sugiyama, M., and Garnett, R. (eds.), Advances
+in Neural Information Processing Systems 28, pp. 955–
+963. Curran Associates, Inc., 2015.
+
+Wang, Ziyu, Mohamed, Shakir, and de Freitas, Nando.
+Adaptive Hamiltonian and Riemann Manifold Monte
+Carlo. In Dasgupta, Sanjoy and Mcallester, David (eds.),
+Proceedings of the 30th International Conference on
+Machine Learning (ICML-13), volume 28, pp. 1462–
+1470. JMLR Workshop and Conference Proceedings,
+2013.
+
+

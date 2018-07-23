@@ -1,0 +1,1961 @@
+Optimal Dynamic Regret of Online Learning with True and Noisy Gradient
+
+Tracking Slowly Moving Clairvoyant:
+
+Tianbao Yang
+Department of Computer Science, The University of Iowa, Iowa City, IA 52242, USA
+Lijun Zhang
+National Key Laboratory for Novel Software Technology, Nanjing University, Nanjing, China
+Rong Jin
+Institute of Data Science and Technologies at Alibaba Group, Seattle, USA
+Jinfeng Yi
+IBM Thomas J. Watson Research Center, Yorktown Heights, NY 10598, USA
+
+TIANBAO-YANG@UIOWA.EDU
+
+ZLJZJU@GMAIL.COM
+
+JINRONG.JR@ALIBABA-INC.COM
+
+JINFENGY@US.IBM.COM
+
+Abstract
+
+This work focuses on dynamic regret of online
+convex optimization that compares the perfor-
+mance of online learning to a clairvoyant who
+knows the sequence of loss functions in advance
+and hence selects the minimizer of the loss func-
+tion at each step. By assuming that the clairvoy-
+ant moves slowly (i.e., the minimizers change
+slowly), we present several improved variation-
+based upper bounds of the dynamic regret under
+the true and noisy gradient feedback, which are
+optimal in light of the presented lower bounds.
+The key to our analysis is to explore a regular-
+ity metric that measures the temporal changes
+in the clairvoyant’s minimizers, to which we re-
+fer as path variation. Firstly, we present a gen-
+eral lower bound in terms of the path variation,
+and then show that under full information or gra-
+dient feedback we are able to achieve an op-
+timal dynamic regret. Secondly, we present a
+lower bound with noisy gradient feedback and
+then show that we can achieve optimal dynamic
+regrets under a stochastic gradient feedback and
+two-point bandit feedback. Moreover, for a se-
+quence of smooth loss functions that admit a
+small variation in the gradients, our dynamic re-
+gret under the two-point bandit feedback matches
+what is achieved with full information.
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+1. Introduction
+Online convex optimization (OCO) can be deemed as a re-
+peated game between an online player and an adversary, in
+which an online player iteratively chooses a decision and
+then her decisions incur (possibly different) losses by the
+loss functions chosen by the adversary. These loss func-
+tions are unknown to the decision maker ahead of time,
+and can be adversarial or even depend on the action taken
+by the decision maker. To formulate the problem mathe-
+matically, let Ω ⊆ Rd denote a convex decision set (i.e.,
+the feasible set of the decision vector), wt ∈ Ω denote the
+decision vector and ft(·) : Rd → R denote the loss func-
+tion at the t-th step, respectively. The goal of the online
+t=1 ft(wt).
+The traditional performance metric - the regret of the de-
+cision maker, is deﬁned as the difference between the total
+cost she has incurred and that of the best ﬁxed decision in
+hindsight, i.e.,
+
+learner is to minimize her cumulative loss(cid:80)T
+
+T(cid:88)
+
+t=1
+
+T(cid:88)
+
+t=1
+
+ft(wt) − min
+w∈Ω
+
+ft(w).
+
+(1)
+
+Recently, there emerges a surge of interest (Besbes et al.,
+2013; Hall & Willett, 2013; Jadbabaie et al., 2015) in the
+dynamic regret that compares the performance of online
+learning to a sequence of optimal solutions. If we denote by
+t ∈ Ω an optimal solution of ft(w), the dynamic regret
+w∗
+T(cid:88)
+is deﬁned as
+
+T(cid:88)
+
+(ft(wt) − ft(w∗
+
+t )) =
+
+(ft(wt) − min
+w∈Ω
+
+ft(w)) (2)
+
+t=1
+
+t=1
+
+i.e., the performance of the online learner is compared to
+a clairvoyant who knows the sequence of loss functions in
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+T−1(cid:88)
+
+t=1
+
+(cid:80)T
+
+t ) ≤ minw∈Ω
+
+(cid:80)T
+t=1 ft(w∗
+
+advance, and hence selects the minimizer w∗
+t at each step.
+Compared to the traditional regret in (1) (termed as static
+regret), the dynamic regret is more aggressive since the per-
+formance of the clairvoyant in the dynamic regret model
+is always better than that in the static regret model, i.e.,
+t=1 ft(w). It was pointed out
+that algorithms that achieve performance close to the best
+ﬁxed decision may perform poorly in terms of dynamic re-
+gret (Besbes et al., 2013).
+Unfortunately, it is impossible to achieve a sublinear dy-
+namic regret for any sequences of loss functions (c.f.
+Proposition 1).
+In order to achieve a sublinear dynamic
+regret, one has to impose some regularity constraints on
+the sequence of loss functions. In this work, we leverage a
+notion of variation that measures how fast the clairvoyant
+moves, i.e., how fast the minimizers of the sequence of loss
+functions change, to which we refer as path variation in
+order to differentiate with other variation deﬁnitions. For-
+mally the path variation is deﬁned as
+
+V p
+T
+
+(cid:44) max
+t ∈Ω∗
+t }T
+
+{w∗
+
+t=1
+
+(cid:107)w∗
+
+t − w∗
+
+t+1(cid:107)2
+
+(3)
+
+where Ω∗
+t denotes the set of all minimizers of ft(w) to
+account for the potential non-uniqueness. We aim to de-
+velop optimal dynamic regrets when the clairvoyant moves
+slowly given (noisy) gradient feedback (including bandit
+feedback) for non-strongly convex loss functions. The
+main results are summarized in Table 1 and the contribu-
+tions of this paper are summarized below.
+
+• We present a general lower bound dependent solely
+on V p
+T and show that under true gradient feedback for
+smooth functions with vanishing gradients in the fea-
+sible domain, one can achieve the optimal dynamic
+regret of O(V p
+T ) comparable to that with full informa-
+tion feedback.
+
+• We present a lower bound under a noisy (sub)gradient
+feedback dependent on V p
+T and T , and then show that
+online gradient descent (OGD) with an appropriate
+step size can achieve the optimal dynamic regret of
+T T ) under both stochastic gradient feedback
+
+O((cid:112)V p
+
+and two-point bandit feedback.
+
+• When the loss functions are smooth, we establish an
+improved dynamic regret under the two-point bandit
+feedback, which could match the bound achieved with
+the full information feedback in a certain condition.
+
+We note that a regularity metric similar to the path variation
+(possibly measured in different norms) has been explored
+in shifting regret analysis (Herbster & Warmuth, 1998) and
+drifting regret analysis (Cesa-Bianchi et al., 2012; Buch-
+binder et al., 2012). The regret against the shifting ex-
+perts was studied in tracking the best expert, where the
+
+fact, a similar dynamic regret bound to(cid:112)V p
+
+best sequence of minimizers are assumed to change for a
+constant number of times. In drifting regret analysis, the
+constraint is relaxed to that the path variation is small. In
+T T has been
+established for online convex optimization over the sim-
+plex (Cesa-Bianchi et al., 2012), where the path variation
+is measured in (cid:96)1 norm. The present work focuses on OCO
+in the Euclidean space and considers noisy gradient feed-
+back. A more general variation is considered in (Hall &
+Willett, 2013), where a sequence of (or a family of) dy-
+namic models φ1, . . . , φT are revealed by the environment
+for the learner to predict the decision in the next step. Their
+t )(cid:107) for a
+variation is deﬁned as V φ
+sequence of comparators and their dynamic regret scales as
+V φ
+T , which is worse than our bounds when φt(w) = w.
+T
+There have been different notions of variation that measure
+the point-wise changes in the sequence of loss functions
+at any feasible points. For example, Besbes et al. (2013)
+considered the functional variation deﬁned as
+|ft(w) − ft+1(w)|.
+
+T =(cid:80)T−1
+
+t+1−φt(w∗
+
+t=1 (cid:107)w∗
+
+T−1(cid:88)
+
+√
+
+(4)
+
+V f
+T =
+
+max
+w∈Ω
+
+t=1
+
+Besbes et al. considered two feedback structures, i.e., the
+noisy gradient and the noisy cost, and established sublinear
+dynamic regret for both feedback structures. For Lipschitz
+continuous loss functions, their results are presented in Ta-
+ble 1 1. An annoying fact is that even the sequence of
+Lipschitz loss functions change slowly (namely the func-
+√
+tional variation is small), Besbes’ dynamic regret is worse
+than O(
+In com-
+parison, our results match that for static regret when the
+clairvoyant moves slowly such that the path variation is a
+constant. Another variation that measures point-wise dif-
+ference between loss functions is the gradient variation in-
+troduced in (Chiang et al., 2012), which is deﬁned as
+
+T ), the optimal rate for static regret.
+
+(cid:107)∇ft(w) − ∇ft−1(w)(cid:107)2
+2.
+
+(5)
+
+max
+w∈Ω
+
+The gradient variation has been explored for bounding the
+static regret (Chiang et al., 2012; Rakhlin & Sridharan,
+2013; Yang et al., 2014). Recently, Jadbabaie et al. (2015)
+used the three variations and developed possibly better dy-
+namic regret than using a single variation measure for non-
+strongly convex loss functions. They considered the full
+information feedback (i.e., the whole loss function is re-
+vealed to the learner) and a true gradient feedback for a
+sequence of bounded functions. Their results are also pre-
+sented in Table 1. In comparison, our results could be po-
+tentially better when the clairvoyant moves slowly. Dif-
+ferent from (Jadbabaie et al., 2015), we consider the noisy
+
+1For strongly convex loss functions, better bounds were also
+
+established in (Besbes et al., 2013)
+
+(cid:44) T(cid:88)
+
+t=1
+
+V g
+T
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+Table 1. Summary of dynamic regret bounds in this paper and comparison with the previous work. N.B. means that no better bounds are
+explicitly given. However, the bounds in the degenerate case may apply. N.A. means that not available. ∗ marks the result is restricted
+to a family of smooth loss functions with vanishing gradients in the feasible domain. Please note that the bandit feedback in this work
+refers to two-point bandit feedback, and that in (Besbes et al., 2013) refers to noisy one-point bandit feedback.
+
+Loss function
+
+Lipschitz
+Lipschitz
+Smooth
+
+Lipschitz
+Lipschitz
+Bandit
+Smooth/Linear Bandit
+Lower Bounds
+
+This paper
+path variation
+
+Feedback
+Full Information O(V p
+T )
+True Gradient
+N.B.
+T )∗
+O(V p
+True Gradient
+
+Stochastic Grad. O((cid:112)V p
+O((cid:112)V p
+O(max{(cid:112)V p
+
+T T )
+T T )
+
+T V g
+
+T , V p
+
+Yes
+
+(Jadbabaie et al., 2015)
+three variations
+T V g
+
+T )1/3T 1/3(V f
+T V p
+T )
+
+O((cid:112)V g
+
+T , (V g
+
+T )1/3))
+
+T ) O(min((cid:112)V p
+
+(Besbes et al., 2013)
+functional variation
+O(V f
+N.B.
+N.B.
+O((V f
+O((V f
+T }) N.B.
+Yes
+
+T )1/3T 2/3)
+T )1/5T 4/5)
+
+N.B.
+
+N.A.
+N.A.
+N.A.
+No
+
+gradient feedback (including the bandit feedback) and de-
+velop both upper bounds and lower bounds.
+
+2. Optimal Dynamic Regret with Noiseless
+
+Information
+
+In this section, we present an optimal dynamic regret
+bound dependent solely on V p
+T and present algorithms with
+matched upper bounds.
+
+2.1. Preliminaries and a Lower Bound
+
+Since it is impossible to achieve a sublinear dynamic re-
+gret for any sequence of loss functions. We consider the
+following family of functions that admit a path variation
+constraint:
+
+T ≤ BT}
+
+Vp = {{f1, . . . , fT} : V p
+
+(6)
+where BT is the budget. For a (randomized) policy π
+that generates a sequence of solutions w1, . . . , wT for a
+sequence of loss functions f1, . . . , fT under the feedback
+structure φ, its dynamic regret is deﬁned as
+
+Rπ
+φ({f1, . . . , fT}) = Eπ
+
+ft(wt)
+
+ft(w∗
+t )
+
+(cid:34) T(cid:88)
+
+t=1
+
+(cid:35)
+
+− T(cid:88)
+
+t=1
+
+The worst dynamic regret of π over f ∈ Vp is
+
+φ(Vp, T ) = sup
+Rπ
+f∈Vp
+
+φ({f1, . . . , fT})
+Rπ
+
+(cid:26)
+
+t , t = 1, . . . , T .
+
+Note that the dynamic regret remains the same for different
+sequences of optimal solutions w∗
+Below, we establish a general lower bound of the dynamic
+regret for the following family of policies:
+A =
+(7)
+where φt(ft) ∈ Rk denotes any feedback of ft, and U ∈ U
+denotes a random variable, π1 : U → Ω, πt : R(t−1)k ×
+
+(cid:26) π1(U ),
+
+πt({φτ (fτ )}t−1
+
+t = 1
+t ≥ 1
+
+τ =1, U ),
+
+π : wt =
+
+(cid:27)
+
+U → Ω are measurable functions.
+Proposition 1. Let C, C1, C2 be positive constants inde-
+T , and let π be any policy in A. (i) If
+pendent of T and V p
+BT ≥ C1T , then there exists a positive constant C2 such
+φ(Vp, T ) ≥ C2T. (ii) For any γ ∈ (0, 1), there ex-
+that Rπ
+ists a sequence of loss functions f1, . . . , fT and a positive
+φ({f1, . . . , ft}) ≥
+constant C such that V p
+C(V p
+
+T ≤ o(T ) and Rπ
+
+T )γ.
+
+Remark: The ﬁrst part indicates that it is impossible to
+achieve a sublinear dynamic regret if there is no constraint
+on the sequence of loss functions. Therefore, in the se-
+quel, we only consider BT ≤ o(T ). A similar result to the
+ﬁrst part using V f
+T as the regularity measure has been es-
+tablished (Besbes et al., 2013). The second part is novel,
+which indicates that it is impossible to achieve a better dy-
+namic regret bound of O((V p
+T )α) with α < 1. If otherwise,
+it then contradicts to the lower bound in the second part of
+Proposition 1.
+
+Proof. Fix T ≥ 1 and γ ∈ (0, 1). To generate the sequence
+of loss functions, we create a sequence of random variables
+ε1, . . . , εT , where each εt is sampled independently from
+{σ,−σ} with equal probabilities. It is obvious that E[εt] =
+0 and E[ε2
+t ] = σ2. For each εt, we deﬁne a loss function
+2 (w − εt)2. Assume σ ∈ (0, 1) whose value will
+(cid:35)
+ft(w) = 1
+be speciﬁed later. Let the feasible domain be Ω = [−1, 1].
+
+E(cid:2)Rπ
+φ({f1, . . . , ft})(cid:3) = E
+T(cid:88)
+E(cid:2)w2
+
+t /2 + ε2
+
+=
+
+t /2 − wtεt
+
+(cid:34) T(cid:88)
+
+t=1
+
+ft(wt) − ft(εt)
+
+(cid:3) ≥ T σ2/2
+
+t=1
+
+where E[·] denotes the expectation over the randomness in
+the sequence of loss functions f1, . . . , ft and the policy π
+and the last inequality is due to that wt is independent of
+t=1 |εt − εt+1| ≤ 2σT . To
+εt. We also have V p
+
+T = (cid:80)T−1
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+p ⊂ Vp. Then
+φ(V(cid:48)
+
+p, T ) ≥ E(cid:2)Rπ
+(cid:104)Rπ
+
+φ({f1, . . . , ft})(cid:3) ≥ C 2
+T )γ(cid:105) ≥ 0,
+
+prove the ﬁrst part, we let σ be a constant C1/2, then any
+sequences of loss functions generated as above constitute a
+subset V(cid:48)
+Rπ
+φ(Vp, T ) ≥ Rπ
+1
+T
+8
+To prove the second part, we set σ = T −µ with µ =
+(1−γ)/(2−γ) ∈ (0, 1/2). Then there exits a positive con-
+stant C such that E
+which implies that there exists a sequence of loss functions
+f1, . . . , fT such that Rπ
+We note that if γ = 1, we have µ = 0 and therefore BT =
+Ω(T ) which reduces to the lower bound in the ﬁrst part.
+Therefore, we restrict γ ∈ (0, 1).
+
+φ({f1, . . . , fT}) − C(V p
+φ({f1, . . . , fT}) ≥ C(V p
+
+T )γ.
+
+An interesting question is that whether an O(V p
+T ) dynamic
+regret bound is achievable, if not what is the best we can
+achieve. In particular, we are interested in scenarios when
+the feedback φt(ft) = φt(wt, ft) only gives a (noisy) gra-
+dient of ft(w) at wt. Before delving into the noisy gra-
+dient feedback, we ﬁrst show that an O(V p
+T ) upper bound
+is achievable with full information of the loss functions or
+with full gradient feedback provided that the loss functions
+are smooth and have vanishing gradients. We make the fol-
+lowing assumptions throughout the paper without explic-
+itly mentioning it in the sequel.
+Assumption 1. For {f1, . . . , fT} ∈ Vp, there exists a r >
+t (cid:107)2 ≤ r, for any w ∈ Ω and
+0 such that supw∗
+1 ≤ t ≤ T .
+
+(cid:107)w− w∗
+
+t ∈Ω∗
+
+t
+
+2.2. Online Learning with Full Information
+
+Assume that at each step the full information of the loss
+function ft(w) is revealed after the decision wt is submit-
+ted, and each loss function ft(w) is G-Lipschitz continu-
+ous. Then we can update wt+1 by
+
+wt+1 = min
+w∈Ω
+
+ft(w), t ≥ 1
+
+with w1 be any point in Ω. To analyze the dynamic regret,
+we denote by w∗
+
+0 = w1.
+ft(w∗
+
+t ) =
+
+T(cid:88)
+
+t−1) − T(cid:88)
+
+ft(w∗
+
+t=1
+
+t=1
+
+ft(w∗
+t )
+
+t−1 − w∗
+
+t (cid:107)2 = G(cid:107)w1 − w∗
+1(cid:107)2
+
+t=1
+
+ft(wt) − T(cid:88)
+T(cid:88)
+≤ T(cid:88)
+T−1(cid:88)
+
+G(cid:107)w∗
+
+t=1
+
+t=1
+
++ G
+
+(cid:107)w∗
+
+t − w∗
+
+t+1(cid:107)2 ≤ Gr + GV p
+
+T = O(max(V p
+
+T , 1)).
+
+t=1
+
+It is notable that a similar upper bound of O(max(V f
+T , 1))
+with the full information can be achieved (Jadbabaie et al.,
+2015).
+
+2.3. Online Learning with Gradient Feedback
+
+Full information may not be available.
+In practice, only
+some partial information of the ft(w) regarding the de-
+cision vector wt is available.
+In this subsection, we as-
+sume that only the gradient information ∇ft(wt) is avail-
+able after the decision wt is submitted. Below, we will ﬁrst
+present several examples showing that O(V p
+T ) is achievable
+and generalize the analysis to a broad family.
+We consider two loss functions g1(w) = max(w, 0)2 and
+g2(w) = (w − α)2 deﬁned in the domain Ω = [−1, 3] and
+divide all iterations 1, . . . , T into a number m of batches
+with each batch size of ∆T . Assume the adversary se-
+lects g1(·) in odd batches and g2(·) in even batches, and
+at each step the full gradient feedback is available, i.e.,
+φt(wt, ft) = f(cid:48)
+t(wt). The example is similar to that pre-
+sented in (Besbes et al., 2013) except that g1(w) is not
+strongly convex. Below, we consider two instances of the
+above example with different ∆T and α. For the updates,
+we adopt the OGD, i.e.,
+
+t(wt)],
+
+wt+1 = ΠΩ[wt − ηf(cid:48)
+
+t = 1, . . . , T − 1
+where ΠΩ[·] denotes the projection into the domain Ω.
+Instance 1. ∆T = (cid:100)T /2(cid:101) and α = 1. Then V p
+T = 1.
+Given the value of ∆T , there are two batches. Let Γ1, Γ2 ⊆
+T denote the iteration indices in the ﬁrst and the second
+batch, respectively, and let Γj[1] denote the ﬁrst iteration
+of the j-th batch. We adopt a constant step size η = 1/2
+with a starting point w0 = 0. Then wt = 0, t ∈ Γ1. For the
+ﬁrst iteration t ∈ Γ2 we have wt = ΠΩ[0 − ηg(cid:48)
+1(0)] = 0.
+And for all remaining iterations t ∈ Γ2, we have wt =
+t , t ∈
+ΠΩ[wt−1 − ηg(cid:48)
+[T ] except wΓ2[1] = 0 (cid:54)= w∗
+Γ2[1], which indicates that the
+dynamic regret is fΓ2[1](wΓ2[1])−fΓ2[1](w∗
+Γ2[1]) = g2(0)−
+g2(1) = 1.
+√
+T , ∆T = (cid:98)1+1/(2θ)(cid:99), α = 1+(1−
+Instance 2. θ = C/
+2θ)∆T , and T > 4C 2 (note that θ < 1/2 and 1 ≤ α ≤ 2).
+Then
+
+2(wt−1)] = α. As a result wt = w∗
+
+V p
+T =
+
+α ≤ 2m =
+
+2T
+∆T
+
+=
+
+(cid:98)1 +
+
+√
+2T
+
+T /(2C)(cid:99) ≤ 4C
+
+√
+
+T
+
+m(cid:88)
+
+j=1
+
+The example is similar to the above except that the loss
+functions change more frequently. We consider OGD with
+a constant step size η = 1/2 and w1 = 1. Similar as before,
+we use j = 1, . . . , m to denote the batch index, Γj ⊆ T to
+denote the indices in the j-th batch, Γj[1] and Γj[2 :] to
+denote the ﬁrst iteration and remaining iterations in batch
+j, respectively. Note that w∗
+t =
+α, t ∈ Γ2j.
+For t ∈ Γ1[2 :] or t = Γ2[1], by induction we can show
+that wt = ΠΩ[wt−1 − ηg(cid:48)
+1(wt−1)] = 0. Therefore, wt =
+t , t ∈ Γ1[2:] and wΓ2[1] = 0. For t ∈ Γ2[2:] or t = Γ3[1],
+w∗
+
+t = 0, t ∈ Γ2j−1 and w∗
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+following the OGD update wt = ΠΩ[wt−1−ηg(cid:48)
+2(wt−1)] =
+ΠΩ[wt−1 − 2η(wt−1 − α)] = α. Therefore, wt = α, t ∈
+Γ2[2:] and t = Γ3[1]. Following the same analysis, we have
+t for t ∈ Γj[2:], wΓ2j−1[1] = α and wΓ2j [1] = 0.
+wt = w∗
+It means that the difference between the decision vector
+wt and the optimal solutions w∗
+t only happens at the ﬁrst
+iterations of all batches. As a result, the dynamic regret is
+α2 ≤ 2V p
+
+max(g1(α) − g1(0), g2(0) − g2(α)) =
+
+m(cid:88)
+
+m(cid:88)
+
+T
+
+j=1
+
+j=1
+It is notable the key ingredient to achieve an O(V p
+T ) dy-
+namic regret is to use a constant step size. Next, we gen-
+eralize this result to a broad family of loss functions. In
+particular, we assume the sequence of loss functions sat-
+isfy the following assumption.
+Assumption 2. Assume that every loss function ft(·) is
+deﬁned over Rd and is convex and smooth, i.e., for any
+w, w(cid:48) ∈ Rd, we have
+
+(cid:107)∇ft(w) − ∇ft(w(cid:48))(cid:107)2 ≤ L(cid:107)w − w(cid:48)(cid:107)2,
+
+t ∈ Ω∗
+
+where L > 0 is the smoothness constant. In addition, we
+assume that there exists w∗
+t ) = 0.
+The condition ∇ft(w∗
+t ) = 0 is referred to as the vanishing
+gradient condition. The examples considered before indeed
+satisfy Assumption 2. Consider the policy of OGD:
+
+t such that ∇ft(w∗
+
+π : wt =
+
+ΠΩ[wt−1 − η∇ft−1(wt−1)]
+
+t = 1
+t > 1
+
+(8)
+
+The following theorem states the dynamic regret bound of
+OGD with a constant step size.
+Theorem 3. (upper bound) Suppose Assumption 2 hold.
+By the policy π in (8) with η = 1/(2L),
+for any
+{f1, . . . , fT} ∈ Vp we have
+ft(wt) − ft(w∗
+
+t ) ≤ 2L(cid:0)r2 + 2rBT
+
+T(cid:88)
+
+(cid:1) .
+
+t=1
+
+To prove the theorem, we ﬁrst give the following lemma
+whose proof is included the supplement.
+Lemma 4. Let wt = ΠΩ[wt−1 − ηgt−1], t > 1. Then
+
+t (wt − w∗
+t ) ≤ η
+g(cid:62)
+2
+(cid:107)wt − w∗
+t (cid:107)2
+
+r(cid:107)w∗
+
+(cid:107)gt(cid:107)2
+
+t − w∗
+2 − (cid:107)w∗
+2 − (cid:107)wt+1 − w∗
+t (cid:107)2
+
+t+1(cid:107)2
+t − w∗
+
+2 +
+
+η
+
+t+1(cid:107)2
+
+2
+
++
+
+(cid:26) w1 ∈ Ω
+
+2η
+
+Proof of Theorem 3. Following Lemma 4 and the convex-
+ity of ft(w), we have
+t ) ≤ η
+ft(wt) − ft(w∗
+2
+
+(cid:107)∇ft(wt)(cid:107)2
+
+t − w∗
+
+t+1(cid:107)2
+
+r(cid:107)w∗
+
+2 +
+
+η
+
+(cid:107)wt − w∗
+t (cid:107)2
+
++
+
+2 − (cid:107)wt+1 − w∗
+2η
+
+t+1(cid:107)2
+
+2 − (cid:107)w∗
+
+(9)
+t+1 − w∗
+t (cid:107)2
+
+2
+
+2
+
+2
+
+By the smoothness of f (w), for any w ∈ Rd
+ft(w) − ft(wt) ≤ (cid:104)∇ft(wt), w − wt(cid:105) +
+L
+2
+Let w = w(cid:48)
+we have ft(w(cid:48)
+of ft(w),
+ft(w(cid:48)
+
+t = wt − 1
+t) − ft(wt) ≤ −(cid:107)∇ft(wt)(cid:107)2
+t − w∗
+
+(cid:107)w − wt(cid:107)2
+L∇ft(wt) in the above inequality,
+. By convexity
+
+t ) − ft(wt) ≤ ft(w(cid:48)
+
+t ) = ft(w∗
+t )
+which follows the vanishing gradient condition. Then
+ft(w∗
+Combing the inequality above with (9), we have
+ft(wt) − ft(w∗
+t (cid:107)2
+(cid:107)wt − w∗
+
+t ) ≤ ηL(ft(wt) − ft(w∗
+t ))
+r(cid:107)w∗
+2 − (cid:107)wt+1 − w∗
+
+t) − ft(wt) ≤ −(cid:107)∇ft(wt)(cid:107)2
+
+t ) + ∇ft(w∗
+
+t) ≥ ft(w∗
+
+t )(cid:62)(w(cid:48)
+
+t+1(cid:107)2
+
+2L
+
+2L
+
+2
+
+2η
+
+By summing over t = 1, . . . , T , we have
+
+2
+
++
+
+η
+
+t+1(cid:107)2
+t − w∗
+(cid:19)
+
++
+
+r
+η
+
+V p
+T
+
+(cid:18) r2
+
+2η
+
++
+
+T(cid:88)
+
+t=1
+
+(ft(wt) − ft(w∗
+
+t )) ≤
+
+1
+
+1 − ηL
+
+We complete the proof by choosing η = 1/[2L].
+
+Remark: Theorem 3 exhibits that OGD can achieve an
+O(max(V p
+T , 1)) dynamic regret for a sequence of loss func-
+tions in Vp that satisfy Assumption 2 with only the gradient
+feedback, which is comparable to that achieved in the full
+information feedback. The instance 1 and 2 in Section 2
+has V p
+T , respectively. There-
+fore, using OGD with η = C we can obtain an O(1) and
+O(
+
+T = O(1) and V p
+
+T ) dynamic regret.
+
+T ≈ 4C
+
+√
+
+√
+
+Finally, it is worth mentioning that the OGD with restarting
+proposed in Besbes et al.’ work achieves an O(T 1/3) dy-
+namic regret for instance 1 and an O(T 5/6) dynamic regret
+for instance 2 due to that the functional variation for the
+√
+ﬁrst instance is bounded by a constant and for the second
+instance is bounded by O(
+
+T ).
+
+3. Optimal Dynamic Regret with Noisy
+
+Gradient
+
+In this section, we focus on noisy gradient feedback, i.e.,
+φt(wt, ft) is only a noisy (sub)gradient of ft(w) at wt.
+
+3.1. A Lower Bound with Noisy Gradient Feedback
+
+Before presenting the upper bounds of the dynamic regret
+with noisy gradient feedback, we will ﬁrst present a lower
+bound. For establishing the lower bound, we consider the
+following class of policies
+
+π : wt =
+
+πt({φτ (wτ , fτ )}t−1
+
+τ =1, U ),
+
+t = 1
+t ≥ 1
+
+(10)
+
+(cid:26) π1(U ),
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+where U, π1, πt are deﬁned similarly as before, and
+φt(wt, ft) is a noisy subgradient of ft at wt. In particu-
+lar, we assume the noisy gradient is given by φt(wt, ft) ∈
+∂ft(wt) + t with t satisfying the following condition.
+Assumption 5. t ∈ Rd, t ≥ 1 are iid random vectors
+with zero mean and covariance matrix Σ with bounded en-
+tries such that tr(Σ) ≤ λ2. Let P (·) denote the cumulative
+function of t. There exists a constant ˜C such that for any
+
+(cid:16) dP (y)
+
+(cid:17)
+
+a ∈ Rd,(cid:82) log
+
+dP (y) ≤ ˜C(cid:107)a(cid:107)2
+2.
+
+dP (y+a)
+
+When the noise vectors are independent Gaussian random
+vectors with zero mean and covariance matrices with en-
+tries uniformly bounded by σ2, the above assumption is
+satisﬁed with ˜C = 1/(2σ2) and λ2 = dσ2 (Besbes et al.,
+2013).
+Theorem 6. (lower bound) For any 1 ≤ BT ≤ T and κ ∈
+(1/2, 1), there exist V(cid:48)
+p ⊂ Vp and C(κ) > 0 independent of
+T and BT such that for any policy π in (10) under the noisy
+gradient feedback that satisﬁes Assumption 5, we have
+
+Rπ
+φ(V(cid:48)
+
+p, T ) ≥ C(κ)Bκ
+
+T T 1−κ.
+
+Remark: Note that from the proof presented below when
+κ → 1/2, C(κ) → 0. However, the above lower bound
+can be used to argue that it is impossible to achieve a bet-
+ter dynamic regret than O(B1/2
+T T 1/2) with the noisy gradi-
+ent feedback for any sequence of loss functions. We prove
+this by contradiction.
+In particular, assume there exists
+an algorithm under the noisy gradient feedback achieves
+better bound than O(B1/2
+T T 1/2) for any sequence of loss
+T T 1−α)
+functions. We can consider two lower orders O(Bα
+T T β) with α ≤ 1/2, β ≤
+with 1 > α > 1/2 and O(Bα
+T T 1−α)
+1/2 and α + β < 1. First, we assume O(Bα
+is achievable. By Theorem 6 we know that there exists
+p, T ) ≥
+φ(V(cid:48)
+2 ) and V(cid:48)
+α < κ < 1 (e.g., κ = α+1
+T T 1−α), which yields a contradic-
+Ω(Bκ
+tion. To show that the second lower bound is unachievable,
+T T β),
+we can construct a BT such that Bκ
+i.e., BT ≥ Ω(T
+
+κ−α ), where β + κ − 1 < κ − α.
+
+T T 1−κ) ≥ Ω(Bα
+
+T T 1−κ ≥ Ω(Bα
+
+p such that Rπ
+
+β+κ−1
+
+Proof. We construct two functions over the domain Ω =
+[−1/2, +1/2]. They are
+
+1
+
+ 1
+ − 1+2γ
+
+1
+
+f (x) =
+
+g(x) =
+
+x ∈ [−1/2, 0]
+1+γ δ1+γ − δγx
+x ∈ [0, 2δ]
+1+γ|x − δ|1+γ
+− 1+2γ
+x ∈ [2δ, 1/2]
+1+γ δ1+γ + δγx
+1+γ δ1+γ − δγx x ∈ [−1/2,−2δ]
+x ∈ [−2δ, 0]
+1+γ|x + δ|1+γ
+x ∈ [0, 1/2]
+1+γ δ1+γ + δγx
+
+1
+
+, (11)
+
+(12)
+
+where 0 < δ < 1/2 and γ > 0 will be determined
+later. It is easy to verify that both f (·) and g(·) are con-
+vex but not strongly convex.
+It is also easy to see that
+
+f − x∗
+
+the optimal solutions for f (·) and g(·) are x∗
+f = δ and
+g = −δ, respectively. Hence |x∗
+g| = 2δ. For
+x∗
+a given budget BT , we will construct a subset of Vp by
+only considering the sequence of these two loss func-
+tions. For some ∆T ∈ {1, . . . , T} that, we divide the en-
+tire sequence T into m = (cid:100)T /∆T(cid:101) batches, denoted by
+T1, . . . ,Tm, each with size of ∆T (except perhaps Tm), i.e.
+Tj = {(j − 1)∆T + 1, . . . , min(j∆t, T )}, j = 1, . . . , m.
+To generate the sequence of loss functions f1, . . . , fT , at
+the beginning of each batch Tj, we randomly choose be-
+tween the two functions f (·) and g(·) and the same loss
+function will be used throughout the batch. We denote by
+V(cid:48)
+p = {{ft(·), t = 1, . . . , T}} the set of a sequence of
+randomly sampled loss functions, and by X1, . . . , XT the
+sequence of solutions generated by any policy in (10). Let
+δ = BT ∆T /2T . For any f ∈ V(cid:48)
+
+p, we have
+
+j=2
+
+= BT
+
+j−1| ≤ ((cid:100)T /∆T(cid:101) − 1) 2δ ≤ T 2δ
+∆T
+
+V p
+T =
+Therefore, V(cid:48)
+f the probability mea-
+sure under policy π when f is the sequence of the loss func-
+tions, and by Eπ
+f the associated expectation operator. Set
+( 4γ
+4 ˜C
+
+|x∗
+j − x∗
+p ⊂ Vp. We denote by Pπ
+(cid:110)
+(cid:88)
+
+(∇f (Xt) − ∇g(Xt))2
+
+ ≤ ˜C
+
+(cid:111)
+(cid:88)
+
+)1/(2γ+1)( T
+BT
+
+)2γ/(2γ+1), 1
+
+∆T = max
+
+. Then
+
+˜CEπ
+f
+
+m(cid:88)
+
+t∈Tj
+
+where we use the condition that BT ≤ T . Using Lemma
+A-1 and A-2 from (Besbes et al., 2013), we have
+
+j=1
+
+t∈Tj
+
+
+
+ft(Xt) − ft(x∗
+j )
+
+max(cid:8)Pπ
+
+g{Xt ≤ 0}(cid:9) ≥ 1
+4eβ ,∀t
+f{Xt > 0}, Pπ
+ m(cid:88)
+(cid:88)
+Using the above result, we have
+(cid:88)
+
+(cid:88)
+
+(cid:88)
+P{Xt ≤ 0}(cid:0)f (0) − f (x∗
+f )(cid:1)
+(cid:88)
+P{Xt > 0}(cid:0)g(0) − g(x∗
+g)(cid:1)
+
+φ(V(cid:48)
+Rπ
+p, T ) ≥ E
+m(cid:88)
+m(cid:88)
+m(cid:88)
+m(cid:88)
+
+f (Xt) − f (x∗
+f )
+
+g(Xt) − g(x∗
+g)
+
+≥ 1
+2
+
+t∈Tj
+
+t∈Tj
+
+t∈Tj
+
+Eπ
+f
+
+Eπ
+g
+
+1
+2
+
+1
+2
+
+j=1
+
+j=1
+
+j=1
+
+=
+
++
+
++
+
+1
+2
+
+j=1
+
+t∈Tj
+
+t∈Tj
+B2γ
+T ∆2γ+1
+22γT 2γ ≤ max(1,
+
+4δ2γ
+
+4 ˜CB2γ
+T
+T 2γ4γ )
+
+≤ 4 ˜C∆T δ2γ ≤ 4 ˜C
+≤ max(1,
+
+4 ˜C
+4γ ) ≤ max(1, 4 ˜C) (cid:44) β
+
+m(cid:88)
+
+δ1+γ
+
+(cid:88)
+
+2(1 + γ)
+
+j=1
+
+t∈Tj
+
+=
+
+≥ δ1+γT
+
+8(1 + γ)eβ .
+
+In the above derivations, the ﬁrst expectation is taking over
+all randomness in π and f1, . . . , fT , the second inequality
+holds because
+
+E[f (Xt)] = E[f (Xt)|Xt > 0] Pr(Xt > 0)
++ E[f (Xt)|Xt ≤ 0] Pr(Xt ≤ 0) ≥ f (0) Pr(Xt ≤ 0)
+E[g(Xt)] = E[g(Xt)|Xt > 0] Pr(Xt > 0)
++ E[g(Xt)|Xt ≤ 0] Pr(Xt ≤ 0) ≥ g(0) Pr(Xt > 0)
+
+where the inequalities are due to f (x) ≥ 0, g(x) ≥ 0 and
+f (x) ≥ f (0) when x ≤ 0 and g(x) ≥ g(0) when x ≥ 0.
+To proceed, we plug in the value of δ into the lower bound
+φ(V(cid:48)
+of Rπ
+Rπ
+φ(V(cid:48)
+
+p, T )
+p, T ) ≥
+
+T
+
+B1+γ
+T ∆1+γ
+21+γT 1+γ
+
+T
+
+8eβ(1 + γ)
+
+≥
+
+4γ(1+γ)/(1+2γ)
+
+8eβ(1 + γ)21+γ(4 ˜C)(1+γ)/(1+2γ)
+
+4γ(1+γ)/(1+2γ)
+
+1+2γ
+
+1+γ−(1+γ) 2γ
+B
+T
+T γ−(1+γ) 2γ
+T 1− 1+γ
+
+1+γ
+1+2γ
+T
+
+1+2γ
+
+8eβ(1 + γ)21+γ(4 ˜C)(1+γ)/(1+2γ)
+
+=
+Let γ = (1− κ)/(2κ− 1), i.e., κ = (1 + γ)/(1 + 2γ). Then
+
+1+2γ
+
+B
+
+Rπ
+φ(V(cid:48)
+
+p, T ) ≥ (4γ)κ
+(1 + γ)2γ
+
+1
+
+16eβ(4 ˜C)κ
+
+T T 1−κ.
+Bκ
+
+In the next two subsections, we consider two types of noisy
+gradient feedback, namely a stochastic subgradient feed-
+back that is an unbiased estimation of the true subgradient
+and a bandit feedback that gives an unbiased estimation of
+the subgradient of a smoothed function instead of the orig-
+inal function. We show that under the two noisy gradient
+feedback, we are able to achieve an optimal dynamic re-
+T T ). Furthermore, for smooth loss functions
+under the two-point bandit feedback, we establish an even
+better upper bound by leveraging the gradient variation in
+T )), which when the gradi-
+ent variation is small matches the lower bound presented in
+Proposition 1.
+
+gret of O((cid:112)V p
+the form of O(max((cid:112)V p
+
+T , V p
+
+T V g
+
+3.2. Online Learning with Bounded Stochastic
+
+Gradient Feedback
+
+We adopt the policy deﬁned by OGD using the noisy gra-
+dient feedback, i.e.,
+
+(cid:26) w1 ∈ Ω
+
+π : wt =
+
+ΠΩ[wt−1 − ηφt−1(wt−1, ft−1)]
+
+t = 1
+t > 1
+
+(13)
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+(P{Xt ≤ 0} + P{Xt > 0})
+
+Rπ
+
+T (G2+λ2) , we have
+
+where φt(wt, ft) ∈ ∂ft(wt) + t is a noisy subgradient
+with t satisfying Assumption 5. The upper bound of the
+dynamic regret of OGD with an appropriate step size is pre-
+sented below.
+Theorem 7. (upper bound) Suppose Assumption 5 hold.
+Assume (cid:107)∂ft(w)(cid:107)2 ≤ G, for any w ∈ Ω and 1 ≤ t ≤ T .
+By the policy π in (13) with η =
+
+(cid:113) r2+2rBT
+
+φ(Vp, T ) ≤(cid:112)(r2 + 2rBT )(G2 + λ2)T .
+(cid:2)(cid:107)φt(wt, ft)(cid:107)2
+
+Proof. Let Et[·] denote the expectation over the random-
+ness in φt given the randomness before t. We abuse the
+notation w∗
+(G2+λ2). Following Lemma 4 and the convexity of ft(w),
+we have
+Et [ft(wt) − ft(w∗
+≤ (cid:107)wt − w∗
+t (cid:107)2
+
+T . Note that Et
+
+T +1 = w∗
+
+− (cid:107)w∗
+
+t (cid:105)]
+t )] ≤ Et [(cid:104)φt(wt, ft), wt − w∗
+t − w∗
+t+1(cid:107)2
+− (cid:107)wt+1 − w∗
+2η
+2η
+t − w∗
+t+1(cid:107)2
+(cid:35)
+
+Hence, by summing the above inequalities over t =
+1, . . . , T we have
+
+(cid:3) ≤
+
+(G2 + λ2) +
+
+t+1(cid:107)2
+
++
+
+η
+2
+
+(cid:107)w∗
+
+r
+η
+
+2η
+
+2
+
+2
+
+2
+
+2
+
+(cid:0)r2 + 2rV p
+
+(cid:1) +
+
+T
+
+ft(wt) − ft(w∗
+t )
+
+≤ 1
+2η
+
+η
+2
+
+G2
+
+λT
+
+where G2
+any w∗
+
+λ = G2 + λ2. Since the above inequality holds for
+t ∈ Ω∗
+
+(cid:35)
+
+t , we thus conclude
+≤ 1
+2η
+
+ft(wt) − ft(w∗
+t )
+
+(r2 + 2rBT ) +
+
+G2
+
+λT
+
+η
+2
+
+(cid:113) r2+2rBT
+
+T (G2+λ2).
+
+We complete the proof by choosing η =
+
+achieve an O((cid:112)max(V p
+size η = C(cid:112)max(V p
+could be better when (cid:112)V p
+
+Remark: From Theorem 7, we can see that OGD can
+T , 1)T ) dynamic regret with a step
+T , 1)/T . Compared to OGD with
+restarting proposed in (Besbes et al., 2013), our result
+T )1/3T 2/3), i.e.,
+T ≤ O((V f
+V p
+
+T T ≤ O((V f
+
+T )2/3T 1/3).
+
+(cid:34) T(cid:88)
+(cid:34) T(cid:88)
+
+t=1
+
+t=1
+
+E
+
+E
+
+3.3. Online Learning with Bandit Feedback
+
+In this subsection, we analyze the dynamic regret with ban-
+dit feedback by building on previous work. Bandit feed-
+back has been analyzed before for the static regret.
+In
+particular, using one-point bandit feedback Flaxman et al.
+(2005) showed an O(T 3/4) static regret bound, while Agar-
+√
+wal et al. (2010) established an optimal static regret bound
+T ) using two-point bandit feedback. Recently, Chi-
+of O(
+ang et al. (2013) derived a variational static regret bound in
+T where
+V g
+T is the gradient variation deﬁned in Section 1. In order
+
+the two-point bandit setting that depends on(cid:112)V g
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+T V p
+
+T , V p
+
+justing the step size can achieve an O((cid:112)V p
+an O(max((cid:112)V g
+
+to have optimal dynamic regret bounds, we also consider
+two-point bandit setting and show that the previous algo-
+rithms in (Agarwal et al., 2010; Chiang et al., 2013) by ad-
+T T ) dynamic
+regret for general Lipschitz continuous loss functions and
+T )) dynamic regret for smooth loss
+functions. Below, we present more details. The omitted
+proof can be found in the supplement.
+Similar to previous work, we assume that ft(w) is G-
+Lipschitz continuous and R1B ⊆ Ω ⊆ R2B where B =
+{w ∈ Rd : (cid:107)w(cid:107)2 ≤ 1} is the unit ball centered at 0. Let
+ut ∈ Rd be a random unit vector, ei ∈ Rd be the i-th
+canonical vector, w1 = 0. For Lipschitz continuous loss
+functions, the update is given by
+
+wt+1 = Π(1−ξ)Ω[wt − ˆgt]
+
+(14)
+where ξ ∈ (0, 1) and ˆgt is computed from two-point bandit
+feedback
+
+Algorithm 1 META algorithm
+
+Choose it uniformly from [d]
+
+2: for t = 1, . . . , T do
+3:
+4:
+5:
+
+1: Initialize solution w1 = (cid:98)w1 = 0 and(cid:98)g0 = 0
+Submit (cid:98)w1
+t = (cid:98)wt + δeit and (cid:98)w2
+t = (cid:98)wt − δeit
+Receive the feedback ft((cid:98)w1
+t ) and ft((cid:98)w2
+2δ (ft((cid:98)w1
+t ) − f ((cid:98)w2
+gt = d(vt,it −(cid:98)gt−1,it )eit, and
+(cid:98)gt = d(vt,it −(cid:98)gt−1,it)eit +(cid:98)gt−1
+
+vt,it = 1
+Compute
+
+t ))
+
+6:
+
+t ) and let
+
+7:
+
+Update
+
+8: end for
+
+wt+1 = Π(1−ξ)Ω[wt − ηgt]
+
+(cid:98)wt+1 = Π(1−ξ)Ω[wt+1 − η(cid:98)gt]
+
+ˆgt =
+
+d
+2δ
+
+[ft(wt + δut) − ft(wt − δut)]ut
+
+E
+
+t=1
+
+t=1
+
+1
+2
+
+t ))
+
+(cid:35)
+
+T G2d2 , we have
+
+with δ = ξR1. For any wt ∈ (1 − ξ)Ω and any unit vector
+u, wt + δu ∈ Ω (Flaxman et al., 2005). It can be shown
+that ˆgt is an unbiased stochastic gradient of the function
+ˆft(w) = Eu[ft(w + δu)]. Importantly, (cid:107)ˆgt(cid:107)2 ≤ Gd. The
+following theorem states the dynamic regret bound for the
+policy in (14).
+Theorem 8. Assume ft(w) is G-Lipschitz continuous. By
+the policy in (14) with ξ = 1
+T , δ = ξR1, and η =
+
+(cid:113) r2+2rBT
+(cid:34) T(cid:88)
+(ft((cid:98)w1
+≤(cid:112)(r2 + 2rBT )G2d2T + G(3R1 + R2).
+t = wt + δut,(cid:98)w2
+where (cid:98)w1
+(cid:112)max(V p
+
+Remark: The dynamic regret averaged over two decisions
+with two-point bandit feedback is in the same order of
+T , 1)T to that in Theorem 7 with stochastic gra-
+
+t ) + f ((cid:98)w2
+
+t = wt − δut.
+
+− T(cid:88)
+
+ft(w∗
+t )
+
+dient feedback.
+Finally, we present an upper bound for smooth loss func-
+tions by leveraging the gradient variation, which leads
+to an improved dynamic regret bound compared to Lip-
+schitz continuous loss functions. The updates are based
+on the META algorithm proposed in (Chiang et al., 2013),
+√
+which is presented in Algorithm 1.
+It was proved to
+T ).
+T ) than O(
+Below, we show that the same policy but with a differ-
+ent step size can achieve an improved dynamic regret, i.e.,
+T )) for a sequence of smooth
+
+achieve a better static regret of O((cid:112)V g
+O(max((cid:112)V g
+
+T max(V p
+
+T , 1), V p
+
+loss functions from the following set
+
+Vp,g = {{f1, . . . , fT} : V p
+
+T ≤ BT , V g
+
+T ≤ ST}
+
+1
+
+(cid:19)
+
+(cid:18)(cid:113) (2rBT +r2)
+(cid:35)
+− T(cid:88)
+
+The theorem below states the result.
+Theorem 9. Assume {f1, . . . , fT} ∈ Vp,g and ft(w) is L-
+smooth for any t ≥ 1. By the policy in Algorithm 1 with ξ =
+T , δ = ξR1 and η = min
+,
+we have
+
+(cid:34) T(cid:88)
+t ) + f ((cid:98)w2
+(ft((cid:98)w1
+(cid:110)
+(cid:16)
+d2(cid:112)ST max(BT , 1), d3/2 max(BT , 1)
+t = wt + δut,(cid:98)w2
+where (cid:98)w1
+
+t = wt − δut.
+
+ft(w∗
+t )
+
+(cid:111)(cid:17)
+
+.
+
+1
+4Ld3/2
+
+≤ O
+
+max
+
+8ST d4
+
+t ))
+
+1
+2
+
+t=1
+
+t=1
+
+ln T
+
+√
+
+E
+
+,
+
+Remark: When the gradient variation is small such that
+the upper bound is dominated by O(V p
+T ), it matches the
+lower bound established in Proposition 1. Finally, we note
+that a similar upper bound can be achieved for linear loss
+functions by extending the static regret analysis in (Chiang
+et al., 2013) to the dynamic regret similarly to the proof of
+Theorem 9.
+
+4. Conclusions
+In this paper, we have considered dynamic regret for on-
+line learning under true and noisy gradient feedback. We
+have developed several lower and upper bounds of the dy-
+namic regret based on the path variation that measures the
+temporal changes in the optimal solutions. In light of the
+presented lower bounds, the achieved upper bounds are op-
+timal for non-strongly convex loss functions when the clair-
+voyant moves slowly. An interesting question that remains
+open is that what is the optimal dynamic regret bound for
+strongly convex loss functions in terms of the path varia-
+tion.
+
+Optimal Dynamic Regrets of Online Learning with True and Noisy Gradient
+
+Yang, Tianbao, Mahdavi, Mehrdad, Jin, Rong, and Zhu,
+Shenghuo. Regret bounded by gradual variation for on-
+line convex optimization. Machine Learning, 95(2):183–
+223, 2014.
+
+Acknowledgements
+The authors would like to thank the anonymous reviewers
+for their helpful comments. T. Yang was supported in part
+by NSF (1463988, 1545995).
+
+References
+Agarwal, Alekh, Dekel, Ofer, and Xiao, Lin. Optimal algo-
+rithms for online convex optimization with multi-point
+bandit feedback. In Proceedings of the 23rd Conference
+on Learning Theory (COLT), pp. 28–40, 2010.
+
+Besbes, Omar, Gur, Yonatan, and Zeevi, Assaf J.
+CoRR,
+
+Non-stationary stochastic optimization.
+abs/1307.5449, 2013.
+
+Buchbinder, Niv, Chen, Shahar, Naor, Joseph, and Shamir,
+Ohad. Uniﬁed algorithms for online learning and com-
+petitive analysis. In Proceedings of the 25th Annual Con-
+ference on Learning Theory (COLT), pp. 5.1–5.18, 2012.
+
+Cesa-Bianchi, Nicol, Gaillard, Pierre, Lugosi, Gbor, and
+Stoltz, Gilles. A new look at shifting regret. CoRR,
+abs/1202.3323, 2012.
+
+Chiang, Chao-Kai, Yang, Tianbao, Lee1, Chia-Jung, Mah-
+davi, Mehrdad, Lu, Chi-Jen, Jin, Rong, and Zhu,
+Shenghuo. Online optimization with gradual variations.
+In Proceedings of the 25th Annual Conference on Learn-
+ing Theory (COLT), 2012.
+
+Chiang, Chao-Kai, Lee, Chia-Jung, and Lu, Chi-Jen. Beat-
+In Proceed-
+ing bandits in gradually evolving worlds.
+ings of the 26th Annual Conference on Learning Theory
+(COLT), pp. 210–227, 2013.
+
+Flaxman, Abraham, Kalai, Adam Tauman, and McMahan,
+H. Brendan. Online convex optimization in the bandit
+setting: gradient descent without a gradient. In Proceed-
+ings of the Sixteenth Annual ACM-SIAM Symposium on
+Discrete Algorithms (SODA), pp. 385–394, 2005.
+
+Hall, Eric C. and Willett, Rebecca M. Online optimization
+in dynamic environments. CoRR, abs/1307.5944, 2013.
+
+Herbster, Mark and Warmuth, Manfred K. Tracking the
+
+best expert. Machine Learning, 32:151–178, 1998.
+
+Jadbabaie, Ali, Rakhlin, Alexander, Shahrampour, Shahin,
+and Sridharan, Karthik. Online optimization : Compet-
+In Proceedings of the
+ing with dynamic comparators.
+Eighteenth International Conference on Artiﬁcial Intel-
+ligence and Statistics (AISTATS), 2015.
+
+Rakhlin, Alexander and Sridharan, Karthik. Optimiza-
+tion, learning, and games with predictable sequences. In
+Advances in Neural Information Processing Systems 26
+(NIPS), pp. 3066–3074, 2013.
+
+

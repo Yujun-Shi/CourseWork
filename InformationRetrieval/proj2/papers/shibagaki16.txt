@@ -1,0 +1,1730 @@
+Simultaneous Safe Screening of Features and Samples
+
+in Doubly Sparse Modeling
+
+Atsushi Shibagaki y
+Masayuki Karasuyama y
+Kohei Hatano z
+Ichiro Takeuchi y
+y Nagoya Institute of Technology, Nagoya, 466-8555, Japan
+z Kyushu University, Fukuoka, 819-0395, Japan
+
+SHIBAGAKI.A.MLLAB.NIT@GMAIL.COM
+KARASUYAMA@NITECH.AC.JP
+HATANO@INF.KYUSHU-U.AC.JP
+TAKEUCHI.ICHIRO@NITECH.AC.JP
+
+Abstract
+
+The problem of learning a sparse model is con-
+ceptually interpreted as the process of identify-
+ing active features/samples and then optimizing
+the model over them. Recently introduced safe
+screening allows us to identify a part of non-
+active features/samples. So far, safe screening
+has been individually studied either for feature
+screening or for sample screening. In this paper,
+we introduce a new approach for safely screen-
+ing features and samples simultaneously by al-
+ternatively iterating feature and sample screen-
+ing steps. A signiﬁcant advantage of consid-
+ering them simultaneously rather than individ-
+ually is that they have a synergy effect in the
+sense that the results of the previous safe feature
+screening can be exploited for improving the next
+safe sample screening performances, and vice-
+versa. We ﬁrst theoretically investigate the syn-
+ergy effect, and then illustrate the practical ad-
+vantage through intensive numerical experiments
+for problems with large numbers of features and
+samples.
+
+1. Introduction
+In many areas of science and industry, large-scale datasets
+with many features and samples are collected and analyzed
+for data-driven scientiﬁc discovery and decision making.
+One promising approach to handle large numbers of fea-
+tures and samples is introducing sparsity constraints in sta-
+tistical models (Hastie et al., 2015). The most common ap-
+proach for inducing feature sparsity, e.g., in a linear least-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+square model ﬁtting, is using sparsity-inducing penalties
+such as L1-norm of the coefﬁcients (Tibshirani, 1996). A
+feature sparse model depends only on a subset of features
+(called active features), and the rest of the features (called
+non-active features) are irrelevant. On the other hand, the
+most popular machine learning algorithm that induces sam-
+ple sparsity would be the support vector machine (SVM)
+(Boser et al., 1992). In the SVM, the large margin princi-
+ple enhances sample sparsity in the sense that it depends
+only on a subset of samples (called support vectors (SVs)
+or active samples) and does not depend on the rest of the
+samples (called non-SVs or non-active samples).
+The problem of learning a sparse model is conceptually in-
+terpreted as the process of identifying active features or
+samples and then optimizing the model over them. Re-
+cently, a new approach called safe screening has been stud-
+ied by several authors. Safe screening enables to identify
+a subset of non-active features or samples before or during
+the model training process. A nice thing about safe screen-
+ing is that it is guaranteed to have no false negatives, i.e.,
+safe screening never identify active features or samples as
+non-active.
+It means that, if we train the model by only
+using the remaining set of features or samples after safe
+screening, the solution is guaranteed to be optimal. The
+basic technical idea behind safe screening is to bound the
+solution of the problem within a region, and show that some
+features or samples cannot be active wherever the optimal
+solution is located within the region.
+After the seminal work by (El Ghaoui et al., 2012), safe
+feature screening (safely screening a part of non-active fea-
+tures in sparse feature models such as LASSO) has been
+intensively studied in the literature (Xiang et al., 2011;
+Wang et al., 2013; Bonnefoy et al., 2014; Liu et al., 2014;
+Wang et al., 2014b; Xiang et al., 2014; Fercoq et al., 2015;
+Ndiaye et al., 2015). Safe feature screening exploits the
+fact that the sparseness of a feature is characterized by a
+property of the dual solution, i.e., if the dual solution satis-
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Figure1. Schematic illustration of the proposed approach. By iterating safe feature screening and safe sample screening, irrelevant
+features and samples are safely removed out from the training set. A signiﬁcant advantage of considering them simultaneously rather
+than individually is that they have a synergy effect in the sense that the screening performances (the number of features/samples that can
+be safely removed out) are gradually improved by exploiting the results in earlier steps.
+
+ﬁes a certain condition in the dual space, the feature is guar-
+anteed to be non-active. Safe feature screening is beneﬁ-
+cial especially when the number of features is large. There
+are also several studies on safe sample screening (safely
+screening a part of non-active samples in sparse sample
+models such as the SVM) (Ogawa et al., 2013; Wang et al.,
+2014a; Zimmert et al., 2015). The basic idea behind safe
+sample screening is that the sparseness of a sample is char-
+acterized by a property of the primal solution. If the primal
+solution satisﬁes a certain condition in the primal space, the
+sample is guaranteed to be non-active. Safe sample screen-
+ing is useful when the number of samples is large.
+In this paper, we consider problems where the numbers of
+features and samples are both large. In these problems, we
+consider a class of learning algorithms that induce both of
+feature sparsity and sample sparsity, which we call doubly
+sparse modeling. Our main contribution in this paper is
+to develop a safe screening method that can identify both
+of non-active features and non-active samples simultane-
+ously in doubly sparse modeling. Speciﬁcally, we pro-
+pose a novel method for simultaneously constructing two
+regions, one in the dual space and the other in the primal
+space. The former is used for safe feature screening, while
+the latter is used for safe sample screening.
+A signiﬁcant advantage of considering safe feature screen-
+ing and safe sample screening simultaneously rather than
+individually is that they have a synergy effect. Speciﬁcally,
+we show that, after we know that a part of features are non-
+active based on safe feature screening, we can potentially
+improve the performance of safe sample screening. Our
+basic idea behind this property is that, by ﬁxing a part of
+the primal variables, the region in the primal space, which
+is used for safe sample screening, can be made smaller (we
+can also show the converse similarly). These ﬁndings sug-
+gest that, safe screening performances of features and sam-
+ples can be both improved by alternatively repeating them.
+Figure 1 is a schematic illustration of the simultaneous safe
+screening approach.
+Another interesting ﬁnding we ﬁrst introduce in this pa-
+per is that, by simultaneously considering regions both in
+
+the dual and the primal spaces, we can also identify fea-
+tures and samples that are guaranteed to be active. We call
+this technique as safe keeping. While safe screening as-
+sures no false negative ﬁndings, safe keeping guarantees no
+false positive ﬁndings of active features/samples. By com-
+bining these two techniques, we can better identify active
+features/samples. A practical advantage of safe keeping is
+that we do not have to consider the safe screening rules any-
+more for features and samples which are identiﬁed as active
+by safe keeping. This is helpful for reducing the compu-
+tational costs of safe screening rule evaluations especially
+in the context of dynamic safe screening (Bonnefoy et al.,
+2014).
+
+∑
+
+k2[m]
+
+Notation: For any natural number n, we deﬁne [n] :=
+f1; : : : ; ng. For an n (cid:2) d matrix M, its i-th row and j-
+th column are denoted as Mi: and M:j, respectively, for
+i 2 [n] and j 2 [d]. The L1 norm, the L2 norm and
+the L1 norm of a vector v 2 Rm are respectively writ-
+ten as ∥v∥1 :=
+jvkj2
+and ∥v∥1 := maxk2[m] jvkj. For a scalar z, we deﬁne
+[z]+ := maxf0; zg. We write the subdifferential opera-
+tor as @, and remind that the subdifferential of L1 norm is
+given as @∥v∥1 = fg j ∥g∥1 (cid:20) 1; g
+v = ∥v∥1g. For a
+function f, we denote its domain as domf.
+
+jvkj, ∥v∥2 :=
+
+√∑
+
+k2[m]
+
+⊤
+
+2. Preliminaries
+In this section, we ﬁrst describe the problem formulation
+in x2.1. Then, we brieﬂy summarize the basic concepts of
+safe feature screening and safe sample screening in x2.2
+and x2.3, respectively.
+
+2.1. Problem formulation
+
+Consider classiﬁcation and regression problems with the
+number of samples n and the number of features d. The
+training set is written as f(xi; yi)gi2[n] where xi 2 Rd, and
+yi 2 f(cid:0)1; 1g for classiﬁcation and yi 2 R for regression.
+The n (cid:2) d input data matrix (design matrix) is denoted as
+X := [x1; : : : ; xn]
+
+⊤.
+
+(cid:57)(cid:18)(cid:84)(cid:85)(cid:1)(cid:84)(cid:68)(cid:83)(cid:70)(cid:70)(cid:79)(cid:74)(cid:79)(cid:72)(cid:19)(cid:79)(cid:69)(cid:1)(cid:84)(cid:68)(cid:83)(cid:70)(cid:70)(cid:79)(cid:74)(cid:79)(cid:72)(cid:15)(cid:15)(cid:15)(cid:79)(cid:70)(cid:88)(cid:77)(cid:90)(cid:1)(cid:84)(cid:68)(cid:83)(cid:70)(cid:70)(cid:79)(cid:70)(cid:69)(cid:1)(cid:84)(cid:66)(cid:78)(cid:81)(cid:77)(cid:70)(cid:84)(cid:79)(cid:70)(cid:88)(cid:77)(cid:90)(cid:1)(cid:84)(cid:68)(cid:83)(cid:70)(cid:70)(cid:79)(cid:70)(cid:69)(cid:1)(cid:71)(cid:70)(cid:66)(cid:85)(cid:86)(cid:83)(cid:70)(cid:84)(cid:66)(cid:77)(cid:83)(cid:70)(cid:66)(cid:69)(cid:90)(cid:1)(cid:84)(cid:68)(cid:83)(cid:70)(cid:70)(cid:79)(cid:70)(cid:69)(cid:1)(cid:71)(cid:70)(cid:66)(cid:85)(cid:86)(cid:83)(cid:70)(cid:84)(cid:16)(cid:84)(cid:66)(cid:78)(cid:81)(cid:77)(cid:70)(cid:84)Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+d
+
+(cid:3)
+
+(v) = 1
+2
+
+∑
+j=1([jvjj(cid:0) 1]+)2: The
+term in (2) is given as  
+convex conjugate functions of the smoothed hinge loss and
+the smoothed "-insensitive loss are respectively written as
+i + yi(cid:11)i for yi(cid:11)i 2 [(cid:0)1; 0] and 1 otherwise,
+(cid:3)
+i ((cid:11)i) = (cid:13)
+ℓ
+i + yi(cid:11)i + "j(cid:11)ij for (cid:11)i 2 [(cid:0)1; 1] and
+(cid:3)
+i ((cid:11)i) = (cid:13)
+and ℓ
+2 (cid:11)2
+1 otherwise. We call the problems in (1) and (5) as pri-
+mal problem and dual problem, respectively, and denote the
+(cid:3) 2 Rd and the dual optimal
+primal optimal solution as w
+solution as (cid:11)
+
+(cid:3) 2 Rn.
+
+2 (cid:11)2
+
+2.2. Safe feature screening
+
+The goal of safe feature screening is to identify a part of
+non-active features fj 2 [d] j w
+j = 0g before or during
+(cid:3)
+the optimization process. Safe feature screening is built on
+the following KKT optimality condition (see Theorem 31.3
+in (Rockafellar, 1970))
+
+⊤
+
+(cid:3) 2 @ (w
+
+(cid:3)
+
+(cid:11)
+
+):
+
+X
+
+(6)
+
+1
+(cid:21)n
+
+8><>: w
+
+(cid:3)
+j
+(cid:3)
+j
+
+In the case of our speciﬁc regularization term (2), the opti-
+mality condition (6) is written as
+
+̸= 0);
+
+X
+
+(cid:3)
+j
+
+(w
+
+(w
+
+(7)
+
+(cid:3) 2
+
+⊤
+:j (cid:11)
+
+⊤
+:j (cid:11)
+
+1
+(cid:21)n
+
+⊤
+:j (cid:11)
+
+j + w
+
+jw
+[(cid:0)1; 1]
+
+(cid:3)j) := max(cid:11)2(cid:2)(cid:11)(cid:3) jX
+
+(cid:3)
+j
+(cid:3)
+j = 0):
+The optimality condition (7) indicates that jX
+(cid:3)j (cid:20)
+(cid:21)n ) w
+(cid:3)
+j = 0: The basic idea behind safe feature
+screening is to construct a region (cid:2)(cid:11)(cid:3) (cid:26) Rn in the dual
+(cid:3) 2 (cid:2)(cid:11)(cid:3), and then compute an upper bound
+space so that (cid:11)
+U B(jX
+:j (cid:11)j. Using this upper
+⊤
+bound, we can construct a safe feature screening rule in
+the form of U B(jX
+After the seminal work (El Ghaoui et al., 2012), many dif-
+ferent approaches for constructing a region (cid:2)(cid:11)(cid:3) have been
+developed (see x1). Among those, we use an approach in
+(Ndiaye et al., 2015). Noting the fact that the convex con-
+(cid:3) is (cid:13)-strongly convex, and henceforth the
+jugate function ℓ
+dual objective function D(cid:21)((cid:11)) is (cid:13)=n-strongly concave, we
+can deﬁne a region
+
+(cid:3)j) (cid:20) (cid:21)n ) w
+
+(cid:3)
+j = 0:
+
+⊤
+:j (cid:11)
+
+(cid:2)(cid:11)(cid:3) := f(cid:11) j ∥^(cid:11) (cid:0) (cid:11)∥2 (cid:20)
+
+(8)
+where G(cid:21)( ^w; ^(cid:11)) := P(cid:21)( ^w) (cid:0) D(cid:21)(^(cid:11)) is the duality gap
+deﬁned by an arbitrary pair of primal feasible solution ^w 2
+domP(cid:21) and dual feasible solution ^(cid:11) 2 domD(cid:21). Since the
+region (cid:2)(cid:11)(cid:3) is a sphere, we can explicitly write the upper
+bound as
+U B(jX
+
+:j ^(cid:11)j+∥X:j∥2
+⊤
+
+2nG(cid:21)( ^w; ^(cid:11))=(cid:13):
+
+(cid:3)j) =jX
+
+√
+
+⊤
+:j (cid:11)
+
+(9)
+
+√
+2nG(cid:21)( ^w; ^(cid:11))=(cid:13)g;
+
+We consider a linear classiﬁcation and regression function
+in the form of f (x) = x
+w, and study the problem of
+estimating the parameter w 2 Rd by solving a class of reg-
+ularized empirical risk minimization problems:
+
+⊤
+
+min
+w2Rd
+
+P(cid:21)(w) := (cid:21) (w) +
+
+1
+n
+
+⊤
+i w);
+
+ℓi(x
+
+(1)
+
+∑
+
+i2[n]
+
+where   is a penalty function, ℓi is a loss function for the
+i-th sample1, and (cid:21) > 0 is a trade-off parameter for con-
+trolling the balance between the penalty and the loss.
+In this paper, we study doubly sparse modeling,
+i.e.,
+a pair of penalty and loss function that induces sparsi-
+ties both in features and samples. As speciﬁc work-
+ing examples, we consider L1-penalized smoothed hinge
+SV classiﬁcation and L1-penalized smoothed "-insensitive
+SV regression. The use of these smoothed loss func-
+tions are known to produce almost same solutions as the
+original hinge or "-insensitive loss functions (see e.g.,
+Shalev-Shwartz & Zhang, 2015). We will discuss other
+doubly sparse modeling problem in x5.
+Remembering that the original SVMs are trained with
+L2 penalty, by combining an additional L1-penalty, our
+penalty function   is written as elastic net penalty:
+
+ (w) := ∥w∥1 +
+
+∥w∥2
+2;
+
+(cid:12)
+2
+
+(2)
+
+where (cid:12) > 0 is a balancing parameter which we omit here-
+after by substituting (cid:12) = 1 for notational simplicity. The
+smoothed hinge loss and the smoothed "-insensitive loss
+are respectively written as
+
+⊤
+i w):=
+
+jx
+i w(cid:0)yij(cid:0)"(cid:0) (cid:13)
+⊤
+i w (cid:0) yij(cid:0) ")2 (otherwise);
+2(cid:13) (jx
+⊤
+
+1
+
+2
+
+where (cid:13) > 0 is a tuning parameter.
+Using Fenchel’s duality theorem (see, e.g., Corollary
+31.2.1 in (Rockafellar, 1970)), the dual problem of (1) is
+written as
+
+(
+
+)
+
+D(cid:21)((cid:11)) := (cid:0)(cid:21) 
+
+max
+
+(cid:11)
+
+(cid:3)
+
+⊤
+
+(cid:11)
+
+X
+
+1
+(cid:21)n
+
+(cid:0) 1
+n
+
+i ((cid:0)(cid:11)i);
+(cid:3)
+ℓ
+
+(5)
+
+∑
+
+i2[n]
+
+8><>:0
+8><>:0
+
+⊤
+i w):=
+
+i w (cid:0) (cid:13)
+1 (cid:0) yix
+⊤
+2(cid:13) (1 (cid:0) yix
+2
+⊤
+i w)2
+
+1
+
+ℓi(x
+
+ℓi(x
+
+⊤
+i w > 1);
+i w < 1 (cid:0) (cid:13));
+⊤
+
+(yix
+(yix
+(otherwise);
+(jx
+i w (cid:0) yij<");
+⊤
+(jx
+i w(cid:0)yij>"+(cid:13));
+⊤
+
+(3)
+
+(4)
+
+(cid:3) and ℓ
+
+(cid:3) is convex conjugate function of   and ℓ,
+where  
+respectively. The convex conjugate function of the penalty
+1 Here, we use individual loss function ℓi for i 2 [n] because
+
+it implicitly depends on yi (see, e.g., (3) and (4)).
+
+2.3. Safe sample screening
+
+The goal of safe sample screening is to identify a part of
+non-active samples fi 2 [n] j (cid:11)
+i = 0;(cid:6)1g before or dur-
+(cid:3)
+ing the optimization process. Here, we slightly abuse the
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+word “non-active” in the sense that we call a sample to be
+(cid:3)
+i is 0, but
+non-active not only when the corresponding (cid:11)
+also when it is (cid:6)1. Although the i-th sample can be re-
+(cid:3)
+moved out only when (cid:11)
+i = 0, we have similar computa-
+i = (cid:6)1 be-
+(cid:3)
+tional advantages when we can guarantee that (cid:11)
+cause the size of the optimization problem can be reduced.
+Safe sample screening is also built on the KKT optimality
+condition
+
+⊤
+i w
+x
+
+(cid:3) 2 @ℓ
+
+i ((cid:0)(cid:11)
+(cid:3)
+
+(cid:3)
+i ):
+
+(10)
+
+In the case of smoothed hinge loss, the KKT condition (10)
+is written when yi = 1 as
+
+8><>:[1;1)
+
+((cid:0)1; 1 (cid:0) (cid:13)]
+(cid:0)(cid:13)(cid:11)
+
+(cid:3)
+i + 1
+
+⊤
+x
+i w
+
+(cid:3) 2
+
+(cid:3)
+i = 0)
+((cid:11)
+(cid:3)
+i = 1)
+((cid:11)
+2 (0; 1)):
+(cid:3)
+((cid:11)
+i
+
+(11)
+
+(cid:3)
+
+) (cid:21) 1 ) (cid:11)
+
+We construct a region (cid:2)w(cid:3) (cid:26) Rd in the primal space
+(cid:3) 2 (cid:2)w(cid:3), and then compute a lower bound
+so that w
+(cid:3)
+⊤
+⊤
+:= minw2(cid:2)w(cid:3) x
+i w and an upper bound
+i w
+LB(x
+)
+⊤
+(cid:3)
+⊤
+) := maxw2(cid:2)w(cid:3) x
+i w. The optimality con-
+i w
+U B(x
+(cid:3)
+⊤
+dition (11) suggests that LB(x
+i =
+i w
+i = 1: Similarly, for yi = (cid:0)1,
+) (cid:20) 1(cid:0)(cid:13) ) (cid:11)
+(cid:3)
+(cid:3)
+⊤
+i w
+0; U B(x
+the optimality condition is written as
+(cid:3)
+i = 0)
+((cid:11)
+i = (cid:0)1)
+(cid:3)
+((cid:11)
+2 ((cid:0)1; 0));
+(cid:3)
+((cid:11)
+i
+
+[(cid:13) (cid:0) 1;1)
+(cid:0) 1
+(cid:0)(cid:13)(cid:11)
+(cid:3)
+⊤
+(cid:3)
+suggesting that U B(yix
+i w
+i =
+i = (cid:0)1: In the case of
+(cid:3)
+0; LB(yix
+smoothed "-insensitive loss, the optimality condition (10)
+is written as
+
+8><>:((cid:0)1;(cid:0)1]
+
+) (cid:20) (cid:0)1 ) (cid:11)
+
+) (cid:21) (cid:13) (cid:0) 1 ) (cid:11)
+
+⊤
+x
+i w
+
+⊤
+i w
+
+(cid:3) 2
+
+(12)
+
+(cid:3)
+i
+
+(cid:3)
+
+(13)
+
+⊤
+i w
+x
+
+(cid:3) 2
+
+[yi (cid:0) "; yi + "]
+[(cid:13) + yi + ";1)
+((cid:0)1;(cid:0)(cid:13) + yi (cid:0) "]
+(cid:0)(cid:13)(cid:11)
+(cid:0)(cid:13)(cid:11)
+
+(cid:3)
+i + yi + "
+i + yi (cid:0) "
+(cid:3)
+(cid:3)
+
+(cid:3)
+i = 0);
+((cid:11)
+i = (cid:0)1);
+(cid:3)
+((cid:11)
+(cid:3)
+i = 1);
+((cid:11)
+2 ((cid:0)1; 0));
+(cid:3)
+((cid:11)
+i
+2 (0; 1)):
+(cid:3)
+((cid:11)
+i
+) (cid:21) yi (cid:0) " and U B(x
+) (cid:20)
+⊤
+(cid:3)
+i w
+) (cid:21) (cid:13) + yi + " ) (cid:11)
+(cid:3)
+⊤
+i w
+i =
+
+(cid:3)
+i = 1:
+
+⊤
+i w
+(cid:3)
+i = 0; LB(x
+) (cid:20) (cid:0)(cid:13) + yi (cid:0) " ) (cid:11)
+(cid:3)
+
+It indicates that LB(x
+yi + " ) (cid:11)
+(cid:0)1; U B(x
+⊤
+i w
+In order to develop a sphere region (cid:2)w(cid:3) in the primal space,
+we extend the duality GAP-based safe feature screening ap-
+proach proposed in (Ndiaye et al., 2015) into safe sample
+screening context. The result is summarized in the follow-
+ing lemma.
+√
+Lemma 1. For any ^w 2 domP(cid:21) and ^(cid:11) 2 domD(cid:21),
+2G(cid:21)( ^w; ^(cid:11))=(cid:21)g;
+
+(cid:3) 2 (cid:2)w(cid:3) = fw j ∥ ^w (cid:0) w∥2 (cid:20)
+
+(14)
+
+w
+
+(cid:3)
+
+8>>>>>><>>>>>>:
+
+Furthermore, using the sphere form region (cid:2)w(cid:3) in (14),
+for any ^w 2 domP(cid:21) and ^(cid:11) 2 domD(cid:21), a pair of lower and
+upper bounds of x
+
+√
+√
+
+(cid:3) are given as
+⊤
+i w
+i ^w (cid:0) ∥xi∥2
+⊤
+i ^w + ∥xi∥2
+⊤
+
+) = x
+
+) = x
+
+LB(x
+
+U B(x
+
+(cid:3)
+(cid:3)
+
+⊤
+i w
+⊤
+i w
+
+2G(cid:21)( ^w; ^(cid:11))=(cid:21);
+
+2G(cid:21)( ^w; ^(cid:11))=(cid:21):
+
+(15a)
+(15b)
+
+The proof of Lemma 1 is presented in Appendix.
+
+3. Simultaneous safe screening
+We have shown that, for doubly sparse modeling problems,
+safe screening rules for both of features and samples can
+be constructed respectively.
+In this paper we further de-
+velop the framework in which safe feature screening and
+safe sample screening are alternately iterated. A signiﬁcant
+additional beneﬁt of this framework is that the result of the
+previous safe feature screening can be exploited for mak-
+ing the primal region (cid:2)w(cid:3) smaller, meaning that the perfor-
+mance of the next safe sample screening can be improved,
+and vice-versa.
+The following two theorems formally state these ideas.
+First, Theorem 2 states that we can obtain tighter upper
+bound for feature screening by exploiting the result of the
+previous safe sample screening.
+Theorem 2. Consider a safe feature screening problem
+given arbitrary pair of primal and dual feasible solution
+^w 2 domP(cid:21) and ^(cid:11) 2 domD(cid:21). Furthermore, suppose
+√
+that the result of the previous safe sample screening step
+(cid:3)
+i for a subset of the samples
+assures the optimal values (cid:11)
+i 2 S (cid:26) [n]. Let Us := [n] n S, rD :=
+2nG(cid:21)( ^w; ^(cid:11))=(cid:13),
+and ~(cid:11) be an n-dimensional vector whose element is de-
+i for i 2 S.
+ﬁned as ~(cid:11)i = ^(cid:11)i for i 2 Us and ~(cid:11)i = (cid:11)
+(cid:3)
+Then, jX
+(cid:3)j is bounded from above by the following up-
+⊤
+:j (cid:11)
+per bound:
+~U B(jX
+and the upper bound in (16) is tighter than or equal to that
+in (9), i.e., ~U B(jX
+The proof of Theorem 2 is presented in Appendix. By re-
+placing the upper bounds in (9) with that in (16) in the safe
+feature screening step, there are more chance for screening
+out non-active features.
+Next, Theorem 3 states that we can obtain tighter lower and
+upper bounds for sample screening by exploiting the result
+of the previous safe feature screening.
+Theorem 3. Consider a safe sample screening problem
+given arbitrary pair of primal and dual feasible solutions
+^w 2 domP(cid:21) and ^(cid:11) 2 domD(cid:21). Furthermore, suppose that
+the result of the previous safe feature screening step as-
+j = 0 for a subset of the features j 2 F (cid:26) [d].
+(cid:3)
+sures that w
+
+:j ~(cid:11)j+∥XUsj∥2
+⊤
+
+(cid:3)j) (cid:20) U B(jX
+
+(cid:0)∥^(cid:11)S(cid:0)(cid:11)
+
+(cid:3)j):=jX
+
+S∥2
+(cid:3)
+2;
+
+√
+
+⊤
+:j (cid:11)
+
+⊤
+:j (cid:11)
+
+⊤
+:j (cid:11)
+
+(cid:3)j).
+
+(16)
+
+r2
+D
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+2 (0; 1) or (cid:11)
+
+2 ((cid:0)1; 0) holds for
+(cid:3)
+when the condition (cid:11)
+the i-th element of 8(cid:11) 2 (cid:2)(cid:11)(cid:3). Since (cid:2)(cid:11)(cid:3) is a sphere, safe
+i
+sample keeping rule can be simply derived by (8).
+
+(cid:3)
+i
+
+√
+
+√
+√
+
+Let Uf := [d] n F, rP :=
+2G(cid:21)( ^w; ^(cid:11))=(cid:21), and ~w be a
+d-dimensional vector whose element is deﬁned as ~wj = ^wj
+for j 2 Uf and ~wj = 0 for j 2 F. Then, x
+(cid:3) is bounded
+from below and above respectively by the following lower
+and upper bounds:
+
+⊤
+i w
+
+~LB(x
+
+~U B(x
+
+(cid:3)
+
+(cid:3)
+
+⊤
+i w
+⊤
+i w
+
+) := x
+
+) := x
+
+i ~w (cid:0) ∥xiUf
+⊤
+i ~w + ∥xiUf
+⊤
+
+∥2
+∥2
+
+(cid:0) ∥ ^wF∥2
+(cid:0) ∥ ^wF∥2
+
+2
+
+2
+
+(17a)
+
+(17b)
+
+r2
+P
+
+r2
+P
+
+and these bounds in (17) are tighter than or equal to those
+) (cid:20)
+in (15), i.e., ~LB(x
+U B(x
+
+⊤
+) and ~U B(x
+i w
+
+) (cid:21) LB(x
+⊤
+i w
+
+⊤
+i w
+
+).
+
+(cid:3)
+
+(cid:3)
+
+(cid:3)
+
+(cid:3)
+
+⊤
+i w
+
+The proof of Theorem 3 is presented in Appendix. By re-
+placing the lower and the upper bounds in (15) with those
+in (17) in the safe sample screening step, there are more
+chance to be able to screen out non-active samples.
+Theorems 2 and 3 suggests that, by alternately iterating fea-
+ture screening and sample screening, more and more fea-
+tures and samples could be screened out. This iteration
+process can be terminated when there are few chances to
+be able to screen out additional features and samples. Such
+a termination condition can be developed by using the re-
+sults in the next section.
+
+4. Safe keeping of active features and samples
+Safe screening studies initiated by the seminal work by
+(El Ghaoui et al., 2012) enabled us to identify a part of
+non-active features/samples before actually solving the op-
+timization problem. In other words, safe screening is in-
+terpreted as an active set prediction method without false
+negative error (an error that truly active features/samples
+are predicted as non-active). In this section, we show that,
+by exploiting the two regions in the dual and the primal
+spaces, we can develop an active set prediction method
+without false positive error (an error that truly non-active
+features/samples are predicted as active). We call the latter
+approach as safe feature/sample keeping.
+Safe feature keeping rule can be constructed by using the
+region in the primal space. Using (cid:2)w(cid:3) in (14), we can
+get the lower bound of jw
+j) :=
+2G(cid:21)( ^w; ^(cid:11))(cid:21). Using this lower bound, safe feature
+keeping rule is simply formulated as the following theorem.
+Theorem 4. For an arbitrary pair of primal feasible solu-
+tion ^w 2 domP(cid:21) and dual feasible solution ^(cid:11) 2 domD(cid:21),
+̸= 0 for j 2 [d]:
+
+j for j 2 [d] as LB(jw
+
+2G(cid:21)( ^w; ^(cid:11))=(cid:21) > 0 ) w
+
+j ^wjj(cid:0)√
+
+j ^wjj (cid:0)
+
+√
+
+(cid:3)
+j
+
+(cid:3)
+j
+
+(cid:3)
+j
+
+Similarly, safe sample keeping rule can be constructed by
+(cid:3)
+using a region in the dual space. The condition for (cid:11)
+i being
+̸= (cid:0)1; 0; 1. This can be guaranteed
+(cid:3)
+active is written as (cid:11)
+i
+
+Theorem 5. For an arbitrary pair of primal feasible solu-
+tion ^w 2 domP(cid:21) and dual feasible solution ^(cid:11) 2 domD(cid:21),
+
+√
+√
+2nG(cid:21)( ^w; ^(cid:11))=(cid:13) > 0 and j^(cid:11)ij+
+j^(cid:11)ij(cid:0)
+) (cid:11)
+̸= 0;(cid:6)1 for i 2 [n]:
+
+(cid:3)
+i
+
+2nG(cid:21)( ^w; ^(cid:11))=(cid:13) < 1
+
+When we use safe screening approaches, there is a trade-off
+between the computational costs of evaluating safe screen-
+ing rules and the computational time saving by screening
+out some features/samples.
+If we know in advance that
+some of the features/samples cannot be non-active by using
+safe keeping approaches, we do not have to waste the rule
+evaluation costs for those features/samples. Safe screen-
+ing rule evaluation costs would be more signiﬁcant in dy-
+namic screening and our simultaneous screening scenarios
+because rules are repeatedly evaluated. By combining safe
+screening and safe keeping approaches, we can get an in-
+formation about how many features/samples are not yet
+determined to be active or non-active. This information
+can be also used as a stopping criteria of dynamic screen-
+ing and our simultaneous screening. We can stop evaluat-
+ing safe screening rules when there only remain few fea-
+tures/samples that have not been determined to be active or
+non-active.
+We ﬁnally note that, in our particular working problem of
+L1 smooth SVC and L1 smooth SVR, safe keeping is also
+possible by using the KKT optimality conditions in (7) for
+features, and (11) - (13) for samples. We describe the de-
+tails in the Appendix.
+
+5. LP-based simultaneous safe screening
+In this section, we consider another empirical risk min-
+imization problem that
+induces sparsities both in fea-
+tures and samples.
+Speciﬁcally, we study a problem
+with L1-penalty  (w) = ∥w∥1 and vanilla hinge loss
+i w) = [1 (cid:0) yix
+⊤
+⊤
+i w]+, which we call LP-based SVM
+ℓi(x
+because it is casted into a linear program (LP). LP-based
+SVM has been studied in (Bradley & Mangasarian, 1998;
+Zhu et al., 2004), and also in boosting context. LPBoost
+(Demiriz et al., 2002) solves LP-based SVM via the col-
+umn generation approach of linear programming. Sparse
+LPBoost (Hatano & Takimoto, 2009) is similar to simul-
+taneous screening in that it iteratively solves LP sub-
+problems for features and samples. LP-based SVM induces
+feature sparsity due to L1-penalty and sample sparsity due
+to the property of hinge loss.b
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Figure2.Safe screening and keeping rates for classiﬁcation problems (for real-sim and rcv1-test datasets). The three plots in the
+i = (cid:6)1, respectively).
+(cid:3)
+left show the individual safe feature/sample screening rates (the middle and the bottom ones are for (cid:11)
+The three plots in the center show the additional safe screening rates by simultaneously considering feature and sample screenings. The
+gray area in these center plots corresponds to the blue area in the corresponding left plot. In these gray area, the individual safe screening
+performances are good enough (screening rate > 0:95) and additional screening is unnecessary. The top right and middle right plots
+show the safe keeping rates for feature and samples, respectively. The bottom right plot shows the numbers of non-active features and
+samples for various values of (cid:21).
+
+(cid:3)
+i = 0 and (cid:11)
+
+5.1. Safe feature screening for LP-based SVM
+
+Feature safe screening for LP-based SVM was studied in
+the seminal safe feature screening paper by El Ghaoui et al.
+(2012). However, the method presented in their paper re-
+quires a precise optimal solution of an LP-based SVM with
+a different penalty parameter (cid:21). This requirement is im-
+practical because precise optimal solutions are often dif-
+ﬁcult to get numerically. Here, we present a novel safe
+feature screening method for LP-based SVM that only re-
+quires an arbitrary pair of a primal feasible solution ^w 2
+domP(cid:21) and a dual feasible solution ^(cid:11) 2 domD(cid:21). The pro-
+posed safe feature screening method for LP-based SVM is
+summarized in the following theorem.
+
+U B(X
+
+(cid:3)
+
+⊤
+:j (cid:11)
+
+(cid:3)
+j = 0; where
+
+) > (cid:21)n ) w
+(cid:3)
+
+⊤
+
+g
+
+′
+ij
+
+′
+uqj
+
+LB(X
+
+⊤
+:j (cid:11)
+
+′
+(lq+1)j
+
+^(cid:11) (cid:0) lq)Z
+
+8><>:
+∑lq
+∑uq
+) :=
+′
+∑
+i=1 Z
+ij + (y
+ij + (P(cid:21)( ^w) (cid:0) uq); Z
+′
+i=1 Z
+i=1 minf0; Z
+n
+8><>:
+∑
+⊤
+∑
+:j (cid:11)
+) :=
+′
+′
+∑
+i=n(cid:0)lq
+(n(cid:0)lq(cid:0)1)j
+ij + (y
+Z
+ij + (P(cid:21)( ^w) (cid:0) uq)Z
+′
+i=n(cid:0)uq
+Z
+i=1 maxf0; Z
+
+^(cid:11) (cid:0) lq)Z
+
+′
+ij
+
+g
+
+n
+
+n
+
+n
+
+⊤
+
+(cid:3)
+
+U B(X
+
+′
+:j
+′
+:j
+
+< lq + 1);
+(nZ
+(nZ
+> uq)
+(otherwise);
+
+(pZ
+′
+(n(cid:0)uq(cid:0)1)j(pZ
+
+′
+:j
+′
+:j
+
+< lq + 1);
+> uq);
+(otherwise):
+
+⊤
+
+^(cid:11)⌋, uq = ⌊P(cid:21)( ^w)⌋, Z := [y1x1; : : : ; ynxn]
+
+Theorem 6. Consider safe feature screening problem
+given an arbitrary pair of a primal feasible solution ^w 2
+domP(cid:21) and a dual feasible solution ^(cid:11) 2 domD(cid:21). Let
+ℓq := ⌊y
+⊤ 2
+2 Rn, j 2 [d], be the vector obtained
+Rn(cid:2)d, and Z
+by sorting Z:j in increasing order. Furthermore, let nZ
+′
+:j
+represent the numbers of negative and positive el-
+and pZ
+) < (cid:0)(cid:21)n and
+ements of Z
+
+′
+:j, respectively. Then, LB(X
+
+⊤
+:j (cid:11)
+
+′
+:j
+
+′
+:j
+
+(cid:3)
+
+The proof of Theorem 6 is presented in Appendix.
+
+5.2. Safe sample screening for LP-based SVM
+
+Here, we develop a novel safe sample screening method for
+LP-based SVM as summarized in the following theorem.
+Theorem 7. Consider safe sample screening given an arbi-
+trary primal feasible solution ^w 2 domP(cid:21). Let gℓi(w) be a
+i w) for w 2 domP(cid:21),
+⊤
+subgradient of vanilla hinge loss ℓi(x
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Figure3. Total computation time for training 100 solutions for various values of (cid:21) in classiﬁcation problems.
+
+⊤
+ℓi( ^w) ^w. Then,
+
+∑
+and deﬁne k := (cid:21)∥ ^w∥1 + 1
+i2[n] g
+n
+) > +1 ) (cid:11)
+(cid:3)
+(cid:3)
+⊤
+yi = +1 and LB(x
+i = +1;
+i w
+) < +1 ) (cid:11)
+(cid:3)
+(cid:3)
+⊤
+yi = +1 and U B(x
+i = 0;
+i w
+) > (cid:0)1 ) (cid:11)
+yi = (cid:0)1 and LB(x
+(cid:3)
+⊤
+(cid:3)
+i w
+i = 0;
+i = (cid:0)1;
+) < (cid:0)1 ) (cid:11)
+yi = (cid:0)1 and U B(x
+(cid:3)
+(cid:3)
+⊤
+i w
+n∑
+n∑
+
+f(cid:22)kg s:t:
+
+xi (cid:0) (cid:22)
+
+):=max
+(cid:22)>0
+
+gℓi ( ^w)
+
+where
+
+⊤
+i w
+
+(cid:21)n
+
+i=1
+
+(cid:3)
+
+LB(x
+
+U B(x
+
+(cid:3)
+
+⊤
+i w
+
+):=max
+(cid:22)>0
+
+f(cid:22)kg s:t:
+
+(cid:13)(cid:13)(cid:13)(cid:13)(cid:13)(cid:0) 1
+(cid:13)(cid:13)(cid:13)(cid:13)(cid:13) 1
+
+(cid:21)
+
+(cid:21)
+
+The proof of Theorem 7 is presented in Appendix. Al-
+though the lower and the upper bounds are not explic-
+itly presented, these optimization problems can be easily
+solved because they are just linear programs with one vari-
+able (cid:22) > 0.
+As we discussed in x3, by alternatively iterating safe feature
+screening in x5.1 and safe sample screening in x5.2, we can
+make the regions in the dual and the primal regions step
+by step, indicating that the chance of screening out more
+features and samples increases 2.
+
+6. Numerical experiments
+We demonstrate the advantage of simultaneous safe screen-
+ing through numerical experiments. After we describe the
+experimental setups in x6.1, we report the results on safe
+screening and keeping rates, and computation time savings
+2 The tighter bounds can be obtained by exploiting the previ-
+ous safe screening results as we discussed in x3 although we do
+not explicitly present those bounds here due to the space limita-
+tion.
+
+(cid:13)(cid:13)(cid:13)(cid:13)(cid:13)
+(cid:13)(cid:13)(cid:13)(cid:13)(cid:13)
+
+1
+
+1
+
+(cid:20) (cid:22);
+
+(cid:20) (cid:22):
+
+xi (cid:0) (cid:22)
+
+(cid:21)n
+
+gℓi ( ^w)
+
+i=1
+
+in x6.2 and x6.2, respectively. Due to the space limitation,
+we only show the results on classiﬁcation problems in the
+main text. Other experimental results are presented in Ap-
+pendix.
+
+6.1. Experimental setups
+
+Table 1 summarizes the datasets used in the experiments.
+We picked up four datasets whose numbers of features
+and samples are both large from libsvm dataset reposi-
+tory (Chang & Lin, 2011).
+Here, we report the results
+
+dataset name
+real-sim
+rcv1-test
+
+Table1. Benchmark datasets used in the experiments.
+#(nnz)/nd
+0.002448
+0.025639
+0.991000
+0.001568
+
+sample size: n
+72,309
+677,399
+6,000
+20,242
+
+feature size: d
+20,958
+47,236
+5,000
+47,236
+
+rcv1-train
+
+gisette
+
+#(nnz) indicates the number of non-zero elements.
+
+⊤
+
+on L1-penalized smoothed hinge SV classiﬁcation. We
+set (cid:21)max := ∥Z
+1∥1, and considered problems with
+various values of the penalty parameter (cid:21) between (cid:21)max
+(cid:0)4(cid:21)max. The parameter in the smoothed hinge
+and 10
+loss (cid:13) is set to be 0:5. The proposed methods can be
+used with any optimization solvers as long as they pro-
+vide both primal and dual sequences of solutions that con-
+verge to the optimal solution. For the experiments, we
+used Proximal Stochastic Dual Coordinate Ascent (SDCA)
+(Shalev-Shwartz & Zhang, 2015) and Stochastic Primal-
+Dual Coordinate (SPDC) (Zhang & Lin, 2015) because
+they are state-of-the-art optimization methods for general
+large-scale regularized empirical risk minimization prob-
+lems. We wrote the code in C++. The code is available on
+https://github.com/takeuchi-lab/s3fs. All
+the computations were conducted by using a single core of
+an Intel Xeon CPU E5-2643 v2 (3.50GHz), 64GB MEM.
+
+6.2. Safe screening and keeping rates
+
+We compared the simultaneous screening rates with indi-
+vidual safe screening rates. Figure 2 shows the results.
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Figures 3 show the entire computation time for training
+100 different solutions.
+In all the datasets, simultane-
+ous safe screening was signiﬁcantly faster than individual
+safe feature/sample screening and non-screening. Figure
+4 shows a sequence of computation times for various val-
+ues of (cid:21) for the classiﬁcation problem on rcv1-test
+and real-sim datasets with SPDC optimization solver.
+These plots suggest that the computation time savings by
+individual safe feature screening was better than individual
+safe sample screening when (cid:21) is large because the feature
+screening rates are high when (cid:21) is large, while the differ-
+ence between the two individual screening approaches gets
+smaller as (cid:21) gets smaller (see Figure 2). Simultaneous safe
+screening was consistently faster than individual safe fea-
+ture/sample screening and non-screening in all the problem
+setups.
+
+(cid:3)
+i = 0 or (cid:11)
+
+(cid:3)
+j = 0 or (cid:11)
+
+(cid:3)
+i = 0 or (cid:11)
+
+(cid:3)
+j = 0 or (cid:11)
+
+(cid:3)
+i = 0 and (cid:11)
+
+In the 3 (cid:2) 3 subplots, the left plots indicate the individual
+screening rates deﬁned as (#(screened features or samples)
+i = (cid:6)1)). The center plots in-
+(cid:3)
+/ #(w
+dicate the additional screening rates by the synergy effect
+deﬁned as (#(additionally screened features or samples) /
+i = (cid:6)1)). The top plots repre-
+(cid:3)
+#(w
+sent the results on feature screening, while the middle and
+the bottom plots show the results on sample screening (for
+i = (cid:6)1). We investigated the screen-
+(cid:3)
+each of (cid:11)
+ing rates for various values of (cid:21) in the horizontal axis and
+for various quality of the solutions measured in terms of the
+duality gap in the vertical axis. In all the datasets, we ob-
+served that it is valuable to consider both feature and sam-
+ple screening when the numbers of features and samples
+are both large. In addition, we conﬁrmed that there are im-
+provements in screening rates by the synergy effect both in
+feature and sample screenings especially when duality gap
+G(cid:21)( ^w; ^(cid:11)) is large. Note that gray areas in the center plots
+corresponds to the blue area in the corresponding left plot,
+where the individual safe screening performances are good
+enough (screening rate > 0:95) and additional screening is
+unnecessary.
+The top left and the middle left plots show the rates of fea-
+tures and samples, respectively, that are determined to be
+active or non-active by using safe keeping and safe screen-
+ing approaches, respectively. We see that, by combining
+safe keeping and safe screening approaches, a large portion
+of features/samples can be determined to be active or non-
+active without actually solving the optimization problems.
+
+6.3. Computation time savings
+
+We compared the computational costs of simultaneous
+safe screening and individual safe feature/sample screen-
+ing with the naive baseline (denoted as “non-screening”).
+We compared the computation costs in a realistic model
+building scenario. Speciﬁcally, we computed a sequence of
+solutions at 100 different penalty parameter values evenly
+(cid:0)4(cid:21)max; (cid:21)max] in the logarithmic scale. In
+allocated in [10
+all the cases, we used warm-start approach, i.e., when we
+computed a solution at a new (cid:21), we used the solution at the
+previous (cid:21) as the initial starting point of the optimizer. In
+addition, whenever possible, we used dynamic safe screen-
+ing strategies (Bonnefoy et al., 2014) in which safe screen-
+ing rules are evaluated every time the duality gap G(cid:21)( ^w; ^(cid:11))
+was 0:1 times smaller than before. Here, we exploited
+the information obtained by safe keeping as well, i.e., we
+did not evaluate safe screening rules for features and sam-
+ples which are safely kept as active, and the rate of fea-
+tures/samples that are determined to be active or non-active
+(see the left top and left middle plots in Figure 2) is used as
+the stopping criterion for safe feature rule evaluations.
+
+Figure4. Number of optimization steps and computation time
+(for real-sim and rcv1-test datasets). Sequences of the
+number of passes through the entire dataset and computation time
+to convergence for various values of (cid:21) for classiﬁcation problems
+with SPDC solver are plotted.
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Acknowledgements
+For this work, MK was partially supported by JSPS KAK-
+ENHI Grant Number 26280083. KH was partially sup-
+ported by JSPS KAKENHI Grant Number 16K00305 and
+MEXT KAKENHI Grant Number 24106010 (the ELC
+project).
+IT was partially supported by JST CREST
+13217726, CREST 15656320, JSPS KAKENHI Grant
+Number 26280083, MEXT KAKENHI Grant Number
+16H00886, and JST support program for starting up
+innovation-hub on materials research by information inte-
+gration initiative.
+
+References
+Bonnefoy, Antoine, Emiya, Valentin, Ralaivola, Liva, and
+Gribonval, R´emi. A dynamic screening principle for
+the lasso. In Signal Processing Conference (EUSIPCO),
+2014 Proceedings of the 22nd European, pp. 6–10.
+IEEE, 2014.
+
+Boser, Bernhard E, Guyon,
+
+Isabelle M, and Vapnik,
+Vladimir N. A training algorithm for optimal margin
+classiﬁers. In Proceedings of the ﬁfth annual workshop
+on Computational learning theory, pp. 144–152. ACM,
+1992.
+
+Bradley, Paul S and Mangasarian, Olvi L. Feature selection
+via concave minimization and support vector machines.
+In ICML, volume 98, pp. 82–90, 1998.
+
+Chang, Chih-Chung and Lin, Chih-Jen. Libsvm: A library
+for support vector machines. ACM Transactions on In-
+telligent Systems and Technology (TIST), 2(3):27, 2011.
+
+Demiriz, Ayhan, Bennett, Kristin P, and Shawe-Taylor,
+John. Linear programming boosting via column genera-
+tion. Machine Learning, 46(1-3):225–254, 2002.
+
+El Ghaoui, Laurent, Viallon, Vivian, and Rabbani, Tarek.
+Safe feature elimination for the lasso and sparse super-
+vised learning problems. Paciﬁc Journal of Optimiza-
+tion, 8(4):667–698, 2012.
+
+Fercoq, Olivier, Gramfort, Alexandre, and Salmon, Joseph.
+Mind the duality gap: safer rules for the lasso. In Pro-
+ceedings of the 32nd International Conference on Ma-
+chine Learning, pp. 333–342, 2015.
+
+Hastie, Trevor, Tibshirani, Robert, and Wainwright, Mar-
+tin. Statistical Learning with Sparsity: The Lasso and
+Generalizations. CRC Press, 2015.
+
+Hatano, Kohei and Takimoto, Eiji. Linear Programming
+Boosting by Column and Row Generation. In Proceed-
+ings of the 12th International Conference on Dicovery
+Science (DS 2009), volume 5808 of LNCS, pp. 401–408,
+2009.
+
+Johnson, Tyler B. and Guestrin, Carlos. Blitz: A principled
+meta-algorithm for scaling sparse optimization. In Pro-
+ceedings of the 32nd International Conference on Ma-
+chine Learning, 2015.
+
+Liu, Jun, Zhao, Zheng, Wang, Jie, and Ye, Jieping. Safe
+Screening with Variational Inequalities and Its Applica-
+tion to Lasso. In Proceedings of the 31st International
+Conference on Machine Learning, 2014.
+
+Ndiaye, Eugene, Fercoq, Olivier, Gramfort, Alexandre, and
+Salmon, Joseph. Gap safe screening rules for sparse
+multi-task and multi-class models. In Advances in Neu-
+ral Information Processing Systems, pp. 811–819, 2015.
+
+Ogawa, Kohei, Suzuki, Yoshiki, and Takeuchi, Ichiro. Safe
+screening of non-support vectors in pathwise svm com-
+putation. In Proceedings of the 30th International Con-
+ference on Machine Learning, pp. 1382–1390, 2013.
+
+Rockafellar, Ralph Tyrell. Convex analysis. Princeton uni-
+
+versity press, 1970.
+
+Shalev-Shwartz, Shai and Zhang, Tong. Accelerated proxi-
+mal stochastic dual coordinate ascent for regularized loss
+minimization. Mathematical Programming, pp. 1–41,
+2015.
+
+Tibshirani, Robert. Regression shrinkage and selection via
+the lasso. Journal of the Royal Statistical Society. Series
+B (Methodological), pp. 267–288, 1996.
+
+Vainsencher, Daniel, Liu, Han, and Zhang, Tong. Local
+In Ad-
+smoothness in variance reduced optimization.
+vances in Neural Information Processing Systems 28, pp.
+2179–2187. 2015.
+
+Wang, Jie, Zhou, Jiayu, Wonka, Peter, and Ye, Jieping.
+Lasso screening rules via dual polytope projection.
+In
+Advances in Neural Information Processing Systems, pp.
+1070–1078, 2013.
+
+Wang, Jie, Wonka, Peter, and Ye, Jieping. Scaling svm and
+least absolute deviations via exact data reduction. Pro-
+ceedings of The 31st International Conference on Ma-
+chine Learning, 2014a.
+
+Wang, Jie, Zhou, Jiayu, Liu, Jun, Wonka, Peter, and Ye,
+Jieping. A safe screening rule for sparse logistic regres-
+sion. In Advances in Neural Information Processing Sys-
+tems, pp. 1053–1061, 2014b.
+
+Xiang, Zhen J, Xu, Hao, and Ramadge, Peter J. Learning
+sparse representations of high dimensional data on large
+In Advances in Neural Information
+scale dictionaries.
+Processing Systems, pp. 900–908, 2011.
+
+Simultaneous Safe Screening of Features and Samples in Doubly Sparse Modeling
+
+Xiang, Zhen James, Wang, Yun, and Ramadge, Peter J.
+arXiv preprint
+
+Screening tests for lasso problems.
+arXiv:1405.4897, 2014.
+
+Zhang, Yuchen and Lin, Xiao. Stochastic primal-dual co-
+ordinate method for regularized empirical risk minimiza-
+tion. Proceedings of The 32nd International Conference
+on Machine Learning, pp. 353–361, 2015.
+
+Zhu, Ji, Rosset, Saharon, Hastie, Trevor, and Tibshirani,
+Rob. 1-norm support vector machines. Advances in neu-
+ral information processing systems, 16(1):49–56, 2004.
+
+Zimmert, Julian, de Witt, Christian Schroeder, Kerg, Gi-
+ancarlo, and Kloft, Marius. Safe screening for support
+vector machines. NIPS 2015 Workshop on Optimization
+in Machine Learning (OPT), 2015.
+
+

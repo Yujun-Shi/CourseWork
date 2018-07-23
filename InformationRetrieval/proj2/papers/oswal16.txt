@@ -1,0 +1,985 @@
+Representational Similarity Learning with Application to Brain Networks
+
+Urvashi Oswal
+Christopher Cox
+Matthew A. Lambon Ralph†
+Timothy Rogers
+Robert Nowak
+University of Wisconsin-Madison, Madison, WI 53706, USA
+†University of Manchester, Manchester M13 9PL, UK
+
+UOSWAL@WISC.EDU
+CRCOX@WISC.EDU
+MATT.LAMBON-RALPH@MANCHESTER.AC.UK
+TTROGERS@WISC.EDU
+RDNOWAK@WISC.EDU
+
+Abstract
+
+Representational Similarity Learning (RSL)
+aims to discover features that are important in
+representing (human-judged) similarities among
+objects.
+RSL can be posed as a sparsity-
+regularized multi-task regression problem. Stan-
+dard methods, like group lasso, may not select
+important features if they are strongly correlated
+with others. To address this shortcoming we
+present a new regularizer for multitask regression
+called Group Ordered Weighted (cid:96)1 (GrOWL).
+Another key contribution of our paper is a novel
+application to fMRI brain imaging. Representa-
+tional Similarity Analysis (RSA) is a tool for test-
+ing whether localized brain regions encode per-
+ceptual similarities. Using GrOWL, we propose
+a new approach called Network RSA that can dis-
+cover arbitrarily structured brain networks (pos-
+sibly widely distributed and non-local) that en-
+code similarity information. We show, in theory
+and fMRI experiments, how GrOWL deals with
+strongly correlated covariates.
+
+1. Introduction
+This paper considers the following learning task. Suppose
+we have a set of items along with human-judged pairwise
+similarities among them. For instance, the items could
+be visual stimuli such as advertisements, pictures, or dia-
+grams. Assume that we also have a high-dimensional fea-
+ture associated with each item. These could be numerical
+features quantifying the characteristics of each item or, in
+the case of fMRI, the features are voxel responses to stim-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+uli. The learning task is to determine the subset of fea-
+tures that is most predictive of the human-judged similari-
+ties. This can be posed mathematically as follows. Let S
+be an n×n matrix of pairwise similarities between n items.
+Let X be an n × p matrix where the ith row is the 1 × p
+vector of the features for item i. We then wish to ﬁnd a
+weight matrix W such XW X T ≈ S. The weight matrix
+reveals which features are most important and how they are
+combined to represent the human-judged similarities. We
+call this Representational Similarity Learning (RSL). This
+problem can be viewed as special case of regression metric
+learning, see (Kulis, 2012), but the focus of RSL is to iden-
+tify the subset of features that are most strongly inﬂuencing
+human-judged similarities. The theory and methods devel-
+oped in this paper may also be applicable to other metric
+learning problems (Atzmon et al., 2015; Ying et al., 2009).
+Let us illustrate this learning problem with two applica-
+tions. First, suppose the items are diagrams of chemical
+molecules, and each diagram is also described by a vector
+comprised of many visual features (e.g., counts of differ-
+ent atom types, bonds, bond angles, etc). Novice chem-
+istry students may miss critical similarities and differences
+when comparing different diagrams. After gathering pair-
+wise similarity judgments from the students, RSL could be
+used to identify which features they are attending to and,
+thus, which important features they may be overlooking
+(Rau et al., 2016). Second, consider Representational Sim-
+ilarity Analysis (RSA) in fMRI brain imaging (Kriegesko-
+rte et al., 2008). In RSA a person is scanned while viewing
+n different visual stimuli. Pairwise similarities are obtained
+through other experiments, such as asking people to look
+at pairs of stimuli and rate the similarity. In this case, the
+features are the stimuli responses of p voxels in the brain,
+and the goal is to determine which voxels (and hence brain
+regions) are encoding the similarities. RSA is depicted in
+Figure 1, and it is the focus of our application in Section 4.
+
+Representational Similarity Learning
+
+symmetric and approximately rank r matrix, then there ex-
+ists a matrix Y ∈ Rn×r and diagonal matrix D ∈ Rr×r
+which satisﬁes S ≈ Y DY T (e.g., obtained via eigende-
+composition or Cholesky decomposition) where the diag-
+onal entries of D correspond to the sign of the r largest
+eigenvalues and the columns of Y are the corresponding
+eigenvectors of S. We will assume that S is rank r in the
+following discussion (if not, then we will use its best rank
+r approximation instead). Thus, we may instead consider
+the optimization
+
+(cid:107)Y − XB(cid:107)2
+
+F
+
+min
+B
+
+(2)
+
+For any coefﬁcient matrix B the corresponding weight ma-
+trix is given by W = BDBT . Both optimizations are
+convex, but we will work with the latter since it automat-
+ically enforces the low-rank assumption and can be easily
+modiﬁed to include additional constraints or regularizers.
+It is easily veriﬁed that every stationary point of (2) leads
+to a stationary point of (1). Therefore, since both opti-
+F yields
+
+mizations are convex, (cid:98)B = arg minB (cid:107)Y − XB(cid:107)2
+(cid:99)W = (cid:98)BD(cid:98)BT , which is a minimizer of (1).
+
+In many applications the weight matrix W and the coefﬁ-
+cient matrix B are expected to exhibit sparsity. Indeed, our
+hypothesis is that a small subset of the features encodes
+the similarity representations, hence the sparsity. Thus, the
+optimization above can be modiﬁed to obtain sparse and
+low-rank solutions, as described next.
+
+2. RSL via Group Lasso
+Consider the group lasso optimization
+
+(cid:107)Y − XB(cid:107)2
+
+F + λ(cid:107)B(cid:107)1,2 .
+
+min
+
+B∈Rp×r
+
+and the norm (cid:107)B(cid:107)1,2 = (cid:80)p
+
+(3)
+Note that the optimization variable B is a p × r matrix,
+which guarantees a rank r (or less) solution, and thus
+similarity representation XBDBT X T will be rank r at
+most, which is a simple way to enforce the low-rank con-
+straint. The parameter λ > 0 is an adjustable weight on the
+sparsity-promoting regularizer (cid:107)B(cid:107)1,2, which is deﬁned as
+follows. The rows of B are denoted by βi·, i = 1, . . . , p,
+i=1 (cid:107)βi·(cid:107)2. This encourages
+solutions with only a few nonzero rows in B (Lounici et al.,
+2009; 2011; Obozinski et al., 2011). We note that the op-
+timization in (1) can also be modiﬁed directly to obtain
+sparse and low-rank solutions. For instance, the nuclear
+norm of W could be penalized to obtain a low-rank solu-
+tion. However, the nuclear norm optimization tends to be
+computationally expensive in practice.
+We mention here that recently a similar approach to sparse
+distance metric learning has been proposed in (Atzmon
+et al., 2015). This method also solves a form of sparsity-
+regularized optimization to obtain a sparse W matrix but
+
+Figure 1. Representational Similarity Analysis. Traditional RSA
+methods consider only localized brain regions of interest or spher-
+ical clusters in the cortex (upper left) (Kriegeskorte et al., 2006;
+2008). In Section 4, we propose a new Network RSA (NRSA)
+method that can potentially identify non-local brain networks that
+encode similarity information (lower left).
+
+1.1. Representational Similarity Learning
+Let X ∈ Rn×p denote a feature matrix. Each row cor-
+responds to p features associated with a speciﬁc item, and
+each column corresponds to the values of a speciﬁc feature
+for the n items. The goal of RSL is to ﬁnd a sparse and
+symmetric matrix W ∈ Rp×p such that S ≈ XW X T .
+By sparse we mean that at most k < p rows/columns of
+W are nonzero. The locations of the nonzero elements
+indicate which features are included in the similarity repre-
+sentation. For instance, consider the n × 1 vectors corre-
+sponding features xk and x(cid:96) (i.e., the kth and (cid:96)th columns
+of X).
+It is easy to show that the contribution of these
+two features to the similarity representation is given by
+k . If Wk,(cid:96) = W(cid:96),k (cid:54)= 0, then the
+Wk,(cid:96) xkxT
+correlations between the two features contribute to the ap-
+proximation of the similarity matrix S. The complete sim-
+ilarity representation can be expressed as
+
+(cid:96) + W(cid:96),k x(cid:96)xT
+
+p(cid:88)
+
+S ≈ XW X T =
+
+Wk,(cid:96) xkxT
+
+(cid:96) .
+
+k,(cid:96)=1
+
+The approximation problem can be posed as the least
+squares optimization
+
+(cid:107)S − XW X T(cid:107)2
+
+F
+
+min
+W
+
+(1)
+
+where the objective is the Frobenius norm of the difference
+between the similarity matrix S and its approximation.
+Classic studies of human-produced similarity judgments in
+many domains of interest yield low rank matrices (McRae
+et al., 2005; Shaver et al., 1987; Shepard, 1980) due to clus-
+tering or other representational structure amongst the items
+under consideration. Therefore, we suppose S is a real,
+
+ΩRSANRSAΩXΩŜ = XΩXΩTRepresentational Similarity Learning
+
+with weak supervision in form of rankings over triplets of
+items. Also, (Ying et al., 2009) have proposed and studied
+another optimization for sparse metric learning where they
+impose group sparsity directly on W .
+The main technical innovation in this paper is a new ap-
+proach to the group lasso that is designed to cope with
+strongly correlated covariates (i.e., cases in which certain
+columns of X may be close to, or even exactly, collinear).
+This is a concern in fMRI, since certain voxels may have
+very correlated activation patterns. This problem is illus-
+trated in Figure 2, where we simulate a situation in which
+columns 5 and 7 of the data matrix X are highly corre-
+lated. Group lasso selects one of the corresponding rows in
+B (row 5), whereas GrOWL correctly selects both rows 5
+and 7. Note that the group lasso can select at most n fea-
+tures (n being the number of items), since the number of
+nonzero rows in the solution cannot exceed the number of
+measurements. This can be severe limitation of the group
+lasso in applications where the number of features far ex-
+ceeds the number of items.
+
+Figure 2. A comparison of group lasso (middle) and grOWL
+(right) optimization solutions with correlated columns in X
+showing that GrOWL selects relevant features (row 5 and 7) even
+if they happen to be strongly correlated and automatically cluster
+them by setting the corresponding coefﬁcient rows to be equal (or
+nearly equal).
+
+In the standard (single-task) regression problem, this issue
+has been tackled using many techniques, including elas-
+tic net (Zou & Hastie, 2005), OSCAR (Bondell & Reich,
+2008), OWL (Figueiredo & Nowak, 2016), and others. We
+propose a generalization of the OWL approach to the multi-
+task setting, and thus call our new approach Group OWL
+(GrOWL). We show that GrOWL shares many of the de-
+sirable features of the OWL method, namely it automati-
+cally clusters and averages regression coefﬁcients associ-
+ated with strongly correlated columns of X. This has two
+desirable effects, in terms of both model selection and pre-
+diction. First, GrOWL can select all of the relevant features
+in X, unlike standard group lasso which may not select
+relevant features if they happen to be strongly correlated
+with others. Second, GrOWL encourages the coefﬁcients
+
+associated with strongly correlated features to be near or
+exactly equal. In effect, this averages strongly correlated
+columns which can help to denoise features and improve
+predictions. This property of GrOWL could also be useful
+in other applications of multi-task regression with corre-
+lated features.
+
+3. GrOWL
+Here we discuss modiﬁcations of the group lasso in order to
+deal with strongly correlated columns in X. Our approach
+is motivated by the recently proposed OWL (Figueiredo
+& Nowak, 2016), a special case of which is the so-called
+OSCAR (Bondell & Reich, 2008). These methods are
+designed to automatically cluster and effectively average
+highly correlated columns in the data matrix, and have been
+shown to outperform conventional lasso in many applica-
+tions, particularly in cases of strong correlations. Both
+OWL and OSCAR deal only with the single regression set-
+ting. The main innovation here is the development of new
+norms, in the spirit of OWL, that allow us to deal with cor-
+related columns in the multiple regression / multitask set-
+ting. We deﬁne the GrOWL (Group OWL) norm, and show
+that it automatically groups and averages highly correlated
+columns in X in the multiple regression setting.
+In this section, we consider the general optimization
+
+min
+
+B∈Rp×r
+
+L(B) + G(B)
+
+(4)
+
+where typical loss functions considered here are absolute
+error, L(B) = (cid:107)Y − XB(cid:107)1, or squared Frobenius error,
+L(B) = (cid:107)Y − XB(cid:107)2
+F , and G(B) is the GrOWL norm
+deﬁned later in the section. We give proof sketches for the
+main theorems and leave the proof details to the supple-
+mentary material.
+
+3.1. GrOWL penalty
+Let B ∈ Rp×r and let βi· and β·j denote the ith row and
+jth column of B. Deﬁne the GrOWL penalty
+
+p(cid:88)
+
+G(B) =
+
+wi(cid:107)β[i]·(cid:107)2,
+
+(5)
+
+i=1
+
+where β[i]· is the row of B with the i-th largest 2-norm and
+w is a vector of non-negative and non-increasing weights.
+Before we analyze the GrOWL regularization, we state
+a generalization of Lemma 2.1 in (Figueiredo & Nowak,
+2016) which will be useful later in the section.
+Lemma 1. Consider a vector β ∈ Rp
++ and any two of its
+components βj and βk, such that βj > βk. Let v ∈ Rp
++
+be obtained by applying a transfer of size ε, ε(cid:48) to β such
+that ε ∈ (0, (βj − βk)/2] and −βk ≤ ε(cid:48) ≤ ε, that is:
+vj = βj − ε, vk = βk + ε(cid:48), and vi = βi, for i (cid:54)= j, k. Let
+
+Representational Similarity Learning
+
+w be a vector of non-increasing non-negative real values,
+w1 ≥ w2 ≥ ··· ≥ wp ≥ 0, and ∆ be the minimum gap
+between two consecutive components of vector w, that is,
+∆ = min{wi−wi+1, i = 1,··· , p−1}. Ωw(·) is the OWL
+norm with weight vector w, then
+
+Ωw(β) − Ωw(v) ≥ ∆ε.
+
+Proof sketch. The proof is similar to that of Lemma 2.1 in
+(Figueiredo & Nowak, 2016) with different sizes ε, ε(cid:48). The
+result follows since we assume that increase in k-th com-
+ponent is less than decrease in j-th component i.e., ε(cid:48) ≤ ε.
+The following theorem states that identical variables lead
+to equal coefﬁcient rows corresponding to those variables
+in the solution given by the optimization using GrOWL.
+
+to the optimization in (4) with L(B) = (cid:107)Y − XB(cid:107)1 or
+L(B) = (cid:107)Y − XB(cid:107)2
+F . If columns x·j and x·k satisfy
+
+Theorem 1 (Identical columns). Let (cid:98)B denote the solution
+x·j = x·k and the minimum gap, ∆ > 0, then (cid:98)βj· = (cid:98)βk·.
+we show (cid:107)(cid:98)βj·(cid:107) = (cid:107)(cid:98)βk·(cid:107) and then we further show that
+(cid:107)(cid:98)βj·(cid:107) (cid:54)= (cid:107)(cid:98)βk·(cid:107) and, without loss of generality, suppose
+(cid:107)(cid:98)βj·(cid:107) > (cid:107)(cid:98)βk·(cid:107). We see that there exists a modiﬁcation of
+tive value which contradicts our assumption that (cid:98)B is the
+
+the solution with a smaller GrOWL norm using Lemma 1
+and same data-ﬁtting term, and thus smaller overall objec-
+
+Proof sketch. The proof is divided into two steps. First,
+
+the rows are equal. We proceed by contradiction. Assume
+
+r or (cid:107)x·j − x·k(cid:107)2 ≤ ∆(cid:107)Y (cid:107)F
+
+minimizer of L(B) + G(B).
+The following theorems state that nearly identical variables
+lead to equal norm coefﬁcient rows, and further highly cor-
+related coefﬁcient rows, corresponding to those variables
+in the solution given by the optimization using GrOWL.
+
+Proof sketch. The proof is similar to the identical columns
+theorem. By contradiction and without loss of generality,
+
+Theorem 2 (Correlated columns 1). Let (cid:98)B denote the so-
+lution to the optimization in (4) with L(B) = (cid:107)Y −XB(cid:107)1
+F . If x·j and x·k satisfy (cid:107)x·j −
+or L(B) = (cid:107)Y − XB(cid:107)2
+(cid:107)(cid:98)βj·(cid:107) = (cid:107)(cid:98)βk·(cid:107).
+x·k(cid:107)1 ≤ ∆√
+respectively, then
+suppose (cid:107)(cid:98)βj·(cid:107) > (cid:107)(cid:98)βk·(cid:107). We show that there exists a trans-
+formation of (cid:98)B such that the increase in the data ﬁtting
+Theorem 3 (Correlated columns 2). Let (cid:98)B denote the so-
+lution to the optimization in (4) with L(B) = (cid:107)Y −XB(cid:107)1
+or L(B) = (cid:107)Y − XB(cid:107)2
+F . If x·j and x·k satisfy (cid:107)x·j −
+(cid:107)(cid:98)βj· − (cid:98)βk·(cid:107) ≤ 8φ(cid:107)(cid:98)βk·(cid:107)
+x·k(cid:107)1 ≤ ∆
+√
+respectively, then
+
+term is smaller than decrease in the GrOWL norm.
+
+r or (cid:107)x·j − x·k(cid:107)2 ≤ ∆
+φ(cid:107)Y (cid:107)F
+
+φ
+
+4φ2+1
+
+which further implies that
+
+(cid:98)βT
+j·(cid:98)βk·
+(cid:107)(cid:98)βj·(cid:107)(cid:107)(cid:98)βk·(cid:107)
+
+1 ≥
+
+≥ 1 − 1
+2
+
+(cid:18) 8φ
+
+4φ2 + 1
+
+(cid:19)2(cid:18)
+
+≥ 1 − 2
+φ2
+
+(cid:19)
+
+φ
+
+where φ ≥ 1.
+Proof sketch. By contradiction, suppose (cid:107)(cid:98)βj· − (cid:98)βk·(cid:107) ≥
+8φ(cid:107)(cid:98)βk·(cid:107)
+4φ2+1 ≥ 2(cid:107)(cid:98)βk·(cid:107)
+formation of (cid:98)B such that the increase in the data ﬁtting
+This contradicts our assumption that (cid:98)B is the minimizer
+
+term is smaller than the decrease in the GrOWL norm.
+
+. We show that there exists a trans-
+
+of L(B) + G(B) and completes the proof.
+So far, we have seen that the GrOWL penalty has desirable
+clustering properties that lead to nearly identical coefﬁcient
+rows. We study two variants of GrOWL with different
+weight sequences w. We study the GrOWL-Lin weights
+with linear decay (equivalent to the OSCAR in single-task
+regression), and the GrOWL-Spike weight sequence which
+puts a big weight on the maximum magnitude while the rest
+of the coefﬁcients are weighted equally.
+
+wi = λ + λ1(p − i)/p for i = 1, . . . , p
+GrOWL-Lin:
+GrOWL-Spike: w1 = λ + λ1, wi = λ1 for i = 2, . . . , p
+
+3.2. Proximal algorithms
+
+We derive the proximal operator for the optimization using
+the GrOWL norm here. The computational algorithms to
+solve the GrOWL optimization based on the proximity op-
+erators can be found in (Parikh & Boyd, 2013). The proxi-
+mal operator of the GrOWL norm is given by
+
+proxG(V ) = arg min
+B
+
+(cid:107)B − V (cid:107)2
+
+F + G(B)
+
+1
+2
+
+(6)
+
+In the following theorem, we solve for the proximity op-
+erator of GrOWL in terms of the proximity of OWL. For
+the exact formulation of proxΩw, see (Bogdan et al., 2013),
+(Zeng et al., 2014).
+Theorem 4. Let ˜vi = (cid:107)vi·(cid:107) for i = 1,··· , p. Then
+
+proxG(V ) = (cid:98)V , where i-th row of (cid:98)V is
+
+(cid:98)vi· = (proxΩw
+
+(˜v))i
+
+vi·
+(cid:107)vi·(cid:107)
+
+(7)
+
+Proof Sketch: The proof proceeds by ﬁnding a lower bound
+for the objective function in (6) and then we show that the
+proposed solution achieves this lower bound.
+Efﬁcient O(p log p) algorithms to compute proxΩw have
+been proposed by Bodgan et al (Bogdan et al., 2013; 2014).
+
+Representational Similarity Learning
+
+4. RSL from fMRI Data
+Network-based approaches to cognitive neuroscience typ-
+ically assume that mental representations are encoded as
+distributed patterns of activation over large neural popula-
+tions, with different populations encoding different kinds
+of representational structure and communicating this struc-
+ture to other network components. Extensive research over
+past several years has focused on testing such hypotheses
+using data from functional brain imaging techniques such
+as fMRI. The best-known approach in this vein has been
+RSA (Kriegeskorte et al., 2008). RSA is typically applied
+either to a speciﬁc brain region of interest (ROI) or to many
+localized regions throughout the brain in a process called
+searchlight analysis (Kriegeskorte et al., 2006). For a given
+region, RSA computes the cosine distances between the
+evoked responses for all stimulus pairs. The resulting dis-
+similarity matrix is correlated with a target matrix of known
+psychophysical distances amongst stimuli. If these correla-
+tions are reliably non-zero, this suggests the corresponding
+region may encode the similarity information.
+A drawback of ROI and searchlight RSA is that these meth-
+ods place strong assumptions on the anatomical structure
+of the regions thought to encode the similarities of inter-
+est (predeﬁned ROIs or spherical clusters). We propose a
+new approach called Network RSA (NRSA) that can dis-
+cover arbitrarily structured brain networks (possibly widely
+distributed and non-local) that encode similarity informa-
+tion. The key insight behind our method is that RSA can
+be posed as a multi-task regression problem which, in con-
+junction with sparsity regularization methods, can automat-
+ically detect networks of voxels that appear to jointly en-
+code similarity information.
+Network RSA is summarized as follows. Consider a set
+of n items and suppose we are given an n × n similar-
+ity matrix S, where the ij-th element Sij is the known
+psychophysical similarity (Tversky & Gati, 1982) between
+item i and item j. For example, these may come from hu-
+man judgments of perceptual similarity between pairs of
+stimuli. RSA is based on the hypothesis that there exists a
+set of voxels whose correlations across stimuli encode the
+similarities in S, as depicted in Figure 1. In RSA, the fea-
+tures are X ∈ Rn×p, a matrix of voxel activations. Each
+row corresponds to activations in all p voxels in response to
+a stimulus, and each column corresponds to the activations
+in speciﬁc voxel to the n stimuli. Our generalized notion of
+RSA, which encompasses conventional ROI (Kriegeskorte
+et al., 2008) and searchlight (Kriegeskorte et al., 2006) ap-
+proaches, involves ﬁnding a sparse and symmetric matrix
+W ∈ Rp×p such that S ≈ XW X T . The locations of the
+nonzero elements indicate which voxels are included in the
+similarity-encoding brain network, and the weights in W
+indicate the strength of the edges in the network.
+
+4.1. Network RSA application: Simulated Data
+
+Before applying our framework to real fMRI data, we con-
+sider a simulation study that allows us to compare results
+against a known ground-truth. We compare group lasso
+and GrOWL by analyzing synthetic data generated from a
+deep neural network model trained to generate distributed
+representations of a word’s sound (phonology) and mean-
+ing (semantics) from its spelling (orthography; Figure 3 top
+left). The network structure is motivated by the inﬂuential
+“triangle” model of the human reading system (Plaut et al.,
+1996). Speciﬁcally, phonological outputs receive contribu-
+tions from two separate pathways: a direct route mediated
+by a single hidden layer, and an “indirect” route composed
+of three hidden layers, which must ﬁrst compute mappings
+from orthography to semantics, then project onward to con-
+tribute to the phonological outputs. This architecture is
+interesting because different kinds of similarity structure
+emerge through learning in different network components.
+The central idea is that orthographic and phonological sim-
+ilarities are highly systematic:
+items that are similar in
+spelling are likely (though not guaranteed) to be similar
+in pronunciation.
+In contrast, orthographic and semantic
+similarity structures are unsystematic: similarity of word
+spelling does not necessarily predict similarity of meaning
+and vice versa. In learning to map from orthography to se-
+mantics and on to phonology, the indirect path thus comes
+to encode quite different similarity relations amongst the
+words than does the direct path (Harm & Seidenberg, 2004;
+Plaut et al., 1996).
+To capture these properties we generated model “ortho-
+graphic” representations as patterns sampled from 6 over-
+lapping clusters of binary input features, roughly corre-
+sponding to different orthographic neighborhoods. For
+every word a “phonological” pattern was generated by
+ﬂipping each orthographic feature with probability 0.1.
+Thus phonological patterns were distorted variants of or-
+thographic patterns, creating high systematicity between
+these. We also created a “semantic” pattern for each word
+from a set of binary features also organized into clus-
+ters. Across items, these vectors expressed a hierarchi-
+cal similarity structure with two broad superordinate clus-
+ters each composed of three tighter clusters. Importantly,
+the similarity structure expressed by the semantic vectors
+was independent of the structure expressed in the ortho-
+graphic/phonological patterns. The left bottom panel in
+Figure 3 shows the cosine distances encoded amongst the
+30 “words” in each layer of one trained model. Layers
+in the direct path each encode roughly the same distances
+amongst items, while the semantic layer encodes a quite
+different set of distances that is weakly reﬂected in two
+of the three hidden layers in the indirect path. Thus the
+different components of this simple word-reading network
+contribute differentially to the encoding of semantic versus
+
+Representational Similarity Learning
+
+ortho-phonological similarity structure.
+We trained 100 models with different initial weights, cor-
+responding to 100 model subjects, and presented each with
+30 orthographic inputs. Each input generated a vector of
+activations over the 100 model units. To ensure high re-
+dundancy amongst units this vector was concatenated 5
+times and perturbed with independent noise, yielding 500
+measurements per model subjects. These were treated as
+analogs of the estimated BOLD response at each of 500
+model voxels in a brain imaging study. We then applied
+group lasso and GrOWL to ﬁnd the voxel subsets that en-
+code either the semantic or phonological distances (derived
+from target values for the output layers of the network).
+We ﬁt models by searching a grid of parameters (λ, λ1),
+including λ1 = 0 as the special case of GrOWL that is
+group lasso. For each grid point we counted a voxel as “se-
+lected” if it received a non-zero weight, and assessed how
+accurately the model selected the voxels encoding phono-
+logical structure (all those along the direct pathway) or se-
+mantic structure (the semantic layer hidden layers 2 and 3
+in the indirect path) by computing hit rates and false alarm
+rates). All three models showed low and equivalent cross-
+validation error; however GrOWL achieved this error rate
+while selecting considerably more voxels. The ROC plots
+in Figure 4 further show that GrOWL did not select addi-
+tional voxels at random: it outperformed group lasso con-
+siderably in discriminating signal-carrying from non-signal
+carrying voxels. The right panel of Figure 3 shows the fre-
+quency with which each model unit is selected for the best-
+performing solution of each method and structure type. The
+strong sparsity enforced by group lasso is clearly appar-
+ent:
+target units are selected less consistently than with
+GrOWL, which consistently discovers more of the signal.
+Finally, we considered the ability of GrOWL to reveal the
+network structure encoding each kind of similarity, treating
+the weights in the matrix W as direct estimates of the joint
+participation of pairs of units in expressing the target sim-
+ilarity. The rightmost plots of Figure 3 show the estimated
+connectivity, thresholded to show the 25% of the non-zero
+weights with the largest magnitudes. The detected edges
+clearly express the network representational substructure:
+units in the direct pathway are shown as highly intercon-
+nected with one another and weakly or disconnected from
+those in the indirect pathway, and vice versa. Thus the
+search for different kinds of similarity reveals different
+functional subnetworks in the model.
+
+4.2. Network RSA application: Real Data
+
+We next consider the application of group lasso and
+GrOWL to the discovery of similarity structure in neural
+responses measured by fMRI across the whole brain while
+participants perform a cognitive task. As with the well-
+
+known searchlight RSA (Kriegeskorte et al., 2008), we be-
+gin with a measurement of the n × n similarities existing
+amongst a set of n items in some cognitive domain. Us-
+ing fMRI, we measure the neural responses evoked by each
+item at the scale of single voxels (3mm cubes), and treat
+these p voxels as features of the n items. We then com-
+pute a rank-r approximation of the target similarity ma-
+trix S = Y Y T , and use this as the target Y ∈ Rn×r
+matrix for a sparse-regression analysis of the n × p ma-
+trix of fMRI responses, X, evoked by each item across the
+whole cortex. The model is then ﬁt to optimize the objec-
+tive functions speciﬁed in (3) for group lasso and (4) with
+squared Frobenius loss for GrOWL. The best regulariza-
+tion parameter is selected through cross-validation, and a
+ﬁnal model is ﬁt with that parameter and used to predict
+the similarities existing amongst a set of items in an in-
+dependent hold-out set. Model predictions are compared
+to results expected from a null hypothesis that no features
+encode the target similarity structure.
+If predictions are
+more accurate than expected from random data, this pro-
+vides evidence that the model has discovered voxel subsets
+that jointly encode some of the target similarity structure.
+Moreover, because the model is constrained to be sparse,
+most voxels will receive coefﬁcients of zero, and the pres-
+ence of non-zero coefﬁcients can be taken as evidence that
+the corresponding voxel encodes information important to
+representing the target similarity structure.
+The current experiment aims to answer three questions. (1)
+Does either approach learn a model from whole-brain fMRI
+that can accurately predict the pairwise similarities among
+stimuli? (2) Does group lasso or GrOWL learn a more
+accurate model? (3) Do the ﬁtted models identify voxels
+in areas that are consistent with known neural representa-
+tions? To answer these questions, we applied the approach
+to discover voxels that work to encode the visual similar-
+ities existing amongst a set of line drawings of common
+objects. We chose this task and dataset because (a) there
+exist well-understood methods for objectively measuring
+the degree of visual similarity amongst such items (Antani
+et al., 2002) and (b) it is well known that visual similarity
+is encoded by neural responses in occipital and posterior
+temporal cortices (Kriegeskorte & Kievit, 2013).
+fMRI dataset. The data were collected as part of a larger
+study from 23 participants at the University of Manchester
+who were compensated for their time. Each participant
+viewed a series of line drawings depicting common objects
+while their brains were scanned with fMRI. The line draw-
+ings included 37 items, each repeated 4 times for a total
+of 148 unique stimulus events. At each trial participants
+pressed a button to indicate whether the item could ﬁt in a
+trash can. Scans were collected in a sparse event-related de-
+sign and underwent standard pre-processing to align func-
+tional images to the anatomy and to remove movement and
+
+Representational Similarity Learning
+
+Figure 3. Left panel: Network architecture (top) and the similarity structure expressed in each layer (bottom). Red background shows
+the direct pathway and blue the indirect pathway from orthography to phonology. Layers in the two pathways encode different similarity
+structures. The target similarity matrices for the analysis express either the semantic structure (top layer) or the phonological structure
+(bottom right layer). Arrows indicate feed-forward connectivity. Right panel: Units selected by group LASSO (right) and GrOWL
+(middle) when decoding semantic (top) or phonological (bottom) structure. Colors show the proportion of times across subjects and unit
+concatenations that the unit received a non-zero weight, with red indicating 1 and gray 0. The rightmost plots show the largest weights
+in the associated matrix W for each GrOWL model, which pick out two subnetworks in the model.
+
+Figure 4. Trade-off curves for FPR ≤ 0.1 generated by sweeping through (λ, λ1) values (for λ = 0, all units are selected and as λ is
+increased fewer units are given non-zero weight). Each point corresponds to a combination of λ and λ1 that gives the best trade-off
+(where setting λ1 = 0 results in the group lasso). The pareto-frontier for group lasso (red), GrOWL-Lin (black), GrOWL-Spike (blue)
+is averaged across 100 participants for each method, considering both similarity structures, Semantics (left panel) and Phonology (right
+panel). Note for any λ > 0, the group lasso solution will include at most n = 30 voxels, since the number of selected voxels will not
+exceed the number of measurements. If λ = 0, then the group lasso will select all voxels. Thus, group lasso curve beyond n = 30
+selections (around 0.01 FPR) is shown as a dashed line, which extends linearly to the point (F P R, T P R) = (1, 1).
+
+scanner artifact and temporal drift. Responses to each stim-
+ulus event were estimated at each voxel using a deconvo-
+lution procedure with a standard HRF kernel. For each
+participant a cortical surface mask was generated based on
+T1-weighted anatomical images, and functional data were
+ﬁltered to exclude non-cortical voxels. Voxels with esti-
+mated responses more than 5 standard deviations from the
+mean response across voxels were excluded from the analy-
+
+sis. 10k-15k voxels were selected for each participant, and
+neural responses across all voxels for each of 148 stimulus
+events were entered into the analysis. The mean response
+across the 4 repeated observations of each item were taken
+to give 37 item responses for each participant. Each column
+corresponding to a voxel was normalized to be of standard
+deviation equal to one and a column of ones was added for
+bias correction.
+
+Representational Similarity Learning
+
+(a)
+
+(b)
+
+Figure 5. Panel (a) shows surface maps corresponding to group lasso (left), GrOWL-Lin (middle) and GrOWL-Spike (right) showing the
+voxels selected for the tuning parameters with smallest prediction error on the hold-out data for at least ﬁve and all nine cross-validations
+in the top and bottom rows respectively. The heat map shows the number of subjects for which those voxels were picked. Blue is the
+least (1 subject) and red is the most (10 or more subjects). Panel (b) is a network plot showing the top edges from the W matrix for
+the best-performing parameterization of group LASSO (top) and GrOWL-Spike (bottom) in one subject. The thickness of the edges is
+proportional to the edge weights.
+
+Target similarities. Each stimulus was a bitmap of a
+black-and-white line drawing. We took pairwise Cham-
+fer distance (Borgefors, 1988) as a proxy for inter-item vi-
+sual dissimilarities.
+r = 3 is the smallest value to attain
+(cid:107)S − Y Y T(cid:107)F /(cid:107)S(cid:107)F ≤ 0.15. This 37 × 3 matrix Y was
+used as the target matrix for the analysis.
+Model ﬁtting. For each participant, training data were di-
+vided into 9 subsets containing 4-5 stimulus events each.
+One subset was selected as a ﬁnal hold-out set. Models
+were then ﬁt at each of 10 increasing values of each λ and
+λ1 parameter (grid points) using 8-fold cross validation. At
+each fold we assessed the model using the Frobenius norm
+of the difference between the target Y entries and the pre-
+
+dicted (cid:98)Y = X(cid:98)B entries for hold-out items (henceforth the
+
+model error). We selected the λ with the lowest mean er-
+ror for each subject, then ﬁt a full model for each subject
+at this value and assessed it against the ﬁnal hold-out set,
+considering the model error on hold-out items. We repeat
+this with 9 different ﬁnal hold-out sets.
+Results. The table below shows performance on the ﬁnal
+hold-out sets (H) for each participant and each method,
+
+considering error between predicted ((cid:98)Y ) and actual dissim-
+ilarities (Y ) where MSE = (cid:107)YH − (cid:98)YH(cid:107)F /(cid:107)YH(cid:107)F . Both
+
+approaches show signiﬁcantly non-random prediction. As
+in our simulations, all methods show comparable predic-
+tion error on hold-out sets. We also note that, as in the
+simulations, GrOWL selected almost double the number
+of voxels in each participant. Our assertion that both
+approaches show signiﬁcantly non-random predictions is
+based on a permutation-based paired t-test, where chance
+would have been zero difference. By this measure, for ex-
+
+ample, GrOWL-Spike’s performance is signiﬁcantly better
+than chance (t-value=8.59, p<0.0001).
+
+Method
+
+Group Lasso
+GrOWL-Lin
+GrOWL-Spike
+
+MSE (p-value)
+
+0.5266 (1.045e-07)
+0.5271 (6.456e-08)
+0.5213 (1.774e-08)
+
+Figure 5(a) shows the locations of selected voxels (i.e.,
+those with non-zero coefﬁcients) across all 23 participants
+for the tuning parameters with smallest mean prediction er-
+ror on hold-out data, mapped into a common anatomical
+space with 4mm full-width-half-max spatial smoothing and
+projected onto a model of the cortical surface. To look into
+the stability of selection across different training sets, the
+top row shows the voxels selected for at least ﬁve (out of
+nine) cross-validation runs while the bottom row shows the
+voxels selected for all the nine cross-validation runs. As
+seen in the maps, both methods pick voxels prominently in
+the occipital and posterior temporal cortices and GrOWL
+picks consistently more voxels than group lasso.
+Figure 5(b) shows the largest magnitude edges in the W
+matrix for the best-performing parameterization of group
+LASSO (top) and GrOWL-Spike (bottom) in one subject.
+Two observations are of note. First, both methods uncover
+a similar network structure, with many interconnections in
+visual cortical regions and some edges connecting to ante-
+rior regions in frontal and temporal cortex. Second, as in
+the simulations, GrOWL reveals a much denser network.
+The results suggest the possibility that subregions of frontal
+and temporal cortex may, together with occipito-temporal
+cortex, participate in networks that serve to encode visual
+similarity structure.
+
+Representational Similarity Learning
+
+Acknowledgements
+This work was partially supported by NSF grant CCF-
+1218189.
+
+References
+Antani, Sameer, Kasturi, Rangachar, and Jain, Ramesh. A survey
+on the use of pattern recognition methods for abstraction, in-
+dexing and retrieval of images and video. Pattern recognition,
+35(4):945–965, 2002.
+
+Atzmon, Yuval, Shalit, Uri, and Chechik, Gal. Learning sparse
+metrics, one feature at a time. Journal of Machine Learning
+Research, 1:1–48, 2015.
+
+Bogdan, Malgorzata, Berg, Ewout van den, Su, Weijie, and Can-
+des, Emmanuel. Statistical estimation and testing via the sorted
+l1 norm. arXiv preprint arXiv:1310.1969, 2013.
+
+Bogdan, Malgorzata, Berg, Ewout van den, Sabatti, Chiara,
+Slope–adaptive
+arXiv preprint
+
+Su, Weijie, and Candes, Emmanuel J.
+variable selection via convex optimization.
+arXiv:1407.3824, 2014.
+
+Bondell, Howard D and Reich, Brian J. Simultaneous regression
+shrinkage, variable selection, and supervised clustering of pre-
+dictors with oscar. Biometrics, 64(1):115–123, 2008.
+
+Borgefors, Gunilla. Hierarchical chamfer matching: A paramet-
+ric edge matching algorithm. Pattern Analysis and Machine
+Intelligence, IEEE Transactions on, 10(6):849–865, 1988.
+
+Figueiredo, M.A.T. and Nowak, R. D. Ordered weighted l1 reg-
+ularized regression with strongly correlated covariates: Theo-
+retical aspects. In Proceedings of the 19th International Con-
+ference on Artiﬁcial Intelligence and Statistics, pp. 930–938,
+2016.
+
+Lounici, Karim, Pontil, Massimiliano, Van De Geer, Sara, and
+Tsybakov, Alexandre B. Oracle inequalities and optimal infer-
+ence under group sparsity. The Annals of Statistics, pp. 2164–
+2204, 2011.
+
+McRae, Ken, Cree, George S, Seidenberg, Mark S, and McNor-
+gan, Chris. Semantic feature production norms for a large set
+of living and nonliving things. Behavior research methods, 37
+(4):547–559, 2005.
+
+Obozinski, Guillaume, Wainwright, Martin J, and Jordan,
+Michael I. Support union recovery in high-dimensional multi-
+variate regression. The Annals of Statistics, pp. 1–47, 2011.
+
+Parikh, Neal and Boyd, Stephen. Proximal algorithms. Founda-
+
+tions and Trends in optimization, 1(3):123–231, 2013.
+
+Plaut, David C, McClelland, James L, Seidenberg, Mark S, and
+Patterson, Karalyn. Understanding normal and impaired word
+reading: computational principles in quasi-regular domains.
+Psychological review, 103(1):56, 1996.
+
+Rau, M., Mason, B., and Nowak, R. D. How to model implicit
+knowledge? Similarity learning methods to assess perceptions
+In Proceedings of the 9th Interna-
+of visual representations.
+tional Conference on Educational Data Mining, 2016.
+
+Shaver, Phillip, Schwartz, Judith, Kirson, Donald, and O’connor,
+Cary. Emotion knowledge: further exploration of a prototype
+approach. Journal of personality and social psychology, 52(6):
+1061, 1987.
+
+Shepard, Roger N. Multidimensional scaling, tree-ﬁtting, and
+
+clustering. Science, 210(4468):390–398, 1980.
+
+Tversky, Amos and Gati, Itamar. Similarity, separability, and the
+
+triangle inequality. Psychological review, 89(2):123, 1982.
+
+Ying, Yiming, Huang, Kaizhu, and Campbell, Colin. Sparse met-
+In Advances in neural
+
+ric learning via smooth optimization.
+information processing systems, pp. 2214–2222, 2009.
+
+Harm, Michael W and Seidenberg, Mark S. Computing the mean-
+ings of words in reading: cooperative division of labor between
+visual and phonological processes. Psychological review, 111
+(3):662, 2004.
+
+Zeng, Xiangrong, Figueiredo, Mario, et al. The atomic norm for-
+mulation of oscar regularization with application to the frank-
+wolfe algorithm. In Proceedings of the European Signal Pro-
+cessing Conference, Lisbon, Portugal, 2014.
+
+Kriegeskorte, Nikolaus and Kievit, Rogier A. Representational
+geometry: integrating cognition, computation, and the brain.
+Trends in cognitive sciences, 17(8):401–412, 2013.
+
+Zou, Hui and Hastie, Trevor. Regularization and variable selec-
+tion via the elastic net. Journal of the Royal Statistical Society:
+Series B (Statistical Methodology), 67(2):301–320, 2005.
+
+Kriegeskorte, Nikolaus, Goebel, Rainer, and Bandettini, Peter.
+Information-based functional brain mapping. Proceedings of
+the National Academy of Sciences of the United States of Amer-
+ica, 103(10):3863–3868, 2006.
+
+Kriegeskorte, Nikolaus, Mur, Marieke, and Bandettini, Peter.
+Representational similarity analysis–connecting the branches
+of systems neuroscience. Frontiers in systems neuroscience, 2,
+2008.
+
+Kulis, Brian. Metric learning: A survey. Foundations and Trends
+
+in Machine Learning, 5(4):287–364, 2012.
+
+Lounici, Karim, Pontil, Massimiliano, Tsybakov, Alexandre B,
+and Van De Geer, Sara. Taking advantage of sparsity in multi-
+task learning. arXiv preprint arXiv:0903.1468, 2009.
+
+

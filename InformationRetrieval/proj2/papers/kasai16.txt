@@ -1,0 +1,2030 @@
+Low-rank tensor completion:
+
+a Riemannian manifold preconditioning approach
+
+Hiroyuki Kasai
+
+KASAI@IS.UEC.AC.JP
+
+The University of Electro-Communications,1-5-1, Chofu-gaoka, Chofu-shi, Tokyo, 182-8585, Japan
+
+Bamdev Mishra
+
+BAMDEVM@AMAZON.COM
+
+Amazon Development Centre India, Bengaluru 560055, Karnataka, India
+
+Abstract
+
+We propose a novel Riemannian manifold pre-
+conditioning approach for the tensor completion
+problem with rank constraint. A novel Rieman-
+nian metric or inner product is proposed that ex-
+ploits the least-squares structure of the cost func-
+tion and takes into account the structured symme-
+try that exists in Tucker decomposition. The spe-
+ciﬁc metric allows to use the versatile framework
+of Riemannian optimization on quotient mani-
+folds to develop preconditioned nonlinear con-
+jugate gradient and stochastic gradient descent
+algorithms for batch and online setups, respec-
+tively. Concrete matrix representations of var-
+ious optimization-related ingredients are listed.
+Numerical comparisons suggest that our pro-
+posed algorithms robustly outperform state-of-
+the-art algorithms across different synthetic and
+real-world datasets.
+
+1. Introduction
+
+This paper addresses the problem of low-rank tensor com-
+pletion when the rank is a priori known or estimated. We
+focus on 3-order tensors in the paper, but the developments
+can be generalized to higher order tensors in a straight-
+forward way. Given a tensor X n1×n2×n3 , whose entries
+X ⋆
+are only known for some indices (i1, i2, i3) ∈
+Ω, where Ω is a subset of the complete set of indices
+{(i1, i2, i3) : id ∈ {1, . . . , nd}, d ∈ {1, 2, 3}}, the ﬁxed-
+rank tensor completion problem is formulated as
+
+i1,i2,i3
+
+min
+
+X ∈Rn1×n2×n3
+subject to
+
+kPΩ(X ) − PΩ(X ⋆)k2
+F
+
+1
+|Ω|
+rank(X ) = r,
+
+(1)
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+|Ω| is the number of known entries.
+
+where the operator PΩ(X )i1,i2,i3 = Xi1,i2,i3
+if
+(i1, i2, i3) ∈ Ω and PΩ(X )i1,i2,i3 = 0 otherwise and
+(with a slight abuse of notation) k · kF is the Frobenius
+rank(X )
+norm.
+(= r = (r1, r2, r3)), called the multilinear rank of X , is
+the set of the ranks of for each of mode-d unfolding matri-
+ces. rd ≪ nd enforces a low-rank structure. The mode is a
+matrix obtained by concatenating the mode-d ﬁbers along
+columns, and mode-d unfolding of a D-order tensor X is
+Xd ∈ Rnd×nd+1···nD n1···nd−1 for d = {1, . . . , D}.
+
+Problem (1) has many variants, and one of those is ex-
+tending the nuclear norm regularization approach from the
+matrix case (Cand`es & Recht, 2009) to the tensor case.
+This results in a summation of nuclear norm regularization
+terms, each one corresponds to each of the unfolding ma-
+trices of X . While this generalization leads to good results
+(Liu et al., 2013; Tomioka et al., 2011; Signoretto et al.,
+2014), its applicability to large-scale instances is not triv-
+ial, especially due to the necessity of high-dimensional
+singular value decomposition computations. A different
+approach exploits Tucker decomposition (Kolda & Bader,
+2009, Section 4) of a low-rank tensor X to develop large-
+scale algorithms for (1), e.g., in (Filipovi´c & Juki´c, 2013;
+Kressner et al., 2014).
+
+The present paper exploits both the symmetry present
+in Tucker decomposition and the least-squares struc-
+ture of the cost function of (1) to develop competi-
+tive algorithms. The multilinear rank constraint forms
+a smooth manifold (Kressner et al., 2014).
+To this
+end, we use the concept of manifold preconditioning.
+While preconditioning in unconstrained optimization is
+well studied (Nocedal & Wright, 2006, Chapter 5), pre-
+conditioning on constraints with symmetries, owing to
+non-uniqueness of Tucker decomposition (Kolda & Bader,
+2009),
+is not straightforward. We build upon the re-
+cent work (Mishra & Sepulchre, 2016) that suggests to
+use preconditioning with a tailored metric (inner prod-
+uct) in the Riemannian optimization framework on quo-
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+tient manifolds (Absil et al., 2008; Edelman et al., 1998;
+Mishra & Sepulchre, 2016). The differences with respect
+to the work of Kressner et al. (2014), which also exploits
+the manifold structure, are twofold.
+(i) Kressner et al.
+(2014) exploit the search space as an embedded subman-
+ifold of the Euclidean space, whereas we view it as a prod-
+uct of simpler search spaces with symmetries. Conse-
+quently, certain computations have straightforward inter-
+(ii) Kressner et al. (2014) work with the stan-
+pretation.
+dard Euclidean metric, whereas we use a metric that is
+tuned to the least-squares cost function, thereby induc-
+ing a preconditioning effect. This novel idea of using
+a tuned metric leads to a superior performance of our
+algorithms. They also connect to state-of-the-art algo-
+rithms proposed in (Ngo & Saad, 2012; Wen et al., 2012;
+Mishra & Sepulchre, 2014; Boumal & Absil, 2015).
+
+The paper is organized as follows. Section 2 discusses the
+two fundamental structures of symmetry and least-squares
+associated with (1) and proposes a novel metric that cap-
+tures the relevant second order information of the problem.
+The optimization-related ingredients on the Tucker mani-
+fold are developed in Section 3. The cost function speciﬁc
+ingredients are developed in Section 4. The ﬁnal formulas
+are listed in Table 1, which allow to develop preconditioned
+conjugate gradient descent algorithm in the batch setup and
+stochastic gradient descent algorithm in the online setup. In
+Section 5, numerical comparisons with state-of-the-art al-
+gorithms on various synthetic and real-world benchmarks
+suggest a superior performance of our proposed algorithms.
+Our proposed algorithms are implemented in the Matlab
+toolbox Manopt (Boumal et al., 2014). The concrete proofs
+of propositions, development of optimization-related ingre-
+dients, and additional numerical experiments are shown in
+Sections A and B, respectively, of the supplementary mate-
+rial ﬁle. The Matlab codes for ﬁrst and second order imple-
+mentations, e.g., gradient descent and trust-region meth-
+ods, are available at https://bamdevmishra.com/
+codes/tensorcompletion/.
+
+2. Exploiting the problem structure
+
+Construction of efﬁcient algorithms depends on properly
+exploiting the problem structure. To this end, we focus on
+two fundamental structures in (1): symmetry in the con-
+straints and the least-squares structure of the cost function.
+Finally, a novel metric is proposed.
+
+The symmetry structure in Tucker decomposition. The
+Tucker decomposition of a tensor X ∈ Rn1×n2×n3 of rank
+r (=(r1, r2, r3)) is
+
+X = G×1U1×2U2×3U3,
+
+(2)
+
+where Ud ∈ St(rd, nd) for d ∈ {1, 2, 3} belongs to the
+Stiefel manifold of matrices of size nd × rd with orthog-
+
+onal columns and G ∈ Rr1×r2×r3 (Kolda & Bader, 2009).
+Here, W ×d V ∈ Rn1×···nd−1×m×nd+1×···nD computes the
+d-mode product of a tensor W ∈ Rn1×···×nD and a matrix
+V ∈ Rm×nd . Tucker decomposition (2) is not unique as X
+remains unchanged under the transformation
+
+(U1, U2, U3, G) 7→
+
+(U1O1, U2O2, U3O3, G×1OT
+
+1 ×2OT
+
+2 ×3OT
+3 )
+
+(3)
+
+for all Od ∈ O(rd), which is the set of orthogonal ma-
+trices of size of rd × rd. The classical remedy to remove
+this indeterminacy is to have additional structures on G like
+sparsity or restricted orthogonal rotations (Kolda & Bader,
+2009, Section 4.3). In contrast, we encode the transforma-
+tion (3) in an abstract search space of equivalence classes,
+deﬁned as,
+
+[(U1, U2, U3, G)] := {(U1O1, U2O2, U3O3,
+
+G×1OT
+
+1 ×2OT
+
+2 ×3OT
+
+3 ) : Od ∈ O(rd)}.
+
+(4)
+
+The set of equivalence classes is the quotient manifold
+(Lee, 2003)
+
+M/ ∼:= M/(O(r1) × O(r2) × O(r3)),
+
+(5)
+
+where M is called the total space (computational space)
+that is the product space
+
+M := St(r1, n1) × St(r2, n2) × St(r3, n3) × Rr1×r2×r3.
+(6)
+
+Due to the invariance (3), the local minima of (1) in M
+are not isolated, but they become isolated on M/ ∼. Con-
+sequently, the problem (1) is an optimization problem on
+a quotient manifold for which systematic procedures are
+proposed in (Absil et al., 2008; Edelman et al., 1998). A
+requirement is to endow endow M/ ∼ with a Riemannian
+structure, which conceptually translates (1) into an uncon-
+strained optimization problem over the search space M/ ∼.
+We call M/ ∼, deﬁned in (5), the Tucker manifold as it re-
+sults from Tucker decomposition.
+
+The least-squares structure of the cost function. In un-
+constrained optimization, the Newton method is interpreted
+as a scaled steepest descent method, where the search space
+is endowed with a metric (inner product) induced by the
+Hessian of the cost function (Nocedal & Wright, 2006).
+This induced metric (or its approximation) resolves conver-
+gence issues of ﬁrst order optimization algorithms. Analo-
+gously, ﬁnding a good inner product for (1) is of profound
+consequence. Speciﬁcally for the case of quadratic opti-
+mization with rank constraint (matrix case), Mishra and
+Sepulchre (Mishra & Sepulchre, 2016) propose a family of
+Riemannian metrics from the Hessian of the cost function.
+Applying this approach directly for the particular cost func-
+tion of (1) is computationally costly. To circumvent the
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+issue, we consider a simpliﬁed cost function by assum-
+ing that Ω contains the full set of indices, i.e., we focus
+on kX − X ⋆k2
+F to propose a metric candidate. Applying
+the metric tuning approach of (Mishra & Sepulchre, 2016)
+to the simpliﬁed cost function leads to a family of Rie-
+mannian metrics. A good trade-off between computational
+cost and simplicity is by considering only the block diag-
+onal elements of the Hessian of kX − X ⋆k2
+F . It should
+be noted that the cost function kX − X ⋆k2
+F is convex
+and quadratic in X . Consequently, it is also convex and
+quadratic in the arguments (U1, U2, U3, G) individually.
+Equivalently, the block diagonal approximation of the Hes-
+sian of kX − X ⋆k2
+
+F in (U1, U2, U3, G) is
+
+((G1GT
+
+1 ) ⊗ In1, (G2GT
+
+2 ) ⊗ In2 , (G3GT
+
+3 ) ⊗ In3 , Ir1r2r3 ),
+(7)
+where Gd is the mode-d unfolding of G and is assumed to
+be full rank. ⊗ is the Kronecker product. The terms GdGT
+d
+for d ∈ {1, 2, 3} are positive deﬁnite when r1 ≤ r2r3, r2 ≤
+r1r3, and r3 ≤ r1r2, which is a reasonable assumption.
+
+A novel Riemannian metric. An element x in the total
+space M has the matrix representation (U1, U2, U3, G).
+Consequently, the tangent space TxM is the Cartesian
+product of the tangent spaces of the individual mani-
+folds of (6), i.e., TxM has the matrix characterization
+(Edelman et al., 1998)
+
+TxM = {(ZU1 , ZU2 , ZU3 , ZG)
+
+∈ Rn1×r1 × Rn2×r2 × Rn3×r3 × Rr1×r2×r3 :
+UT
+
+Ud Ud = 0, for d ∈ {1, 2, 3}}.
+
+d ZUd + ZT
+
+From the earlier discussion on symmetry and least-squares
+structure, we propose the novel metric or inner product gx :
+TxM × TxM → R
+
+(8)
+
+gx(ξx, ηx) = hξU1, ηU1 (G1GT
+
+1 )i + hξU2, ηU2 (G2GT
+
+2 )i
+
++hξU3 , ηU3(G3GT
+
+3 )i + hξG, ηGi,
+
+(9)
+where ξx, ηx ∈ TxM are tangent vectors with matrix
+characterizations, shown in (8), (ξU1, ξU2 , ξU3 , ξG) and
+(ηU1 , ηU2 , ηU3, ηG), respectively and h·, ·i is the Euclidean
+inner product. It should be emphasized that the proposed
+metric (9) is induced from (7).
+
+tangent
+
+Let
+be
+(5)
+
+Proposition
+1.
+(ηU1 , ηU2 , ηU3, ηG)
+quotient manifold
+(ξU1O1 , ξU2O2, ξU3O3, ξG×1OT
+(ηU1O1 , ηU2O2 , ηU3O3, ηG×1OT
+gent
+(U1O1, U2O2, U3O3, G×1OT
+
+(ξU1, ξU2, ξU3 , ξG)
+
+to
+(U1, U2, U3, G),
+2 ×3OT
+3
+2 ×3OT
+3
+
+and
+the
+and
+and
+tan-
+at
+3 ). The metric
+
+1 ×2OT
+1 ×2OT
+quotient manifold
+1 ×2OT
+
+2 ×3OT
+
+vectors
+
+vectors
+
+)
+)
+
+to
+
+the
+
+(5)
+
+be
+
+at
+
+(9) is invariant along the equivalence class (4), i.e.,
+
+g(U1,U2,U3,G)((ξU1 , ξU2, ξU3 , ξG), (ηU1 , ηU2, ηU3 , ηG))
+
+= g(U1O1,U2O2,U3O3,G×1OT
+
+1 ×2OT
+
+((ξU1O1 , ξU2O2 , ξU3O3, ξG×1OT
+(ηU1O1, ηU2O2, ηU3O3 , ηG×1OT
+
+2 ×3OT
+3 )
+1 ×2OT
+1 ×2OT
+
+2 ×3OT
+3
+2 ×3OT
+3
+
+),
+)).
+
+3. Notions of manifold optimization
+
+Hx
+
+x
+
+ξx
+
+M
+
+y
+
+x+
+
+ξ[x]
+
+Vx
+
+TxM = Hx ⊕ Vx
+
+Rx(ξx)
+
+M/ ∼
+
+[x]
+
+[x+]
+
+[Rx(ξx)]
+
+T[x](M/ ∼)
+
+Figure 1. Riemannian optimization framework: geometric ob-
+jects, shown in dotted lines, on quotient manifold M/ ∼ call for
+matrix representatives, shown in solid lines, in the total space M.
+
+Each point on a quotient manifold represents an entire
+equivalence class of matrices in the total space. Abstract
+geometric objects on the quotient manifold M/ ∼ call for
+matrix representatives in the total space M. Similarly, al-
+gorithms are run in the total space M, but under appro-
+priate compatibility between the Riemannian structure of
+M and the Riemannian structure of the quotient manifold
+M/ ∼, they deﬁne algorithms on the quotient manifold.
+The key is endowing M/ ∼ with a Riemannian structure.
+Once this is the case, a constraint optimization problem,
+for example (1), is conceptually transformed into an uncon-
+strained optimization over the Riemannian quotient mani-
+fold (5). Below we brieﬂy show the development of various
+geometric objects that are required to optimize a smooth
+cost function on the quotient manifold (5) with ﬁrst order
+methods, e.g., conjugate gradients.
+
+Quotient manifold representation and horizontal lifts.
+Figure 1 illustrates a schematic view of optimization with
+equivalence classes, where the points x and y in M belong
+to the same equivalence class (shown in solid blue color)
+and they represent a single point [x] := {y ∈ M : y ∼ x}
+on the quotient manifold M/ ∼. The abstract tangent
+space T[x](M/ ∼) at [x] ∈ M/ ∼ has the matrix repre-
+sentation in TxM, but restricted to the directions that do
+not induce a displacement along the equivalence class [x].
+This is realized by decomposing TxM into two comple-
+mentary subspaces, the vertical and horizontal subspaces.
+The vertical space Vx is the tangent space of the equiva-
+lence class [x]. On the other hand, the horizontal space
+Hx is the orthogonal subspace to Vx in the sense of the
+metric (9). Equivalently, TxM = Vx ⊕ Hx. The horizon-
+tal subspace Hx provides a valid matrix representation to
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+Ωd ∈ Rrd×rd, ΩT
+d = −Ωd for d ∈ {1, 2, 3}}. Skew sym-
+metric matrices Ωd for all d ∈ {1, 2, 3} parameterize the
+vertical space. Finally, the horizontal projection operator
+Πx : TxM :→ Hx : ηx 7→ Πx(ηx) is given as follows.
+
+Proposition 3. The quotient manifold (5) endowed with the
+metric (9) admits the horizontal projector deﬁned as
+
+Πx(ηx) = (ηU1− U1Ω1, ηU2− U2Ω2, ηU3− U3Ω3,
+ηG −(−(G×1Ω1 +G×2Ω2 +G×3Ω3))),
+
+where ηx = (ηU1 , ηU2, ηU3 , ηG) ∈ TxM and Ωd is a skew-
+symmetric matrix of size rd × rd that is the solution to the
+coupled Lyapunov equations
+
+the abstract tangent space T[x](M/ ∼). An abstract tan-
+gent vector ξ[x] ∈ T[x](M/ ∼) at [x] has a unique element
+ξx ∈ Hx that is called its horizontal lift.
+
+A Riemannian metric gx : TxM × TxM → R at x ∈
+M deﬁnes a Riemannian metric g[x]
+: T[x](M/ ∼) ×
+T[x](M/ ∼) → R, i.e., g[x](ξ[x], η[x]) := gx(ξx, ηx) on
+the quotient manifold M/ ∼, if gx(ξx, ηx) does not depend
+on a speciﬁc representation along the equivalence class [x].
+Here, ξ[x] and η[x] are tangent vectors in T[x](M/ ∼), and
+ξx and ηx are their horizontal lifts in Hx at x, respectively.
+Equivalently, the deﬁnition of the Riemannian metric is
+well posed when gx(ξx, ζx) = gx(ξy, ζy) for all x, y ∈ [x],
+where ξx, ζx ∈ Hx and ξy, ζy ∈ Hy are the horizontal
+lifts of ξ[x], ζ[x] ∈ T[x](M/ ∼) along the same equiva-
+lence class [x]. This holds true for the proposed metric (9)
+as shown in Proposition 1. From (Absil et al., 2008), en-
+dowed with the Riemannian metric (9), the quotient man-
+ifold M/ ∼ is a Riemannian submersion of M. The sub-
+mersion principle allows to work out concrete matrix rep-
+resentations of abstract object on M/ ∼, e.g., the gradient
+of a smooth cost function (Absil et al., 2008).
+
+Starting from an arbitrary matrix (with appropriate dimen-
+sions), two linear projections are needed: the ﬁrst projec-
+tion Ψx is onto the tangent space TxM, while the second
+projection Πx is onto the horizontal subspace Hx. The
+computation cost of these is O(n1r2
+
+2 + n3r2
+
+1 + n2r2
+
+3).
+
+
+
+
+G1GT
+1
+
+Ω1 + Ω1G1GT
+1
+−G1(Ir3 ⊗ Ω2)GT
+1 − G1(Ω3 ⊗ Ir2)GT
+1
+
+G2GT
+2
+
+1 ηU1 G1GT
+
+= Skew(UT
+Ω2 + Ω2G2GT
+2
+−G2(Ir3 ⊗ Ω1)GT
+2 − G2(Ω3 ⊗ Ir1)GT
+2
+
+1 ) + Skew(G1ηT
+
+2 ηU2 G2GT
+
+= Skew(UT
+Ω3 + Ω3G3GT
+3
+3 − G3(Ω2 ⊗ Ir1)GT
+−G3(Ir2 ⊗ Ω1)GT
+3
+
+2 ) + Skew(G2ηT
+
+G3GT
+3
+
+G1 ),
+
+G2 ),
+
+= Skew(UT
+
+3 ηU3 G3GT
+
+3 ) + Skew(G3ηT
+
+G3 ),
+
+(11)
+where Skew(·) extracts the skew-symmetric part of a
+square matrix, i.e., Skew(D) = (D − DT )/2.
+
+1 )−1, U2SU2 (G2GT
+
+The tangent space TxM projection is obtained by extract-
+ing the component normal to TxM in the ambient space.
+The normal space NxM has the matrix characterization
+{(U1SU1 (G1GT
+SUd ∈ Rrd×rd , ST
+Ud = SUd , for d ∈ {1, 2, 3}}.
+for all d ∈ {1, 2, 3} pa-
+Symmetric matrices SUd
+the operator
+rameterize the normal space.
+Ψx : Rn1×r1 × Rn2×r2 × Rn3×r3 × Rr1×r2×r3 → TxM :
+(YU1 , YU2, YU3, YG) 7→ Ψx(YU1, YU2 , YU3 , YG) is given
+as follows.
+
+2 )−1, U3SU3 (G3GT
+
+Finally,
+
+3 )−1, 0) :
+
+Proposition 2. The quotient manifold (5) endowed with the
+metric (9) admits the tangent space projector deﬁned as
+
+Ψx(YU1, YU2, YU3, YG) = (YU1−U1SU1(G1GT
+2 )−1, YU3−U3SU3 (G3GT
+
+YU2−U2SU2 (G2GT
+
+1 )−1,
+3 )−1, YG),
+
+(10)
+where SUd is the solution to the Lyapunov equation
+SUd GdGT
+d YUd )GdGT
+d
+for d ∈ {1, 2, 3}.
+
+d SUd = GdGT
+
+Ud Ud +UT
+
+d +GdGT
+
+d (YT
+
+The Lyapunov equations in Proposition 2 are solved efﬁ-
+ciently with the Matlab’s lyap routine.
+
+The horizontal space projection of a tangent vector is ob-
+tained by removing the component along the vertical space.
+The vertical space Vx has the matrix characterization
+{(U1Ω1, U2Ω2, U3Ω3, −(G×1Ω1+G×2Ω2+G×3Ω3)) :
+
+The coupled Lyapunov equations (11) are solved efﬁciently
+with the Matlab’s pcg routine that is combined with a spe-
+ciﬁc symmetric preconditioner resulting from the Gauss-
+Seidel approximation of (11). For the variable Ω1, the pre-
+conditioner is of the form G1GT
+1 . Similarly,
+1
+for the variables Ω2 and Ω3.
+
+Ω1 +Ω1G1GT
+
+Retraction. A retraction is a mapping that maps vec-
+tors in the horizontal space to points on the search space
+M and satisﬁes the local rigidity condition (Absil et al.,
+2008). It provides a natural way to move on the manifold
+along a search direction. Because the total space M has
+the product nature, we can choose a retraction by combin-
+ing retractions on the individual manifolds, i.e., Rx(ξx) =
+(uf(U1 +ξU1 ), uf(U2 +ξU2 ), uf(U3 +ξU3 ), G +ξG), where
+ξx ∈ Hx and uf(·) extracts the orthogonal factor of a full
+column rank matrix, i.e., uf(A) = A(AT A)−1/2. The
+retraction Rx deﬁnes a retraction R[x](ξ[x]) := [Rx(ξx)]
+on the quotient manifold M/ ∼, as the equivalence class
+[Rx(ξx)] does not depend on speciﬁc matrix representa-
+tions of [x] and ξ[x], where ξx is the horizontal lift of the
+abstract tangent vector ξ[x] ∈ T[x](M/ ∼).
+
+Vector transport. A vector transport on a manifold M is
+a smooth mapping that transports a tangent vector ξx ∈
+TxM at x ∈ M to a vector in the tangent space at a
+point Rx(ηx). It is deﬁned by the symbol Tηxξx. It gen-
+eralizes the classical concept of translation of vectors in
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+the Euclidean space to manifolds (Absil et al., 2008, Sec-
+tion 8.1.4). The horizontal lift of the abstract vector trans-
+port Tη[x] ξ[x] on M/ ∼ has the matrix characterization
+ΠRx(ηx)(Tηxξx) = ΠRx(ηx)(ΨRx(ηx)(ξx)), where ξx and
+ηx are the horizontal lifts in Hx of ξ[x] and η[x] that belong
+to T[x](M/ ∼). Ψx(·) and Πx(·) are projectors deﬁned in
+Propositions 2 and 3. The computational cost of transport-
+ing a vector solely depends on the projection and retraction
+operations.
+
+4. Riemannian algorithms for (1)
+
+We propose two Riemannian preconditioned algorithms
+for the tensor completion problem (1) that are based on
+the developments in Section 3. The preconditioning ef-
+fect follows from the speciﬁc choice of the metric (9).
+In the batch setting, we use the off-the-shelf conjugate
+gradient implementation of Manopt for any smooth cost
+function (Boumal et al., 2014). A complete description
+of the Riemannian nonlinear conjugate gradient method
+is in (Absil et al., 2008, Chapter 8).
+In the online set-
+ting, we use the stochastic gradient descent implementation
+(Bonnabel, 2013). For ﬁxed rank, theoretical convergence
+of the Riemannian algorithms are to a stationary point, and
+the convergence analysis follows from (Sato & Iwai, 2015;
+Ring & Wirth, 2012; Bonnabel, 2013). However, as simu-
+lations show, convergence to global minima is observed in
+many challenging instances.
+
+In addition to the manifold-related ingredients in Section 3,
+the ingredients needed are the cost function speciﬁc ones.
+To this end, we show the computation of the Riemannian
+gradient as well as a way to compute an initial guess for the
+step-size, which is used in the conjugate gradient method.
+The concrete formulas are shown in Table 1.
+
+Let f (X ) =
+Riemannian gradient computation.
+kPΩ(X ) − PΩ(X ⋆)k2
+F /|Ω| be the mean square error
+function of (1), and S = 2(PΩ(G×1U1×2U2×3U3) −
+PΩ(X ⋆))/|Ω| be an auxiliary sparse tensor variable that
+is interpreted as the Euclidean gradient of f in Rn1×n2×n3 .
+The partial derivatives of f with respect to (U1, U2, U3, G)
+are computed in terms of the unfolding matrices Sd. Due
+to the speciﬁc scaled metric (9), the partial derivatives are
+further scaled by ((G1GT
+3 )−1, I),
+denoted as egradxf (after scaling). Finally, from the
+Riemannian submersion theory (Absil et al., 2008, Sec-
+tion 3.6.2), the horizontal lift of grad[x]f is equal to
+gradxf = Ψ(egradxf ). The total numerical cost of com-
+puting the Riemannian gradient depends on computing the
+partial derivatives, which is O(|Ω|r1r2r3).
+
+2 )−1, (G3GT
+
+1 )−1, (G2GT
+
+Proposition 4. The cost function (1) at (U1, U2, U3, G) un-
+der the quotient manifold (5) endowed with the Riemannian
+metric (9) admits the horizontal lift of the Riemannian gra-
+
+dient
+
+(S1(U3 ⊗ U2)GT
+S2(U3 ⊗ U1)GT
+S3(U2 ⊗ U1)GT
+S ×1 UT
+1 ×2 UT
+
+1 (G1GT
+2 (G2GT
+3 (G3GT
+2 ×3 UT
+
+1 )−1 − U1BU1(G1GT
+2 )−1 − U2BU2 (G2GT
+3 )−1 − U3BU3 (G3GT
+3 ),
+
+1 )−1,
+2 )−1,
+3 )−1,
+
+(12)
+where BUd for d ∈ {1, 2, 3} are the solutions to the Lya-
+punov equations
+
+BU1 G1GT
+
+1 + G1GT
+
+1 BU1
+
+BU2 G2GT
+
+2 + G2GT
+
+2 BU2
+
+= 2Sym(G1GT
+
+1 UT
+
+1 (S1(U3 ⊗ U2)GT
+
+2 ),
+
+= 2Sym(G2GT
+
+2 UT
+
+2 (S2(U3 ⊗ U1)GT
+
+2 ),
+
+
+
+
+BU3 G3GT
+
+3 + G3GT
+
+3 BU3
+
+3 (S3(U2 ⊗ U1)GT
+where Sym(·) extracts the symmetric part of a matrix.
+
+= 2Sym(G3GT
+
+3 UT
+
+3 ),
+
+guess
+
+step-size.
+
+Vandereycken,
+
+the
+2014;
+the least-squares
+
+for
+Initial
+Following
+2013;
+(Mishra & Sepulchre,
+Kressner et al., 2014),
+structure of
+the cost function in (1) is exploited to compute a linearized
+step-size guess efﬁciently along a search direction by
+considering a polynomial approximation of degree 2 over
+the manifold. Given a search direction ξx ∈ Hx, the step-
+size guess is arg mins∈R+ kPΩ(G×1U1×2U2×3U3 +
+sG×1ξU1 ×2U2×3U3
++
+sG×1U1×2U2×3ξU3 + sξG×1U1×2U2×3U3) −
+PΩ(X ⋆)k2
+F , which has a closed-form expression and
+the numerical cost of computing it is O(|Ω|r1r2r3).
+
+sG×1U1×2ξU2 ×3U3
+
++
+
+i1,i2,i3
+
+Stochastic gradient descent in online setting. In the on-
+line setting, we update (U1, U2, U3, G) every time a frontal
+slice, i.e., a matrix ∈ Rn1×n2 , is randomly sampled from
+X ⋆
+. Equivalently, we assume that the tensor grows
+along the third dimension. More concretely, we calculate
+the rank-one Riemannian gradient (12) for the input slice.
+(U1, U2, U3, G) are updated by taking a step along the neg-
+ative Riemannian gradient direction. Subsequently, we re-
+tract using Rx. A popular formula for the step-size γk at
+k-th update is γk = γ0/(1 + γ0λk), where γ0 is the ini-
+tial step-size and λ is a ﬁxed reduction factor. Following
+(Bottou, 2012), we select γ0 in the pre-training phase us-
+ing a small sample size of a training set. λ is ﬁxed to 10−7.
+
+Computational cost. The total computational cost per it-
+eration of our proposed conjugate gradient implementation
+is O(|Ω|r1r2r3), where |Ω| is the number of known en-
+tries. It should be stressed that the computational cost of
+our conjugate gradient implementation is equal to that of
+(Kressner et al., 2014). In the online setting, each stochas-
+tic gradient descent update costs O(|Ωslice|r1r2 + n1r2
+1 +
+n2r2
+3 + r1r2r3), where |Ωslice| is the number of
+known entries of the current frontal slice of the incomplete
+tensor X ⋆
+, and T is the number of slices that we have
+seen along n3 direction.
+
+2 + T r2
+
+i1,i2,i3
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+Table 1. Tucker manifold related optimization ingredients for (1)
+
+Matrix representation
+Computational space M
+Group action
+Quotient space M/ ∼
+Ambient space
+Tangent vectors in TxM
+
+Metric gx(ξx, ηx) for
+any ξx, ηx ∈ TxM
+Vertical tangent vectors in Vx
+
+Horizontal tangent vectors in Hx
+Ψ(·) projects an ambient
+vector (YU1 , YU2 , YU3 , YG)
+onto TxM
+Π(·) projects a tangent vector ξ
+onto Hx
+First order derivative of f (x)
+
+Retraction Rx(ξx)
+Horizontal lift of the
+vector transport Tη[x]ξ[x]
+
+x = (U1, U2, U3, G)
+St(r1, n1) × St(r2, n2) × St(r3, n3) × Rr1×r2×r3
+{(U1O1, U2O2, U3O3, G×1OT
+3 ) : Od ∈ O(rd), for d ∈ {1, 2, 3}}
+St(r1, n1) × St(r2, n2) × St(r3, n3) × Rr1×r2×r3 /(O(r1) × O(r2) × O(r3))
+Rn1×r1 × Rn2×r2 × Rn3×r3 × Rr1×r2×r3
+{(ZU1 , ZU2 , ZU3 , ZG) ∈ Rn1×r1 × Rn2×r2 × Rn3×r3 × Rr1×r2×r3
+d ZUd + ZT
+: UT
+hξU1 , ηU1 (G1GT
+
+Ud Ud = 0, for d ∈ {1, 2, 3}}
+1 )i+hξU2 , ηU2 (G2GT
+
+2 )i+hξU3 , ηU3 (G3GT
+
+3 )i+hξG, ηGi
+
+1 ×2OT
+
+2 ×3OT
+
+, ζU2
+
+, ζU3
+
+d is symmetric, for d ∈ {1, 2, 3}}
+
+d )ζ T
+Ud
+
+Ud + ζGd GT
+
+1 )−1, YU2 − U2SU2 (G2GT
+3 )−1, YG), where SUd for d ∈ {1, 2, 3} are computed
+
+d = −Ωd, for d ∈ {1, 2, 3}}
+, ζG) ∈ TxM : (GdGT
+
+{(U1Ω1, U2Ω2, U3Ω3, −(G×1Ω1 + G×2Ω2 + G×3Ω3)) :
+Ωd ∈ Rrd×rd , ΩT
+{(ζU1
+(YU1 − U1SU1 (G1GT
+YU3 − U3SU3 (G3GT
+by solving Lyapunov equations as in (10).
+(ξU1 − U1Ω1, ξU2 − U2Ω2, ξU3 − U3Ω3,
+ξG − (−(G×1Ω1 + G×2Ω2 + G×3Ω3))), Ωd is computed in (11).
+(S1(U3 ⊗ U2)GT
+where S = 2
+|Ω| (PΩ(G×1U1×2U2×3U3) − PΩ(X ⋆)).
+(uf(U1 + ξU1 ), uf(U2 + ξU2 ), uf(U3 + ξU3 ), G + ξG)
+ΠRx(ηx)(ΨRx(ηx)(ξx))
+
+2 , S3(U2 ⊗ U1)GT
+
+1 , S2(U3 ⊗ U1)GT
+
+2 )−1,
+
+3 ), S ×1 UT
+
+1 ×2 UT
+
+2 ×3 UT
+
+3 ),
+
+5. Numerical comparisons
+
+In the batch setting, we show a number of numerical
+comparisons of our proposed conjugate gradient algo-
+rithm with state-of-the-art algorithms that include TOpt
+(Filipovi´c & Juki´c, 2013) and geomCG (Kressner et al.,
+2014),
+for comparisons with Tucker decomposition
+based algorithms, and HaLRTC (Liu et al., 2013), Latent
+(Tomioka et al., 2011), and Hard (Signoretto et al., 2014)
+as nuclear norm minimization algorithms.
+In the on-
+line setting, we compare our proposed stochastic gradient
+descent algorithm with CANDECOMP/PARAFAC based
+TeCPSGD (Mardani et al., 2015) and OLSTEC (Kasai,
+2016). All simulations are performed in Matlab on a 2.6
+GHz Intel Core i7 machine with 16 GB RAM. For speciﬁc
+operations with unfoldings of S, we use the mex interfaces
+for Matlab that are provided by the authors of geomCG. For
+large-scale instances, our algorithm is only compared with
+geomCG as others cannot handle them. Cases S and R are
+for batch instances, whereas Case O is for online instances.
+
+Since the dimension of the space of a tensor ∈ Rn1×n2×n3
+of rank r = (r1, r2, r3) is dim(M/ ∼) = P3
+d=1(ndrd −
+r2
+d) + r1r2r3, we randomly and uniformly select known en-
+tries based on a multiple of the dimension, called the over-
+sampling (OS) ratio, to create the train set Ω. Algorithms
+are initialized randomly, as suggested in (Kressner et al.,
+2014), and are stopped when either the mean square error
+(MSE) on the train set Ω is below 10−12 or the number of
+iterations exceeds 250. We also evaluate the mean square
+error on a test set Γ, which is different from Ω. Five runs
+
+are performed in each scenario and the plots show all of
+them. The time plots are shown with standard deviations.
+It should be noted that we show most numerical compar-
+isons on the test set Γ as it allows to compare with nuclear
+norm minimization algorithms, which optimize a different
+(training) cost function. Additional plots are provided as
+supplementary material.
+
+Case S1: comparison with the Euclidean metric. We
+ﬁrst show the beneﬁt of the proposed metric (9) over the
+conventional choice of the Euclidean metric that exploits
+the product structure of M and symmetry (3). This is
+deﬁned by combining the individual natural metrics for
+St(rd, nd) and Rr1×r2×r3 . For simulations, we randomly
+generate a tensor of size 200 × 200 × 200 and rank r =
+(10, 10, 10). OS is 10. For simplicity, we compare gradient
+descent algorithms with Armijo backtracking linesearch for
+both the metric choices. Figure 2(a) shows that the algo-
+rithm with the metric (9) gives a superior performance in
+train error than that of the conventional metric choice.
+
+Case S2: small-scale instances. Small-scale tensors of
+size 100 × 100 × 100, 150 × 150 × 150, and 200 × 200 ×
+200 and rank r = (10, 10, 10) are considered. OS is
+{10, 20, 30}. Figure 2(b) shows that our proposed algo-
+rithm has faster convergence than others. In Figure 2(c),
+the lowest test errors are obtained by our proposed algo-
+rithm and geomCG.
+
+Case S3: large-scale instances. We consider large-scale
+tensors of size 3000 × 3000 × 3000, 5000 × 5000 × 5000,
+and 10000 × 10000 × 10000 and ranks r = (5, 5, 5) and
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+ 
+
+ 
+
+Ω
+n
+o
+ 
+r
+o
+r
+r
+e
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+100
+
+10−5
+
+10−10
+
+ 
+
+0
+
+ 
+
+Proposed metric
+Euclidean metric
+
+200 × 200 × 200
+
+ 
+
+Proposed
+geomCG
+HaLRTC
+TOpt
+Latent
+Hard
+
+100 × 100 × 100
+
+150 × 150 × 150
+
+104
+
+103
+
+102
+
+101
+
+s
+d
+n
+o
+c
+e
+s
+ 
+n
+
+i
+ 
+e
+m
+T
+
+i
+
+40
+20
+Time in seconds
+
+60
+
+100
+
+ 
+
+10 20 30 10 20 30 10 20 30
+
+OS
+
+105
+
+100
+
+10−5
+
+10−10
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+
+ 
+
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+10−15
+
+ 
+10
+
+ 
+
+Proposed(100x100x100)
+geomCG(100x100x100)
+HalLRTC(100x100x100)
+TOpt(100x100x100)
+Latent(100x100x100)
+Hard(100x100x100)
+Proposed(150x150x150)
+geomCG(150x150x150)
+HalLRTC(150x150x150)
+TOpt(150x150x150)
+Latent(150x150x150)
+Hard(150x150x150)
+Proposed(200x200x200)
+geomCG(200x200x200)
+HalLRTC(200x200x200)
+TOpt(200x200x200)
+Latent(200x200x200)
+Hard(200x200x200)
+
+20
+
+30
+
+OS
+
+  
+
+  
+
+(a) Case S1: comparison between metrics
+
+(train error).
+
+(b) Case S2: r = (10, 10, 10).
+
+(c) Case S2: r = (10, 10, 10).
+
+s
+d
+n
+o
+c
+e
+s
+ 
+n
+
+i
+ 
+e
+m
+T
+
+i
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+
+ 
+
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+104
+
+103
+
+102
+
+101
+
+100
+
+ 
+
+100
+
+10−10
+
+10−20
+
+ 
+0
+
+ r=(10,10,10)
+
+ 
+
+Proposed
+geomCG
+
+ r=(5,5,5)
+
+3000 5000 10000 3000 5000 10000
+
+Tensor Size (per dimension)
+
+(d) Case S3.
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+ 
+e
+r
+a
+u
+q
+s
+ 
+n
+a
+e
+M
+
+100
+
+10−5
+
+10−10
+
+ 
+
+0
+
+ 
+
+Proposed
+geomCG
+
+50
+
+100
+
+150
+
+Time in seconds
+
+200
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+ 
+e
+r
+a
+u
+q
+s
+ 
+n
+a
+e
+M
+
+102
+
+100
+
+10−2
+
+10−4
+0
+
+ 
+
+50
+
+ 
+
+Proposed (CN=5)
+geomCG (CN=5)
+Proposed (CN=50)
+geomCG (CN=50)
+Proposed (CN=100)
+geomCG (CN=100)
+
+100
+
+150
+
+Time in seconds
+
+200
+
+(e) Case S4: OS = 4.
+
+(f) Case S5: CN = {5, 50, 100}.
+
+(b) 10000 × 10000
+
+× 10000
+
+ 
+
+Proposed
+geomCG
+30000
+× 6000
+× 6000
+
+20000
+× 7000
+× 7000
+
+(a)
+40000
+× 5000
+× 5000
+
+ 
+
+Proposed (ε=0)
+geomCG (ε=0)
+Proposed (ε=1e−12)
+geomCG (ε=1e−12)
+Proposed (ε=1e−10)
+geomCG (ε=1e−10)
+Proposed (ε=1e−08)
+geomCG (ε=1e−08)
+Proposed (ε=1e−06)
+geomCG (ε=1e−06)
+Proposed (ε=0.0001)
+geomCG (ε=0.0001)
+
+700
+
+600
+
+500
+
+400
+
+300
+
+200
+
+100
+
+s
+d
+n
+o
+c
+e
+s
+ 
+n
+
+i
+ 
+e
+m
+T
+
+i
+
+200
+400
+Time in seconds
+
+600
+
+0
+
+ 
+
+(5,5,5) (5,5,5) (5,5,5) (7,6,6) (10,5,5)(15,4,4)
+
+rank
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+
+ 
+
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+104
+
+102
+
+100
+
+10−2
+
+10−4
+0
+
+ 
+
+ 
+
+Proposed
+geomCG
+HaLRTC
+TOpt
+Latent
+Hard
+
+100
+200
+Time in seconds
+
+300
+
+(g) Case S6: noisy data.
+
+(h) Case S7: rectangular tensors.
+
+(i) Case R1: Ribeira, OS = 11.
+
+Figure 2. Experiments on synthetic and real datasets.
+
+(10, 10, 10). OS is 10. Our proposed algorithm outper-
+forms geomCG in Figure 2(d).
+
+Case S4: inﬂuence of low sampling. We look into prob-
+lem instances from scarcely sampled data, e.g., OS is 4.
+The test requires completing a tensor of size 10000 ×
+10000 × 10000 and rank r = (5, 5, 5). Figure 2(e) shows
+the superior performance of the proposed algorithm against
+geomCG. Whereas the test error increases for geomCG, it
+decreases for the proposed algorithm.
+
+Case S5:
+inﬂuence of ill-conditioning and low sam-
+pling. We consider the problem instance of Case S4 with
+OS = 5. Additionally, for generating the instance, we im-
+pose a diagonal core G with exponentially decaying posi-
+tive values of condition numbers (CN) 5, 50, and 100. Fig-
+ure 2(f) shows that the proposed algorithm outperforms ge-
+omCG for all the considered CN values.
+
+Case S6:
+inﬂuence of noise. We evaluate the conver-
+gence properties of algorithms under the presence of noise
+
+by adding scaled Gaussian noise PΩ(E) to PΩ(X ⋆) as
+in (Kressner et al., 2014). The different noise levels are
+ǫ = {10−4, 10−6, 10−8, 10−10, 10−12}. In order to eval-
+uate for ǫ = 10−12, the stopping threshold on the MSE
+of the train set is lowered to 10−24. The tensor size and
+rank are same as in Case S4 and OS is 10. Figure 2(g)
+shows that the test error for each ǫ is almost identical to the
+ǫ2kPΩ(X ⋆)k2
+F (Kressner et al., 2014), but our proposed
+algorithm converges faster than geomCG.
+
+Case S7: rectangular instances. We consider instances
+where the dimensions and ranks along certain modes are
+different than others. Two cases are considered. Case (7.a)
+considers tensors size 20000×7000×7000, 30000×6000×
+6000, and 40000 × 5000 × 5000 with rank r = (5, 5, 5).
+Case (7.b) considers a tensor of size 10000×10000×10000
+with ranks (7, 6, 6), (10, 5, 5), and (15, 4, 4).
+In all the
+cases, the proposed algorithm converges faster than ge-
+omCG as shown in Figure 2(h).
+
+Case R1: hyperspectral image. We consider the hyper-
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+Ribeira
+
+Algorithm
+
+Proposed
+geomCG
+HaLRTC
+TOpt
+Latent
+Hard
+MovieLens-10M
+
+r
+
+(4, 4, 4)
+(6, 6, 6)
+(8, 8, 8)
+(10, 10, 10)
+
+Table2. Cases R1 and R2: test MSE on Γ and time in seconds
+
+Time
+33 ± 13
+36 ± 14
+46 ± 0
+80 ± 32
+553 ± 3
+400 ± 5
+
+OS = 11
+
+MSE on Γ
+
+8.2095 · 10−4 ± 1.7 · 10−5
+3.8342 · 10−1 ± 4.2 · 10−2
+2.2671 · 10−3 ± 3.6 · 10−5
+1.7854 · 10−3 ± 3.8 · 10−4
+2.9296 · 10−3 ± 6.4 · 10−5
+6.5090 · 102 ± 6.1 · 101
+
+Time
+67 ± 43
+150 ± 48
+48 ± 0
+27 ± 21
+558 ± 3
+402 ± 4
+
+OS = 22
+
+MSE on Γ
+
+6.9516 · 10−4 ± 1.1 · 10−5
+6.2590 · 10−3 ± 4.5 · 10−3
+1.3880 · 10−3 ± 2.7 · 10−5
+2.1259 · 10−3 ± 3.8 · 10−4
+1.6339 · 10−3 ± 2.3 · 10−5
+6.5989 · 102 ± 9.8 · 101
+
+Time
+
+1748 ± 441
+6058 ± 47
+11370 ± 103
+32802 ± 52
+
+Proposed
+
+MSE on Γ
+
+0.6762 ± 1.5 · 10−3
+0.6913 ± 3.3 · 10−3
+0.7589 ± 7.1 · 10−3
+1.0107 ± 2.7 · 10−2
+
+Time
+
+2981 ± 40
+6554 ± 655
+13853 ± 118
+38145 ± 36
+
+geomCG
+
+MSE on Γ
+
+0.6956 ± 2.8 · 10−3
+0.7398 ± 7.1 · 10−3
+0.8955 ± 3.3 · 10−2
+1.6550 ± 8.7 · 10−2
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+
+ 
+
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+100
+
+10−5
+
+10−10
+
+ 
+
+0
+
+10
+
+Proposed (Batch)
+Proposed (Online)
+Proposed (Batch)
+Proposed (Online)
+Proposed (Batch)
+Proposed (Online)
+Proposed (Batch)
+Proposed (Online)
+Proposed (Batch)
+Proposed (Online)
+
+ 
+
+10−2
+
+ 
+
+Γ
+n
+o
+ 
+r
+o
+r
+r
+e
+ 
+e
+r
+a
+u
+q
+s
+n
+a
+e
+M
+
+ 
+
+ 
+
+Proposed (Online)
+Proposed (Batch)
+TeCPSGD
+OLSTEC
+
+20
+
+30
+
+Outer iterations
+
+40
+
+50
+
+ 
+0
+
+20
+
+40
+
+60
+
+Outer iterations
+
+80
+
+100
+
+(a) Case O: synthetic dataset.
+
+(b) Case O: Airport Hall dataset.
+
+Figure 3. Experiments on online instances.
+
+spectral image “Ribeira” (Foster et al., 2007) discussed in
+(Signoretto et al., 2011; Kressner et al., 2014). The tensor
+size is 1017 × 1340 × 33, where each slice corresponds to
+a particular image measured at a different wavelength. As
+suggested in (Signoretto et al., 2011; Kressner et al., 2014),
+we resize it to 203 × 268 × 33. We perform ﬁve ran-
+dom samplings of the pixels based on the OS values 11
+and 22, corresponding to the rank r=(15, 15, 6) adopted
+in (Kressner et al., 2014). This set is further randomly
+split into 80/10/10–train/validation/test partitions. The al-
+gorithms are stopped when the MSE on the validation set
+starts to increase. While OS = 22 corresponds to the ob-
+servation ratio of 10% studied in (Kressner et al., 2014),
+OS = 11 considers a challenging scenario with the obser-
+vation ratio of 5%. Figures 2(i) shows the good perfor-
+mance of our algorithm. Table 2 compiles the results.
+
+Case R2: MovieLens-10M1. This dataset contains
+10000054 ratings corresponding to 71567 users and 10681
+movies. We split the time into 7-days wide bins results, and
+ﬁnally, get a tensor of size 71567 × 10681 × 731. The frac-
+tion of known entries is less than 0.002%. The completion
+task on this dataset reveals periodicity of the latent genres.
+We perform ﬁve random 80/10/10–train/validation/test par-
+titions. The maximum iteration threshold is set to 500. In
+Table 2, our proposed algorithm consistently gives lower
+test errors than geomCG across different ranks.
+
+Case O: online instances. We compare the proposed
+stochastic gradient descent algorithm with its batch coun-
+terpart gradient descent algorithm and with TeCPSGD
+(Mardani et al., 2015) and OLSTEC (Kasai, 2016). As the
+implementations of TeCPSGD and OLSTEC are computa-
+tionally more intensive than ours, our plots only show test
+MSE against the number of outer iterations, i.e., the num-
+ber of the passes through the data.
+
+Figure 3(a) shows comparisons on a synthetic instance of
+tensor size 100 × 100 × 10000 with rank r = (5, 5, 5).
+γ0 is selected from the step-size list {8, 9, 10, 11, 12} in
+the pre-training phase. 10% entries are randomly observed.
+The pre-training uses 10% frontal slices of all the slices.
+The maximum number of outer loops is set to 100. Figure
+3(a) shows ﬁve different runs, where the online algorithm
+has the same asymptotic convergence behavior as the batch
+counterpart on a test dataset Γ. Figure 3(b) shows com-
+parisons on the Airport Hall surveillance video sequence
+dataset2 of size 176 × 144 with 1000 frames. γ0 is se-
+lected from {30, 40, 50, 60, 70} and 10% frontal slices are
+selected for pre-training. 2% of the entries are observed. In
+Figure 3(b), both the proposed online and batch algorithms
+achieve lower test errors than TeCPSGD and OLSTEC.
+
+6. Conclusion
+
+We have proposed preconditioned batch (conjugate gra-
+dient) and online (stochastic gradient descent) algorithms
+for the tensor completion problem. The algorithms stem
+from the Riemannian preconditioning approach that ex-
+ploits the fundamental structures of symmetry (due to non-
+uniqueness of Tucker decomposition) and least-squares of
+the cost function. A novel Riemannian metric (inner prod-
+uct) is proposed that enables to use the versatile Rieman-
+nian optimization framework. Numerical comparisons sug-
+gest that our proposed algorithms have a superior perfor-
+mance on different benchmarks.
+
+2http://perception.i2r.a-star.edu.sg/
+
+1http://grouplens.org/datasets/movielens/.
+
+bk_model/bk_index.html
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+Acknowledgments
+
+We thank Rodolphe Sepulchre, Paul Van Dooren, and
+Nicolas Boumal for useful discussions on the paper. This
+paper presents research results of the Belgian Network
+DYSCO (Dynamical Systems, Control, and Optimization),
+funded by the Interuniversity Attraction Poles Programme,
+initiated by the Belgian State, Science Policy Ofﬁce. The
+scientiﬁc responsibility rests with its authors. Hiroyuki Ka-
+sai is (partly) supported by the Ministry of Internal Af-
+fairs and Communications, Japan, as the SCOPE Project
+(150201002). This work was initiated while Bamdev
+Mishra was with the Department of Electrical Engineering
+and Computer Science, University of Li`ege, 4000 Li`ege,
+Belgium and was visiting the Department of Engineer-
+ing (Control Group), University of Cambridge, Cambridge,
+UK. He was supported as a research fellow (aspirant) of the
+Belgian National Fund for Scientiﬁc Research (FNRS).
+
+References
+
+Absil, P.-A., Mahony, R., and Sepulchre, R. Optimization
+Algorithms on Matrix Manifolds. Princeton University
+Press, 2008.
+
+Bonnabel, S. Stochastic gradient descent on Riemannian
+IEEE Trans. Autom. Control, 58(9):2217–
+
+manifolds.
+2229, 2013.
+
+Bottou, L. Stochastic gradient descent tricks. Neural Net-
+works: Tricks of the Trade (2nd ed.), pp. 421–436, 2012.
+
+Boumal, N. and Absil, P.-A. Low-rank matrix completion
+via preconditioned optimization on the Grassmann man-
+ifold. Linear Algebra Appl., 475:200–239, 2015.
+
+Kasai, H. Online low-rank tensor subspace tracking from
+incomplete data by CP decomposition using recursive
+least squares. In IEEE ICASSP, 2016.
+
+Kolda, T. G. and Bader, B. W. Tensor decompositions and
+
+applications. SIAM Rev., 51(3):455–500, 2009.
+
+Kressner, D., Steinlechner, M., and Vandereycken, B. Low-
+rank tensor completion by Riemannian optimization.
+BIT Numer. Math., 54(2):447–468, 2014.
+
+Lee, J. M. Introduction to smooth manifolds, volume 218 of
+Graduate Texts in Mathematics. Springer-Verlag, New
+York, second edition, 2003.
+
+Liu, J., Musialski, P., Wonka, P., and Ye, J. Tensor comple-
+tion for estimating missing values in visual data. IEEE
+Trans. Pattern Anal. Mach. Intell., 35(1):208–220, 2013.
+
+Mardani, M., Mateos, G., and Giannakis, G.B. Subspace
+learning and imputation for streaming big data matrices
+and tensors.
+IEEE Trans. Signal Process., 63(10):266
+–2677, 2015.
+
+Mishra, B. and Sepulchre, R. R3MC: A Riemannian three-
+In
+
+factor algorithm for low-rank matrix completion.
+IEEE CDC, pp. 1137–1142, 2014.
+
+Mishra, B. and Sepulchre, R. Riemannian preconditioning.
+
+SIAM J. Optim., 26(1):635–660, 2016.
+
+Ngo, T. and Saad, Y. Scaled gradients on Grassmann man-
+ifolds for matrix completion. In NIPS, pp. 1421–1429,
+2012.
+
+Nocedal, J. and Wright, S. J. Numerical Optimization, vol-
+
+ume Second Edition. Springer, 2006.
+
+Boumal, N., Mishra, B., Absil, P.-A., and Sepulchre, R.
+Manopt: a Matlab toolbox for optimization on mani-
+folds. J. Mach. Learn. Res., 15(1):1455–1459, 2014.
+
+Ring, W. and Wirth, B. Optimization methods on Rie-
+mannian manifolds and their application to shape space.
+SIAM J. Optim., 22(2):596–627, 2012.
+
+Cand`es, E. J. and Recht, B. Exact matrix completion via
+convex optimization. Found. Comput. Math., 9(6):717–
+772, 2009.
+
+Sato, H. and Iwai, T. A new, globally convergent Rieman-
+nian conjugate gradient method. Optimization, 64(4):
+1011–1031, 2015.
+
+Edelman, A., Arias, T.A., and Smith, S.T. The geometry
+of algorithms with orthogonality constraints. SIAM J.
+Matrix Anal. Appl., 20(2):303–353, 1998.
+
+Filipovi´c, M. and Juki´c, A. Tucker factorization with
+missing data with application to low-n-rank tensor
+completion. Multidim. Syst. Sign. P., 2013. Doi:
+10.1007/s11045-013-0269-9.
+
+Foster, D. H., Nascimento, S. M. C., and Amano, K. In-
+formation limits on neural identiﬁcation of colored sur-
+faces in natural scenes. Visual Neurosci., 21(3):331–336,
+2007.
+
+Signoretto, M., Plas, R. V. d., Moor, B. D., and Suykens, J.
+A. K. Tensor versus matrix completion: A comparison
+with application to spectral data. IEEE Signal Process.
+Lett., 18(7):403–406, 2011.
+
+Signoretto, M., Dinh, Q. T., Lathauwer, L. D., and
+Suykens, J. A. K. Learning with tensors: a framework
+based on convex optimization and spectral regulariza-
+tion. Mach. Learn., 94(3):303–351, 2014.
+
+Tomioka, R., Hayashi, K., and Kashima, H. Estimation
+of low-rank tensors via convex optimization. Technical
+report, arXiv preprint arXiv:1010.0789, 2011.
+
+Low-rank tensor completion: a Riemannian manifold preconditioning approach
+
+Vandereycken, B. Low-rank matrix completion by Rieman-
+nian optimization. SIAM J. Optim., 23(2):1214–1236,
+2013.
+
+Wen, Z., Yin, W., and Zhang, Y. Solving a low-rank fac-
+torization model for matrix completion by a nonlinear
+successive over-relaxation. Math Program. Comput., 4
+(4):333–361, 2012.
+
+

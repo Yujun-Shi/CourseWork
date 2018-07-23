@@ -1,0 +1,1807 @@
+Fast Algorithms for Segmented Regression
+
+Jayadev Acharya
+Massachusetts Institute of Technology, Cambridge, MA 02139, USA
+Ilias Diakonikolas
+University of Southern California, Los Angeles, MA 90089, USA
+Jerry Li
+Ludwig Schmidt∗
+Massachusetts Institute of Technology, Cambridge, MA 02139, USA
+
+JAYADEV@MIT.EDU
+
+DIAKONIK@USC.EDU
+
+JERRYZLI@MIT.EDU
+LUDWIGS@MIT.EDU
+
+Abstract
+
+We study the ﬁxed design segmented regression
+problem: Given noisy samples from a piecewise
+linear function f, we want to recover f up to a
+desired accuracy in mean-squared error.
+Previous rigorous approaches for this problem
+rely on dynamic programming (DP) and, while
+sample efﬁcient, have running time quadratic
+in the sample size. As our main contribution,
+we provide new sample near-linear time algo-
+rithms for the problem that – while not being
+minimax optimal – achieve a signiﬁcantly better
+sample-time tradeoff on large datasets compared
+to the DP approach. Our experimental evalua-
+tion shows that, compared with the DP approach,
+our algorithms provide a convergence rate that is
+only off by a factor of 2 to 4, while achieving
+speedups of three orders of magnitude.
+
+1. Introduction
+We study the regression problem – a fundamental inference
+task with numerous applications that has received tremen-
+dous attention in machine learning and statistics during the
+past ﬁfty years (see, e.g., (Mosteller & Tukey, 1977) for a
+classical textbook). Roughly speaking, in a (ﬁxed design)
+regression problem, we are given a set of n observations
+(xi, yi), where the yi’s are the dependent variables and the
+xi’s are the independent variables, and our goal is to model
+the relationship between them. The typical assumptions
+are that (i) there exists a simple function f that (approxi-
+mately) models the underlying relation, and (ii) the depen-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+dent observations are corrupted by random noise. More
+speciﬁcally, we assume that there exists a family of func-
+tions F such that for some f ∈ F the following holds:
+yi = f (xi) + i, where the i’s are i.i.d. random variables
+drawn from a “tame” distribution such as a Gaussian (later,
+we also consider model misspeciﬁcation).
+Throughout this paper, we consider the classical notion of
+Mean Squared Error (MSE) to measure the performance
+(risk) of an estimator. As expected, the minimax risk de-
+pends on the family F that f comes from. The natural
+case that f is linear is fully understood: It is well-known
+that the least-squares estimator is statistically efﬁcient and
+runs in sample-linear time. The more general case that f is
+non-linear, but satisﬁes some well-deﬁned structural con-
+straint has been extensively studied in a variety of contexts
+(see, e.g.,
+(Gallant & A., 1973; Feder, 1975; Friedman,
+1991; Bai & Perron, 1998; Yamamoto & Perron, 2013;
+Kyng et al., 2015; Avron et al., 2013; Meyer, 2008; Chat-
+terjee et al., 2015)). In contrast to the linear case, this more
+general setting is not well-understood from an information-
+theoretic and/or computational aspect.
+In this paper, we focus on the case that the function f is
+promised to be piecewise linear with a given number k of
+unknown pieces (segments). This is known as ﬁxed de-
+sign segmented regression, and has received considerable
+attention in the statistics community (Gallant & A., 1973;
+Feder, 1975; Bai & Perron, 1998; Yamamoto & Perron,
+2013). The special case of piecewise polynomial functions
+(splines) has been extensively used in the context of in-
+ference, including density estimation and regression, see,
+e.g., (Wegman & Wright, 1983; Friedman, 1991; Stone,
+1994; Stone et al., 1997; Meyer, 2008).
+Information-theoretic aspects of the segmented regression
+problem are well-understood: Roughly speaking, the min-
+
+∗Authors ordered alphabetically.
+
+Fast Algorithms for Segmented Regression
+
+imax risk is inversely proportional to the number of sam-
+ples. In contrast, the computational complexity of the prob-
+lem is poorly understood: Prior to our work, known al-
+gorithms for this problem with provable guarantees were
+quite slow. Our main contribution is a set of new provably
+fast algorithms that outperform previous approaches both
+in theory and in practice. Our algorithms run in time that is
+nearly-linear in the number of data points n and the number
+of intervals k. Their computational efﬁciency is established
+both theoretically and experimentally. We also emphasize
+that our algorithms are robust to model misspeciﬁcation,
+i.e., they perform well even if the function f is only ap-
+proximately piecewise linear.
+Note that if the segments of f were known a priori, the seg-
+mented regression problem could be immediately reduced
+to k independent linear regression problems. Roughly
+speaking, in the general case (where the location of the seg-
+ment boundaries is unknown) one needs to “discover” the
+right segments using information provided by the samples.
+To address this algorithmic problem, previous works (Bai
+& Perron, 1998; Yamamoto & Perron, 2013) relied on dy-
+namic programming that, while being statistically efﬁcient,
+is computationally quite slow:
+its running time scales at
+least quadratically with the size n of the data, hence it is
+rather impractical for large datasets.
+Our main motivation comes from the availability of large
+datasets that has made computational efﬁciency the main
+bottleneck in many cases. In the words of (Jordan, 2013):
+“As data grows, it may be beneﬁcial to consider faster infer-
+ential algorithms, because the increasing statistical strength
+of the data can compensate for the poor algorithmic qual-
+ity.” Hence, it is sometimes advantageous to sacriﬁce sta-
+tistical efﬁciency in order to achieve faster running times
+because we can then achieve the desired error guarantee
+faster (provided more samples). In our context, instead of
+using a slow dynamic program, we employ a subtle itera-
+tive greedy approach that runs in sample-linear time.
+Our
+iterative greedy approach builds on the work
+of (Acharya et al., 2015a;b), but the details of our algo-
+rithms here and their analysis are substantially different. In
+particular, as we explain in the body of the paper, the nat-
+ural adaptation of their analysis to our setting fails to pro-
+vide any meaningful statistical guarantees. To obtain our
+results, we introduce novel algorithmic ideas and carefully
+combine them with additional probabilistic arguments.
+
+2. Preliminaries
+In this paper, we study the problem of ﬁxed design seg-
+mented regression. We are given samples xi ∈ Rd for
+i ∈ [n] ( = {1, . . . , n}), and we consider the following
+
+classical regression model:
+
+yi = f (xi) + i .
+
+(1)
+Here, the i are i.i.d. sub-Gaussian noise variables with
+variance proxy σ2, mean E[i] = 0, and variance s2 =
+E[2
+i ] for all i. We will let  = (1, . . . , n) denote the vec-
+tor of noise variables. We also assume that f : Rd → R is
+a k-piecewise linear function. Formally, this means:
+Deﬁnition 1. The function f : Rd → R is a k-piecewise
+linear function if there exists a partition of the real line into
+k disjoint intervals I1, . . . , Ik, k corresponding parameters
+θ1, . . . , θk ∈ Rd, and a ﬁxed, known j such that for all
+x = (x1, . . . , xd) ∈ Rd we have that f (x) = (cid:104)θi, x(cid:105) if
+xj ∈ Ii. Let Lk,j denote the space of k-piecewise linear
+functions with partition deﬁned on coordinate j.
+Moreover, we say f is ﬂat on an interval I ⊆ R if I ⊆ Ii
+for some i = 1, . . . , k, otherwise, we say that f has a jump
+on the interval I.
+
+In the full paper, we also discuss the agnostic setting where
+the ground truth f is not piecewise linear itself but only
+well-approximated by a k-piecewise linear function. For
+simplicity of exposition, we assume that the partition coor-
+dinate j is 1 in the rest of the paper. We remark that this
+model also contains the problem of (ﬁxed design) piece-
+wise polynomial regression as an important subcase (see
+the full paper for details).
+Following this generative model, a regression algorithm re-
+ceives the n pairs (xi, yi) as input. The goal of the algo-
+
+rithm is then to produce an estimate (cid:98)f that is close to the
+distance between our estimate (cid:98)f and the unknown function
+
+true, unknown f with high probability over the noise terms
+i and any randomness in the algorithm. We measure the
+
+f with the classical mean-squared error:
+
+MSE((cid:98)f ) =
+
+n(cid:88)
+
+i=1
+
+1
+n
+
+(f (xi) − (cid:98)f (xi))2 .
+
+Throughout this paper, we let X ∈ Rn×d be the data ma-
+trix, i.e., the matrix whose j-th row is xT
+j for every j, and
+we let r denote the rank of X.
+The following notation will also be useful. For any func-
+tion f : Rd → R, we let f ∈ Rn denote the vector with
+components fi = f (xi) for i ∈ [n]. For any interval I, we
+let X I denote the data matrix consisting of all data points
+xi for i ∈ I, and for any vector v ∈ Rn, we let vI ∈ R|I|
+be the vector of vi for i ∈ I.
+
+2.1. Our Contributions
+
+Our main contributions are new, fast algorithms for the
+aforementioned segmented regression problem. We now
+informally state our main results and refer to later sections
+
+Fast Algorithms for Segmented Regression
+
+for more precise theorems.
+Theorem 2 (informal statement of Theorems 13 and 14).
+There is an algorithm GREEDYMERGE, which, given X
+(of rank r), y, a target number of pieces k, and the variance
+of the noise s2, runs in time O(nd2 log n) and outputs an
+
+O(k)-piecewise linear function (cid:98)f so that with probability
+
+at least 0.99, we have
+
+MSE((cid:98)f ) ≤ O
+
+(cid:32)
+
+σ2 kr
+n
+
+(cid:114)
+
+k
+n
+
++ σ
+
+log n
+
+.
+
+(cid:33)
+
+That is, our algorithm runs in time which is nearly linear
+in n and still achieves a reasonable rate of convergence.
+While this rate is asymptotically slower than the rate of the
+dynamic programming estimator, our algorithm is signiﬁ-
+cantly faster than the DP so that in order to achieve a com-
+parable MSE, our algorithm takes less total time given ac-
+cess to a sufﬁcient number of samples. For more details on
+this comparision and an experimental evaluation, see Sec-
+tions 2.2 and 4.
+At a high level, our algorithm ﬁrst forms a ﬁne partition of
+[n] and then iteratively merges pieces of this partitions until
+only O(k) pieces are left. In each iteration, the algorithm
+reduces the number of pieces in the following manner: we
+group consecutive intervals into pairs which we call “can-
+didates”. For each candidate interval, the algorithm com-
+putes an error term that is the error of a least squares ﬁt
+combined with a regularizer depending on the variance of
+the noise s2. The algorithm then ﬁnds the O(k) candidates
+with the largest errors. We do not merge these candidates,
+but do merge all other candidate intervals. We repeat this
+process until only O(k) pieces are left.
+A drawback of this algorithm is that we need to know the
+variance of the noise s2, or at least have a good estimate. In
+practice, we might be able to obtain such an estimate, but
+ideally our algorithm would work without knowing s2. By
+extending our algorithm, we obtain the following result:
+Theorem 3 (informal). There is an algorithm BUCKET-
+GREEDYMERGE, which, given X (of rank r), y, and a
+target number of pieces k, runs in time O(nd2 log n) and
+
+outputs an O(k log n)-piecewise linear function (cid:98)f so that
+
+with probability at least 0.99, we have
+
+(cid:32)
+
+MSE((cid:98)f ) ≤ O
+
+(cid:33)
+
+(cid:114)
+
+k
+n
+
+σ2 kr log n
+
++ σ
+
+n
+
+log n
+
+.
+
+At a high level, there are two fundamental changes to the
+algorithm: ﬁrst, instead of merging with respect to the sum
+squared error of the least squares ﬁt regularized by a term
+depending on s2, we instead merge with respect to the av-
+erage error the least squares ﬁt incurs within the current
+interval. The second change is more substantial: instead
+of ﬁnding the O(k) candidates with largest error and merg-
+
+ing the rest, we now split the candidates into log n buck-
+ets based on the lengths of the candidate intervals. In this
+scheme, bucket α contains all candidates with length be-
+tween 2α and 2α+1, for α = 0, . . . , log n− 1. Then we ﬁnd
+the k + 1 candidates with largest error within each bucket
+and merge the remaining candidate intervals. We continue
+this process until we are left with O(k log n) buckets.
+A potential disadvantage of our algorithms above is that
+they produce O(k) or O(k log n) pieces, respectively. In
+order to address this issue, we also provide a postprocess-
+ing algorithm that converts the output of any of our algo-
+rithms and decreases the number of pieces down to 2k + 1
+while preserving the statistical guarantees above. The guar-
+antee of this postprocessing algorithm is as follows.
+Theorem 4 (informal). There is an algorithm POST-
+PROCESSING that
+the output of ei-
+ther GREEDYMERGE or BUCKETGREEDYMERGE to-
+gether with a target number of pieces k, runs in time
+
+O(cid:0)k3d2 log n(cid:1), and outputs a (2k + 1)-piecewise linear
+function (cid:98)f p so that with probability at least 0.99, we have
+
+takes as input
+
+(cid:114)
+
+(cid:33)
+
+(cid:32)
+
+MSE((cid:98)f p) ≤ O
+
+σ2 kr
+n
+
++ σ
+
+k
+n
+
+log n
+
+.
+
+Qualitatively, an important aspect this algorithm is that its
+running time depends only logarithmically on n. In prac-
+tice, we expect k to be much smaller than n, and hence
+the running time of this postprocessing step will usually be
+dominated by the running time of the piecewise linear ﬁt-
+ting algorithm run before it.
+In this document, we only give the formal pseudo code and
+proofs for GREEDYMERGE. We refer the reader to the full
+version for more details.
+
+2.2. Comparison to prior work
+
+Dynamic programming. Previous work on segmented
+regression with statistical guarantees (Bai & Perron, 1998;
+Yamamoto & Perron, 2013) relies heavily on dynamic
+programming-style algorithms to ﬁnd the k-piecewise lin-
+ear least-squares estimator. Somewhat surprisingly, we are
+not aware of any work which explicitly gives the best pos-
+sible running time and statistical guarantee for this algo-
+rithm. For completeness, we prove the following result
+(Theorem 5), which we believe to be folklore. The tech-
+niques used in its proof will also be useful for us later.
+Theorem 5 (informal). The exact dynamic program runs
+in time O(n2(d2 + k)) and outputs an k-piecewise linear
+
+estimator (cid:98)f so that with probability at least 0.99 we have
+MSE((cid:98)f ) ≤ O(cid:0)σ2 kr
+
+(cid:1).
+
+n
+
+We now compare our guarantees with those of the DP.
+The main advantage of our approaches is computational
+
+Fast Algorithms for Segmented Regression
+
+efﬁciency – our algorithm runs in linear time, while the
+running time of the DP has a quadratic dependence on n.
+While our statistical rate of convergence is slower, we are
+able to achieve the same MSE as the DP in asymptotically
+less time if enough samples are available.
+For instance, suppose we wish to obtain a MSE of η with
+a k-piecewise linear function, and suppose for simplicity
+that d = O(1) so that r = O(1) as well. Then Theorem
+5 tells us that the DP requires n = k/η samples and runs
+in time O(k3/η2). On the other hand, Theorem 2 tells us
+
+that GREEDYMERGING requires n = (cid:101)O(k/η2) samples
+and thus runs in time (cid:101)O(k/η2). For non-trivial values of k,
+
+this is a signiﬁcant improvement in time complexity.
+This gap also manifests itself strongly in our experiments
+(see Section 4). When given the same number of samples,
+our MSE is a factor of 2-4 times worse than that achieved
+by the DP, but our algorithm is about 1, 000 times faster
+already for 104 data points. When more samples are avail-
+able for our algorithm, it achieves the same MSE as the DP
+about 100 times faster.
+
+Histogram Approximation Our results build upon
+the techniques of (Acharya et al., 2015a), who consider the
+problem of histogram approximation. Indeed, without too
+much work it is possible to convert their algorithm to our
+regression setting, but the resulting guarantee is not sta-
+tistically meaningful (see the full version for a more de-
+tailed discussion). To overcome this difﬁculty, we propose
+a merging algorithm based on a new merging error mea-
+sure. Utilizing more sophisticated proof techniques than in
+(Acharya et al., 2015a), we show that our new algorithm
+has good statistical guarantees in the regression setting.
+
+2.3. Mathematical Preliminaries
+
+Tail bounds We will require the following tail bound
+on deviations of squares of sub-Gaussian random variables.
+We defer the proof to the supplementary material.
+Corollary 6. Fix δ > 0 and let 1, . . . , n be as in (1).
+i ]. Then, with probability 1−δ, we have
+Recall that s = E[2
+that simultaneously for all intervals I ⊆ [n] the following
+inequality holds:
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) ≤ O(σ2 · log(n/δ))(cid:112)|I| .
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)(cid:88)
+
+i∈I
+
+i − s2|I|
+2
+
+(2)
+
+Linear regression. Our analysis builds on the classical
+results for ﬁxed design linear regression. In linear regres-
+sion, the generative model is exactly of the form described
+in (1), except that f is restricted to be a 1-piecewise linear
+function (as opposed to a k-piecewise linear function), i.e.,
+f (x) = (cid:104)θ∗, x(cid:105) for some unknown θ∗.
+
+I
+
+which minimizes(cid:80)n
+
+The problem of linear regression is very well understood,
+and the asymptotically best estimator is known to be the
+least-squares estimator.
+Deﬁnition 7. Given x1, . . . , xn and y1, . . . , yn, the least
+squares estimator f LS is deﬁned to be the linear function
+i=1(yi − f (xi))2 over all linear func-
+tions f. For any interval I, we let f LS
+denote the least
+squares estimator for the data points restricted to I, i.e. for
+the data pairs {(xi, yi)}i∈I. We also let LEASTSQUARES
+(X, y, I) denote an algorithm which solves linear least
+squares for these data points, i.e., which outputs the coefﬁ-
+cients of the linear least squares ﬁt for these points.
+Following our previous deﬁnitions, we let f LS ∈ Rn de-
+note the vector whose i-th coordinate is f LS(xi), and sim-
+I ∈ R|I| denote the vector
+ilarly for any I ⊆ [n] we let f LS
+whose i-th coordinate for i ∈ I is f LS
+I (xi). The following
+error rate is known for the least-squares estimator:
+Fact 8. Let x1, . . . , xn and y1, . . . , yn be generated as
+in (1), where f is a linear function. Let f LS(x) be the least
+squares estimator. Then,
+
+E(cid:2)MSE(f LS)(cid:3) = O
+
+(cid:16)
+
+σ2 r
+n
+Moreover, with probability 1 − δ, we have
+σ2 r + log 1/δ
+
+MSE(f LS) = O
+
+(cid:18)
+
+.
+
+(cid:19)
+
+.
+
+(cid:17)
+
+n
+
+Fact 8 can be proved with the following lemma, which we
+also use in our analysis. The lemma bounds the correlation
+of a random vector with any ﬁxed r-dimensional subspace:
+
+Lemma 9 (c.f. proof of Theorem 2.2 in (Rigollet, 2015)).
+Fix δ > 0. Let 1, . . . , n be i.i.d. sub-Gaussian random
+variables with variance proxy σ2. Let  = (1, . . . , n),
+and let S be a ﬁxed r-dimensional afﬁne subspace of Rn.
+Then, with probability 1 − δ, we have
+
+(cid:16)
+
+(cid:17)
+σ(cid:112)r + log(1/δ)
+
+.
+
+|vT |
+(cid:107)v(cid:107) ≤ O
+
+sup
+
+v∈S\{0}
+
+This lemma also yields the two following consequences.
+The ﬁrst corollary bounds the correlation between sub-
+Gaussian random noise and any linear function on any in-
+terval (see the full paper for proofs):
+Corollary 10. Fix δ > 0 and v ∈ Rn. Let  = (1, . . . , n)
+be as in Lemma 9. Then with probability at least 1 − δ, we
+have that for all intervals I, and for all non-zero linear
+functions f : Rd → R,
+|(cid:104)I , fI + vI(cid:105)|
+
+(cid:107)fI + vI(cid:107) ≤ O(σ(cid:112)r + log(n/δ)) .
+
+Corollary 11. Fix δ > 0 and v ∈ Rn. Let  be as in
+
+Fast Algorithms for Segmented Regression
+
+Lemma 9. Then with probability at least 1 − δ, we have
+
+into two sets:
+
+|(cid:104), fI + vI(cid:105)|
+(cid:107)fI + vI(cid:107) ≤ O
+
+sup
+f∈Lk
+
+σ
+
+kr + k log
+
+.
+
+F = {I ∈ I : f is ﬂat on I} ,
+J = {I ∈ I : f has a jump on I} .
+
+(cid:18)
+
+(cid:114)
+
+(cid:19)
+
+n
+δ
+
+These bounds also imply the following statement, which
+we will need later. We defer the proof to the supplementary
+material.
+Lemma 12. Fix δ > 0. Then with probability 1−δ we have
+the following: for all disjoint sets of k intervals I1, . . . , Ik
+of [n] so that f is ﬂat on each I(cid:96), the following inequality
+holds:
+
+(cid:107)f LS
+
+I(cid:96)
+
+− fI(cid:96)(cid:107)2 ≤ O(σ2 k(r + log(n/δ))) .
+
+k(cid:88)
+
+(cid:96)=1
+
+3. A greedy merging algorithm
+In this section, we formally state our new algorithm for seg-
+mented regression and analyze its statistical and computa-
+tional efﬁciency. See Algorithm 1 for the corresponding
+pseudocode. The algorithm expects two tuning parameters
+τ, γ because the algorithm does not return a k-piecewise
+linear function but instead a O(k)-piecewise linear function
+The tuning parameters allow us to trade off running time
+for fewer pieces. In typical use cases we have τ, γ = Θ(1),
+in which case our algorithm produces an O(k)-piecewise
+linear function in time O(nd2 log n) time.
+We now state the running time of GREEDYMERGING. The
+analysis is similar to the analysis presented in (Acharya
+et al., 2015a) and for space considerations is left to the sup-
+plementary material.
+Theorem 13.
+Then
+
+(cid:0)(2 + 2
+Theorem 14. Let δ > 0, and let (cid:98)f be the estimator re-
+the number of pieces in (cid:98)f. Then, with probability 1 − δ, we
+MSE((cid:98)f )
+(cid:17)(cid:33)
+(cid:32)
+
+τ )k + γ(cid:1)-piecewise
+
+be
+GREEDYMERGING(τ, γ, s, X, y)
+
+(cid:18) m(r + log(n/δ))
+
+as
+outputs
+
+above.
+a
+function and runs
+
+turned by GREEDYMERGING. Let m = (2 + 2
+
+3.1. Analysis of GREEDYMERGING
+
+in time O(nd2 log(n/γ)).
+
+Let X and
+
+τ )k + γ be
+
+(cid:16) n
+
+have that
+
+linear
+
+(cid:19)
+
+y
+
+≤ O
+
+σ2
+
+√
+k√
+τ +
+n
+
++ σ
+
+log
+
+δ
+
+.
+
+n
+
+Proof. We ﬁrst condition on the event that Corollaries 6,
+10 and 11, and Lemma 12 all hold with error parameter
+O(δ), so that together they all hold with probability at least
+1 − δ. Let I = {I1, . . . , Im} be the ﬁnal partition of [n]
+that our algorithm produces. Recall f is the ground truth
+k-piecewise linear function. We partition the intervals in I
+
+(3)
+
+We ﬁrst bound the error over the intervals in F. By Lemma
+
+(cid:107)fI − (cid:98)fI(cid:107)2 ≤ O(σ2|F|(r + log(n/δ))) ,
+
+12, we have(cid:88)
+
+I∈F
+
+with probability at least 1 − O(δ).
+We now turn our attention to the intervals in J and distin-
+guish two further cases. We let J1 be the set of intervals in
+J which were never merged, and we let J2 be the remain-
+ing intervals. If the interval I ∈ J1 was never merged, the
+interval contains one point, call it i. Because we may as-
+sume that xi (cid:54)= 0, we know that for this one point, our
+
+estimator satisﬁes (cid:98)f (xi) = yi, since this is clearly the
+(cid:88)
+
+least squares ﬁt for a linear estimator on one nonzero point.
+Hence Corollary 6 implies that the following inequality
+holds with probability at least 1 − O(δ):
+
+(cid:107)fI − (cid:98)fI(cid:107)2 =
+
+(cid:107)I(cid:107)2
+
+I∈J1
+
+I∈J1
+
+(cid:88)
+(cid:88)
+≤ σ2(cid:16)
+
+≤ σ2
+
+I∈J1
+
+
+
+|I|
+
+(cid:16)
+(cid:17)√
+
+log
+
+(cid:17)(cid:115)(cid:88)
+(cid:17)
+
+I∈J1
+
+n
+δ
+
+|I| + O
+
+(cid:16)
+
+n
+δ
+
+.
+
+m
+
+log
+
+m + O
+
+(4)
+We now ﬁnally turn our attention to the intervals in J2.
+Fix an interval I ∈ J2. By deﬁnition, the interval I
+was merged in some iteration of the algorithm. This im-
+plies that in that iteration, there were (1 + 1/τ )k intervals
+M1, . . . , M(1+1/τ )k so that for each interval M(cid:96), we have
+(5)
+Since the true, underlying k-piecewise linear function f has
+at most k jumps, this means that there are at least k/τ in-
+tervals of the M(cid:96) on which f is ﬂat. WLOG assume that
+these intervals are M1, . . . , Mk/τ .
+We have, by deﬁnition,
+
+(cid:107)yI − (cid:98)fI(cid:107)2 − s2|I| ≤ (cid:107)yM(cid:96) − f LS
+
+(cid:107)2 − s2|M(cid:96)| .
+
+M(cid:96)
+
+k/τ(cid:88)
+
+(cid:96)=1
+
++ 2
+
+(cid:13)(cid:13)yM(cid:96) − f LS
+k/τ(cid:88)
+
+M(cid:96)
+
+k/τ(cid:88)
+(cid:13)(cid:13)2 − s2|M(cid:96)| =
+(cid:13)(cid:13)fM(cid:96) − f LS
+(cid:88)
+k/τ(cid:88)
+
+(cid:96)=1
+
+M(cid:96)
+
+(cid:104)M(cid:96), fM(cid:96) − f LS
+
+M(cid:96)
+
+(cid:105) +
+
+i − s2) .
+(2
+
+(cid:13)(cid:13)2
+
+(6)
+
+(cid:96)=1
+
+(cid:96)=1
+
+i∈M(cid:96)
+
+We will upper bound each term on the RHS in turn. First,
+since the function f is ﬂat on each M(cid:96) for (cid:96) = 1, . . . , k/τ,
+Lemma 12 implies
+
+(cid:13)(cid:13)fM(cid:96) − f LS
+
+M(cid:96)
+
+(cid:13)(cid:13)2 ≤ O
+
+(cid:18)
+
+k/τ(cid:88)
+
+(cid:96)=1
+
+(cid:16)
+
+σ2 k
+τ
+
+r + log
+
+n
+δ
+
+,
+
+(7)
+
+(cid:17)(cid:19)
+
+Fast Algorithms for Segmented Regression
+
+Algorithm 1 Piecewise linear regression by greedy merging.
+1: GREEDYMERGING(τ, γ, s, X, y)
+2: I 0 ← {{1},{2}, . . . ,{n}}
+3: while |I j| > (2 + 2
+4:
+
+{Initial partition of [n] into intervals of length 1.}
+{Iterative greedy merging (we start with j ← 0).}
+
+τ )k + γ do
+
+Let sj be the current number of intervals. {Compute the least squares ﬁt and its error for merging neighboring pairs
+of intervals.}
+for u ∈ {1, 2, . . . , sj
+
+2 } do
+θu ← LEASTSQUARES(X, y, I2u−1 ∪ I2u)
+eu = (cid:107)yI − X I θu(cid:107)2
+
+2 − s2|I2u−1 ∪ I2u|
+
+end for
+τ )k largest errors eu, breaking ties arbitrarily.
+Let L be the set of indices u with the (1 + 1
+Let M be the set of the remaining indices. {Keep the intervals with large merging errors.}
+
+{I2u−1, I2u} {Merge the remaining intervals.}
+
+I j+1 ← (cid:83)
+
+u∈L
+
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+
+I j+1 ← I j+1 ∪ {I2u−1 ∪ I2u | u ∈ M}
+j ← j + 1
+
+12:
+13:
+14: end while
+15: return the least squares ﬁt to the data on every interval in I j
+
+with probability at least 1 − O(δ).
+is a linear function
+Moreover, note that the function f LS
+M(cid:96)
+(x) = xT ˆβ, where ˆβ ∈ Rd is the
+on M(cid:96) of the form f LS
+M(cid:96)
+least-squares ﬁt on M(cid:96). Because f is just a ﬁxed vector, the
+vector fM(cid:96) − f LS
+lives in the afﬁne subspace of vectors of
+the form fM(cid:96) + (XM(cid:96) )η where η ∈ Rd is arbitrary. So
+Corollary 11 and (7) imply that
+
+M(cid:96)
+
+(cid:96)=1
+
+k/τ(cid:88)
+(cid:118)(cid:117)(cid:117)(cid:116) k/τ(cid:88)
+(cid:18)
+
+≤
+
+(cid:96)=1
+
+≤ O
+
+(cid:104)M(cid:96) , fM(cid:96) − f LS
+
+M(cid:96)
+
+(cid:105)
+
+(cid:104)M(cid:96), fM(cid:96) − f LS
+(cid:16)
+
+(cid:17)(cid:19)
+
+M(cid:96)
+
+n
+δ
+
+σ2 k
+τ
+
+(cid:105) · sup
+
+η
+
+|(cid:104)M(cid:96), Xη(cid:105)|
+
+(cid:107)Xη(cid:107)
+
+r + log
+with probability 1 − O(δ).
+By Corollary 6, we get that with probability 1 − O(δ),
+
+.
+
+(8)
+
+(cid:96)=1
+
+i∈M(cid:96)
+
+(cid:32)(cid:88)
+k/τ(cid:88)
+(cid:16)(cid:13)(cid:13)yM(cid:96) − f LS
+k/τ(cid:88)
+(cid:18) k
+σ2(cid:16)
+
+≤ O
+
+i=1
+
+M(cid:96)
+
+(cid:33)
+i − s2|M(cid:96)|
+2
+
+≤ O
+
+(cid:16)
+(cid:13)(cid:13)2 − s2|M(cid:96)|(cid:17)
+(cid:17)(cid:19)
+(cid:16)
+
+Putting it all together, we get that
+
+n
+δ
+
+(cid:17)√
+
+n .
+
+σ log
+
+n
+δ
+
+(cid:17)√
+
+n
+δ
+
+τ
+
+r + log
+
+(9)
+with probability 1− O(δ). Since the LHS of (5) is bounded
+by each individual summand above, this implies that the
+
+σ log
+
++ O
+
+n
+
+LHS is also bounded by their average, which implies that
+
+(cid:107)yI − (cid:98)fI(cid:107)2 − s2|I|
+(cid:16)(cid:107)yM(cid:96) − f LS
+(cid:107)2 − s2|M(cid:96)|(cid:17)
+k/τ(cid:88)
+(cid:16)
+(cid:17)(cid:17)(cid:17)
+(cid:16) n
+σ2(cid:16)
+(cid:16)
+
+≤ τ
+k
+≤ O
+n
+δ
+We now similarly expand out the LHS of (5):
+
+r + log
+
+σ log
+
++ O
+
+i=1
+
+M(cid:96)
+
+δ
+
+(cid:17) τ
+
+√
+
+n
+
+k
+
+. (10)
+
+Hence, we lower bound the second and third terms of (11).
+The calculations here closely mirror those above.
+By Corollary 10, we have that
+
+(cid:107)yI − (cid:98)fI(cid:107)2 − s2|I|
+= (cid:107)fI + I − (cid:98)fI(cid:107)2 − s2|I|
+= (cid:107)fI − (cid:98)fI(cid:107)2 + 2(cid:104)I , fI − (cid:98)fI(cid:105) + (cid:107)I(cid:107)2 − s2|I| . (11)
+Next, we aim to upper bound (cid:80)
+i∈I (f (xi) − (cid:98)f (xi))2.
+(cid:17)(cid:19)
+(cid:16) n
+(cid:107)fI − (cid:98)fI(cid:107) ,
+(cid:17)(cid:112)|I| ,
+(cid:17)(cid:19)
+
+2(cid:104)I , fI − (cid:98)fI(cid:105) ≥ −O
+
+(cid:107)yI − (cid:98)fI(cid:107)2 − s2|I|
+≥ (cid:107)fI − (cid:98)fI(cid:107)2 − O
+
+(cid:107)I(cid:107)2 − s2|I| ≥ −O
+
+(cid:107)fI − (cid:98)fI(cid:107)
+
+and by Corollary 6 we have
+
+(cid:16) n
+
+(cid:114)
+
+and so
+
+r + log
+
+r + log
+
+(cid:18)
+
+(cid:16)
+
+σ log
+
+n
+δ
+
+σ
+
+δ
+
+δ
+
+(cid:114)
+(cid:18)
+(cid:17)(cid:112)|I| .
+
+σ
+
+(cid:16)
+
+− O
+
+σ log
+
+n
+δ
+
+(12)
+
+Fast Algorithms for Segmented Regression
+
+Putting (10) and (12) together yields that with probability
+1 − O(δ),
+
+(cid:107)fI − (cid:98)fI(cid:107)2 ≤ O
+
+(cid:16)
+
+σ2(cid:16)
+(cid:114)
+(cid:18)
+(cid:16)
+
+σ
+
+δ
+
+(cid:16) n
+(cid:17)(cid:17)(cid:17)
+(cid:17)(cid:19)
+(cid:16) n
+(cid:107)fI − (cid:98)fI(cid:107)
+(cid:17)(cid:18) τ
+(cid:19)
++(cid:112)|I|
+
+δ
+√
+n
+
+.
+
+r + log
+
++ O
+
+r + log
+
++ O
+
+σ log
+
+n
+δ
+
+k
+
+z2 ≤ bz + c where b, c ≥ 0. In this case, we have that
+
+Letting z2 = (cid:107)(cid:98)fI − fI(cid:107)2, then this inequality is of the form
+(cid:19)
++(cid:112)|I|
+
+(cid:19)
+(cid:17)(cid:17)(cid:17)
+(cid:16) n
+
+(cid:114)
+(cid:18)
+σ2(cid:16)
+(cid:16)
+
+(cid:17)(cid:18) τ
+
+r + log
+
+r + log
+
+, and
+
+c = O
+
+b = O
+
+(cid:16)
+
+σ log
+
++ O
+
+√
+
+n
+δ
+
+n
+
+σ
+
+n
+δ
+
+k
+
+δ
+
+We now prove the following lemma about the behavior of
+such quadratic inequalities:
+
+Lemma 15. Suppose z2 ≤ bz + c where b, c ≥ 0. Then
+z2 ≤ O(b2 + c).
+
+Proof. From the quadratic formula, the inequality implies
+√
+that z ≤ b+
+. From this, it is straightforward to
+demonstrate the desired claim.
+
+b2+4c
+2
+
+Hence the total error over all intervals in J2 can be bounded
+
+Thus, from the lemma, we have
+
+(cid:16)
+σ2(cid:16)
+(cid:107)fI − (cid:98)fI(cid:107)2 ≤ O
+(cid:17)(cid:18) τ
+
+(cid:16)
+
++ O
+
+σ log
+
+n
+δ
+
+by: (cid:88)
+
+I∈J2
+
+(cid:16)
+
+(cid:107)fI − (cid:98)fI(cid:107)2 ≤ O
+(cid:17)(cid:32)
+(cid:16)
+kσ2(cid:16)
+(cid:16) n
+(cid:17)(cid:16)
+(cid:16)
+
+r + log
+
+(cid:16)
+
+σ log
+
+n
+δ
+
+τ
+
+√
+
++ O
+
+≤ O
+
+.
+
+δ
+
+k
+
+n
+
+r + log
+√
+
+(cid:16) n
+(cid:17)(cid:17)(cid:17)
+(cid:19)
++(cid:112)|I|
+kσ2(cid:16)
+(cid:88)
+(cid:17)(cid:17)(cid:17)
+
+(cid:16) n
+(cid:33)
+(cid:112)|I|
+(cid:17)
+
+r + log
+
+I∈J
+
+n +
+
+√
+
+δ
+
+δ(cid:48)
+√
+n +
+
+(cid:17)(cid:17)(cid:17)
+
+n
+δ
+
+.
+
+τ
+
+kn
+
++ O
+
+σ log
+
+(13)
+In the last line we use that the intervals I ∈ J2 are disjoint
+(and hence their cardinalities sum up to at most n), and that
+there are at most k intervals in J2 because the function f
+is k-piecewise linear. Finally, applying a union bound and
+summing (3), (4), and (13) yields the desired conclusion.
+
+4. Experiments
+In addition to our theoretical analysis above, we also study
+the empirical performance of our new estimator for seg-
+mented regression on both real and synthetic data. As base-
+line, we compare our estimator (GREEDYMERGING) to
+the dynamic programming approach. Since our algorithm
+combines both combinatorial and linear-algebraic opera-
+tions, we use the Julia programming language1 (version
+0.4.2) for our experiments because Julia achieves perfor-
+mance close to C on both types of operations. All experi-
+ments were conducted on a laptop computer with a 2.8 GHz
+Intel Core i7 CPU and 16 GB of RAM.
+
+n +(cid:112)k/n log n) for
+
+Synthetic data. Experiments with synthetic data allow
+us to study the statistical and computational performance of
+our estimator as a function of the problem size n. Our the-
+oretical bounds indicate that the worst-case performance of
+the merging algorithm scales as O( kd
+constant error variance. Compared to the O( kd
+n ) rate of
+the dynamic program, this indicates that the relative per-
+formance of our algorithm can depend on the number of
+features d. Hence we use two types of synthetic data: a
+piecewise-constant function f (effectively d = 1) and a
+piecewise linear function f with d = 10 features.
+We generate the piecewise constant function f by randomly
+choosing k = 10 integers from the set {1, . . . , 10} as func-
+tion value in each of the k segments.2 Then we draw n/k
+samples from each segment by adding an i.i.d. Gaussian
+noise term with variance 1 to each sample.
+For the piecewise linear case, we generate a n × d data
+matrix X with i.i.d. Gaussian entries (d = 10). In each
+segment I, we choose the parameter values βI indepen-
+dently and uniformly at random from the interval [−1, 1].
+So the true function values in this segment are given by
+fI = XI βI. As before, we then add an i.i.d. Gaussian
+noise term with variance 1 to each function value.
+Figure 1 shows the results of the merging algorithm and the
+exact dynamic program for sample size n ranging from 102
+to 104. Since the merging algorithm can produce a variable
+number of output segments, we run the merging algorithm
+with three different parameter settings corresponding to k,
+2k, and 4k output segments, respectively. As predicted by
+our theory, the plots show that the exact dynamic program
+has a better statistical performance. However, the MSE of
+the merging algorithm with 2k pieces is only worse by a
+factor of 2 to 4, and this ratio empirically increases only
+slowly with n (if at all). The experiments also show that
+
+1http://julialang.org/
+2We also repeated the experiment for other values of k. Since
+the results are not qualitatively different, we only report the k =
+10 case here.
+
+Fast Algorithms for Segmented Regression
+
+Piecewise constant
+
+100
+
+E
+S
+M
+
+10−1
+
+10−2
+
+10
+
+o
+i
+t
+a
+r
+E
+S
+M
+
+e
+v
+i
+t
+a
+l
+e
+R
+
+8
+
+6
+
+4
+
+2
+
+)
+s
+(
+
+e
+m
+
+i
+t
+
+g
+n
+i
+n
+n
+u
+R
+
+100
+
+10−2
+
+10−4
+
+103
+
+102
+
+101
+
+p
+u
+-
+d
+e
+e
+p
+S
+
+102
+
+103
+n
+
+104
+
+102
+
+103
+n
+
+104
+
+102
+
+Piecewise linear
+
+103
+n
+
+104
+
+102
+
+103
+n
+
+104
+
+100
+
+10−1
+
+E
+S
+M
+
+10−2
+
+10
+
+o
+i
+t
+a
+r
+E
+S
+M
+
+e
+v
+i
+t
+a
+l
+e
+R
+
+8
+
+6
+
+4
+
+2
+
+)
+s
+(
+
+e
+m
+
+i
+t
+
+g
+n
+i
+n
+n
+u
+R
+
+102
+
+100
+
+10−2
+
+10−4
+
+103
+
+p
+u
+-
+d
+e
+e
+p
+S
+
+102
+
+102
+
+103
+n
+
+104
+
+102
+
+103
+n
+
+104
+
+Merging k
+
+Merging 2k
+
+102
+
+103
+n
+Merging 4k
+
+104
+
+102
+
+103
+n
+
+104
+
+Exact DP
+
+Figure 1. Experiments with synthetic data: results for piecewise constant models with k = 10 segments (top row) and piecewise linear
+models with k = 5 segments (bottom row, dimension d = 10). Compared to the exact dynamic program, the MSE achieved by the
+merging algorithm is worse but stays within a factor of 2 to 4 for a sufﬁcient number of output segments. The merging algorithm is
+signiﬁcantly faster and achieves a speed-up of about 103× compared to the dynamic program for n = 104. This leads to a signiﬁcantly
+better trade-off between statistical and computational performance (see also Figure 2).
+
+Piecewise constant
+
+Piecewise linear
+
+100
+
+E
+S
+M
+
+10−2
+
+100
+
+E
+S
+M
+
+10−2
+
+10−4
+
+10−4
+
+10−2
+Time (s)
+
+100
+
+10−4
+
+10−4
+
+10−1
+Time (s)
+
+102
+
+Figure 2. Computational vs. statistical efﬁciency in the synthetic
+data experiments. The solid lines correspond to the data in Fig-
+ure 1, the dashed lines show the results from additional runs of
+the merging algorithms for larger values of n. The merging al-
+gorithm achieves the same MSE as the dynamic program about
+100× faster if a sufﬁcient number of samples is available.
+
+Dow Jones data
+
+Piecewise linear approximation
+
+Figure 3. Results of ﬁtting a 5-piecewise linear function (d = 2)
+to a Dow Jones time series. The merging algorithm produces a
+ﬁt that is comparable to the dynamic program and is about 200×
+faster (0.013 vs. 3.2 seconds).
+
+forcing the merging algorithm to return at most k pieces
+can lead to a signiﬁcantly worse MSE.
+In terms of computational performance, the merging algo-
+rithm has a signiﬁcantly faster running time, with speed-
+ups of more than 1, 000× for n = 104 samples. As can be
+seen in Figure 2, this combination of statistical and com-
+putational performance leads to a signiﬁcantly improved
+trade-off between the two quantities. When we have a sufﬁ-
+cient number of samples, the merging algorithm achieves a
+given MSE roughly 100× faster than the dynamic program.
+
+Real data. We also investigate whether the merging
+algorithm can empirically be used to ﬁnd linear trends in a
+real dataset. We use a time series of the Dow Jones index
+as input, and ﬁt a piecewise linear function (d = 2) with 5
+segments using both the dynamic program and our merg-
+ing algorithm with k = 5 output pieces. As can be seen
+from Figure 3, the dynamic program produces a slightly
+better ﬁt for the rightmost part of the curve, but the merging
+algorithm identiﬁes roughly the same ﬁve main segments.
+As before, the merging algorithm is signiﬁcantly faster and
+achieves a 200× speed-up compared to the dynamic pro-
+gram (0.013 vs 3.2 seconds).
+
+Fast Algorithms for Segmented Regression
+
+Kyng, R., Rao, A., and Sachdeva, S. Fast, provable algo-
+rithms for isotonic regression in all lp-norms. In NIPS,
+pp. 2701–2709, 2015.
+
+Meyer, M. C. Inference using shape-restricted regression
+splines. Annals of Applied Statistics, 2(3):1013–1033,
+09 2008.
+
+Mosteller, F. and Tukey, J. W. Data analysis and regres-
+sion: a second course in statistics. Addison-Wesley,
+Reading (Mass.), Menlo Park (Calif.), London, 1977.
+
+Rigollet, P. High dimensional statistics.
+
+2015. URL
+
+http://www-math.mit.edu/~rigollet/
+PDFs/RigNotes15.pdf.
+
+Stone, C. J. The use of polynomial splines and their tensor
+products in multivariate function estimation. Annals of
+Statistics, 22(1):pp. 118–171, 1994.
+
+Stone, C. J., Hansen, M. H., Kooperberg, C., and Truong,
+Y. K. Polynomial splines and their tensor products in
+extended linear modeling: 1994 wald memorial lecture.
+Annals of Statistics, 25(4):1371–1470, 1997.
+
+Wegman, E. J. and Wright, I. W. Splines in statistics. Jour-
+nal of the American Statistical Association, 78(382):pp.
+351–365, 1983.
+
+Yamamoto, Y. and Perron, P. Estimating and testing multi-
+ple structural changes in linear models using band spec-
+tral regressions. Econometrics Journal, 16(3):400–429,
+2013.
+
+Acknowledgements
+Part of this research was conducted while Ilias Diakoniko-
+las was at the University of Edinburgh, Jerry Li was at Mi-
+crosoft Research Cambridge (UK), and Ludwig Schmidt
+was at UC Berkeley.
+Jayadev Acharya was supported by a grant from the MIT-
+Shell Energy Initiative. Ilias Diakonikolas was supported
+in part by EPSRC grant EP/L021749/1, a Marie Curie Ca-
+reer Integration Grant, and a SICSA grant. Jerry Li was
+supported by NSF grant CCF-1217921, DOE grant DE-
+SC0008923, NSF CAREER Award CCF-145326, and a
+NSF Graduate Research Fellowship. Ludwig Schmidt was
+supported by grants from the MIT-Shell Energy Initiative,
+MADALGO, and the Simons Foundation.
+
+References
+Acharya, J., Diakonikolas, I., Hegde, C., Li, J. Z., and
+Schmidt, L. Fast and near-optimal algorithms for ap-
+proximating distributions by histograms. In PODS, pp.
+249–263, 2015a.
+
+Acharya, J., Diakonikolas, I., Li, J. Zheng, and Schmidt,
+L. Sample-optimal density estimation in nearly-linear
+time. CoRR, abs/1506.00671, 2015b. URL http://
+arxiv.org/abs/1506.00671.
+
+Avron, H., Sindhwani, V., and Woodruff, D. Sketching
+In
+
+structured matrices for faster nonlinear regression.
+NIPS, pp. 2994–3002. 2013.
+
+Bai, J. and Perron, P. Estimating and testing linear models
+with multiple structural changes. Econometrica, 66(1):
+47–78, 1998.
+
+Chatterjee, S., Guntuboyina, A., and Sen, B. On risk
+bounds in isotonic and other shape restricted regression
+problems. Annals of Statistics, 43(4):1774–1800, 08
+2015.
+
+Feder, P. I. On asymptotic distribution theory in segmented
+regression problems– identiﬁed case. Annals of Statis-
+tics, 3(1):49–83, 01 1975.
+
+Friedman, J. H. Multivariate adaptive regression splines.
+
+Annals of Statistics, 19(1):1–67, 03 1991.
+
+Gallant, A. R. and A., Fuller W. Fitting segmented poly-
+nomial regression models whose join points have to be
+estimated. Journal of the American Statistical Associa-
+tion, 68(341):144–147, 1973.
+
+Jordan, M. I. On statistics, computation and scalability.
+
+Bernoulli, 19(4):1378–1390, 09 2013.
+
+

@@ -1,0 +1,1428 @@
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+Zhuoran Yang
+Zhaoran Wang
+Han Liu
+Department of Operations Research and Financial Engineering, Princeton University, Princeton, NJ 08544, USA
+
+ZY6@PRINCETON.EDU
+ZHAORAN@PRINCETON.EDU
+HANLIU@PRINCETON.EDU
+
+Yonina C. Eldar
+Department of EE Technion, Israel Institute of Technology, Haifa 32000, Israel
+
+YONINA@EE.TECHNION.AC.IL
+
+Tong Zhang
+Department of Statistics, Rutgers University, Piscataway, New Jersey 08854, USA
+
+TZHANG@STAT.RUTGERS.EDU
+
+Abstract
+
+We study parameter estimation for sparse nonlin-
+ear regression. More speciﬁcally, we assume the
+data are given by y = f (x�β∗) + �, where f
+is nonlinear. To recover β∗, we propose an �1-
+regularized least-squares estimator. Unlike classi-
+cal linear regression, the corresponding optimiza-
+tion problem is nonconvex because of the nonlin-
+earity of f. In spite of the nonconvexity, we prove
+that under mild conditions, every stationary point
+of the objective enjoys an optimal statistical rate
+of convergence. Detailed numerical results are
+provided to back up our theory.
+
+1. Introduction
+We study a family of sparse nonlinear regression models.
+Let β∗ = (β∗1 , . . . , β∗d)� ∈ Rd be the sparse parameter
+vector of interest. We consider the model
+
+y = f (x�β∗) + �,
+
+(1.1)
+where y ∈ R is a response variable, x ∈ Rd is the covariate
+and � ∈ R is the exogenous noise. When f is the iden-
+tity function, model (1.1) reduces to the well studied linear
+model. Given independent and identically distributed obser-
+vations {yi, xi}n
+i=1, our goal is to estimate β∗ even when
+d � n.
+We can view (1.1) as a perceptron with noise, which is
+the basic building block of a feed forward neural network
+(Rumelhart et al., 1986). Establishing the theoretical guaran-
+tees of the estimation in (1.1) may provide insight on more
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume 48.
+Copyright 2016 by the author(s).
+
+complicated neural networks. Our model is also inspired
+by the nonlinear sparse recovery problems (Beck & Eldar,
+2013b;a; Aksoylar & Saligrama, 2014) which aim to recover
+a sparse parameter from a nonlinear system.
+
+1.1. Main Results
+Assuming f is monotonic, a straightforward way to es-
+timate β∗ is to solve a sparse linear regression prob-
+lem (Eldar & Kutyniok, 2012) using the transformed data
+i=1. However, this approach works well only
+{f−1(yi), xi}n
+in the noiseless case with � = 0. Otherwise, it results in inac-
+curate parameter estimation and high prediction error due to
+the inverse operation. In this paper, we propose estimating
+the parameter β∗ by solving the following �1-regularized
+least-squares problem:
+
+minimize
+
+β∈Rd
+
+1
+n
+
+n�i=1�yi − f (x�i β)�2
+
++ λ�β�1,
+
+(1.2)
+
+where λ is a regularization parameter and �·�1 is the vector
+�1-norm. Unlike the linear model for which (1.2) is a con-
+vex optimization problem, in general settings (1.2) could be
+highly nonconvex due to the nonlinearity of f, which pre-
+vents us from obtaining the global optimum. The existence
+of f also prevents us from having the restricted strongly
+convex property of the loss function.
+In spite of the challenge of nonconvexity, we prove that any
+
+stationary point �β of (1.2) enjoys optimal statistical rates
+
+of convergence under suitable conditions, i.e., with high
+probability
+
+���β − β∗��2 ≤ C1 ·�s∗ log d/n and
+���β − β∗��1 ≤ C2 · s∗�log d/n,
+
+where s∗ is the number of nonzero entries of β∗ and C1,
+C2 are some absolute constants which do not depend on
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+n, d or s∗. The statistical rates of convergence cannot be
+improved even when f is the identity function. In addition,
+we require a scaling of n = O(s∗ log d) samples to obtain
+a vanishing error, which is also needed for linear sparse
+recovery problems (Eldar & Kutyniok, 2012). Next, we
+provide an efﬁcient gradient-based algorithm that provably
+converges to a stationary point. Our method is iterative and
+consist of soft-thresholding after a gradient descent step.
+This approach can be viewed as a generalization of the ISTA
+algorithm (Beck & Teboulle, 2009) to the nonlinear setting.
+
+1.2. Related Work
+The model in (1.1) is closely related to the single index
+model, which assumes (y, x) satisfy y = f (x�β∗) + � with
+an unknown f. The single index model is well studied in
+low dimensional settings where d � n. See, e.g., (Mc-
+Cullagh et al., 1989; Horowitz, 2000; H¨ardle et al., 1993;
+Ichimura, 1993; Sherman, 1994; Xia & Li, 1999; Xia et al.,
+1999; Delecroix et al., 2000; 2006) and references therein.
+They mostly consider M-estimators that simultaneously es-
+timate f and β∗. However, these M-estimators are deﬁned
+as the global optima of nonconvex minimization problems
+which are intractable to obtain. In high-dimensional settings
+where β∗ is sparse, (Alquier & Biau, 2013) establish PAC-
+Bayesian analysis for sparse single index models. (Plan
+et al., 2014; Plan & Vershynin, 2015) propose marginal re-
+gression and generalized Lasso estimators which attain fast
+statistical rates of convergence. Nevertheless, the ﬂexibility
+of the unknown link function f comes at a price. In detail,
+(Plan et al., 2014; Plan & Vershynin, 2015) require x to be
+exactly Gaussian for their methods to succeed, even if f
+is known a priori. Also, unknown f raises identiﬁability
+issues, since the magnitude of β∗ can be incorporated into
+f. As a result, these methods only estimate the direction of
+β∗.
+Another related line of work is sufﬁcient dimension reduc-
+tion, for which we aim to recover a subspace U such that
+y only depends on the projection of x onto U. Both single
+index model and our problem can be viewed as special cases
+of the framework in which U is a one-dimensional subspace.
+See (Li, 1991; 1992; Cook, 1998; Cook & Lee, 1999; Li,
+2007) and the references therein. Most works in this direc-
+tion use spectral methods, which also rely on the Gaussian
+assumption and can only estimate the direction of β∗. In
+comparison, we assume f is known. In this setting, we al-
+low x to follow more general distributions and can directly
+estimate β∗. (Kalai & Sastry, 2009; Kakade et al., 2011)
+propose iterative algorithms that alternatively estimate f
+and β∗ based on the isotonic regression in the setting with
+d � n. However, their analysis focuses on generalization
+error instead of estimation error, which is the primary goal
+in this paper.
+
+Our work is also related to problems of phase retrieval where
+the goal is to recover a signal β∗ ∈ Cd from the magnitude
+of its linear measurements contaminated by random noise.
+More speciﬁcally, the model of phase retrieval is given by
+y = |x�β|2+�. For high-dimensional settings, this problem
+is extensively studied under noisy or noiseless settings. See,
+e.g., (Jaganathan et al., 2012; Ohlsson et al., 2012; Li &
+Voroninski, 2013; Cand`es et al., 2013; Eldar & Mendelson,
+2014; Shechtman et al., 2014; 2015; Ohlsson & Eldar, 2014;
+Cand`es et al., 2015; Waldspurger et al., 2015; Eldar et al.,
+2015; Cai et al., 2015; Tu et al., 2015). These works show
+that a high dimensional signal can be accurately estimated
+up to global phase under restrictive assumptions on x, e.g.,
+x is Gaussian or certain classes of measurements. However,
+our work considers general measurements. Note that phase
+retrieval does not fall in the model under (1.1) because it
+uses a quadratic function, which is not monotonic. See §4
+for a more detailed discussion.
+
+1.3. Main Contribution
+Our contribution is twofold. First, we propose an �1-
+regularized least-squares estimator for parameter estimation.
+We prove that every stationary point of the optimization
+problem in (1.2) converges to the true parameter, which
+explains the empirical success of regularized least-squares
+in the presence of nonlinear transforms. In the noiseless
+setting, as long as the number of samples is proportional
+to s∗ log d, we are able to exactly recover β∗. To the best
+of our knowledge, this is the ﬁrst parameter estimation re-
+sult for the model (1.1) in high dimensional settings that
+does not rely on the normality of x, and recovers both the
+magnitude and direction of β∗. Our analysis for the sta-
+tionary points of nonconvex optimization problems is of
+independent interest. Second, we establish the minimax rate
+of parameter estimation for the model (1.1), which estab-
+lishes the minimax optimality of the stationary points of the
+proposed optimization problem in (1.2).
+Organization of the rest of this paper In §2 we present
+our method for parameter estimation. We lay out the theory
+in §3. We discuss the connection to prior work with more
+details in §4. We corroborate our theoretical results with
+thorough numerical results in §5. In addition, we sketch the
+proof the statistical rates in §6. We conclude the paper in
+§7.
+2. High-dimensional Estimation
+In this section, we introduce the proposed methods for pa-
+rameter estimation. In addition, we present the intuition
+behind our methods and compare our estimation procedures
+with the one that inverts the nonlinear function f directly.
+i=1 satisfying yi =
+Recall that we observe {(yi, xi)}n
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+β(t+1) = argmin
+
+β∈Rd ��∇L(β(t)), β − β(t)�+
+
+αt/2 · �β − β(t)�2
+
+2 + λ�β�1�,
+
+(2.2)
+
+f (x�i β∗) + �i. We assume the function f is monotonic
+and continuously differentiable. We deﬁne the least-square
+loss function as
+
+L(β) =
+
+1
+2n
+
+n�i=1
+
+[yi − f (x�i β)]2.
+
+(2.1)
+
+We assume β∗ is sparse and estimate it by solving the �1-
+regularized optimization problem in (1.2).
+Due to the nonlinearity of f, L(β) can be nonconvex. As
+
+a result, we can only ﬁnd a stationary point �β satisfying
+∇L��β� + λ · ξ = 0, where ξ ∈ ∂��β�1 and ∇L(β) is the
+gradient of L(β). To obtain a stationary point, we apply
+the proximal gradient method, which generates an iterative
+sequence {β(t), t ≥ 0} satisfying
+
+where 1/αt > 0 is the stepsize at the t-th iteration. In our
+setting, ∇L(β(t)) is given by
+
+∇L(β(t)) = −
+
+1
+n
+
+n�i=1
+
+[yi − f (x�i β(t))]f�(x�i β(t))xi.
+
+We denote u(t) is given by u(t) := β(t) − 1/αt · ∇L(β(t)).
+then (2.2) has an explicit solution given by
+
+β(t+1)
+i
+
+= soft(u(t)
+i
+
+, λ/αt) for 1 ≤ i ≤ d,
+
+(2.3)
+
+where soft(u, a) := sign(u) max�|u| − a, 0� is the soft-
+
+thresholding operator.
+The resulting algorithm is given in Algorithm 1, which is
+an application of the SpaRSA method proposed by (Wright
+et al., 2009) to our nonconvex problem. The main step
+is given in (2.3), which performs a soft-thresholding step
+on a gradient-descent update. This algorithm reduces to
+ISTA (Beck & Teboulle, 2009) when f is the identity. For
+nonlinear sparse recovery problems, this technique is also
+similar to the thresholded Wirtinger ﬂow algorithm proposed
+for phase retrieval (Cand`es et al., 2015; Cai et al., 2015).
+To pick a suitable αt, we use the line search procedure de-
+scribed in Algorithm 2. It iteratively increases αt by a factor
+of η to ensure that β(t+1) satisﬁes the acceptance criterion,
+which guarantees sufﬁcient decrease of the objective func-
+tion. To choose the initial αt at the beginning of each line
+search iteration, we use the Barzilai-Borwein (BB) spectral
+method (Barzilai & Borwein, 1988) in Algorithm 2, which
+guarantees that the initial value of each stepsize αt lies in
+the interval [αmin, αmax]. Using the theory of (Wright et al.,
+2009), we establish the numerical convergence of the iter-
+ative sequence to a stationary point of (1.2) . However, it
+
+is challenging to establish the statistical properties of the
+stationary points. Our theory in §3 shows that, surprisingly,
+any stationary point enjoys satisfactory statistical guaran-
+tees. Consequently, Algorithm 1 yields a stationary point
+that is desired for parameter estimation.
+
+7:
+8:
+9:
+10:
+
+Algorithm 1 Proximal gradient algorithm for solving the
+�1-regularized problem in (1.2).
+1: Input: regularization parameter λ > 0, update factor
+η > 1, constants ζ > 0, αmin, αmax with 0 < αmin <
+1 < αmax, integer M > 0, and φ(β) := L(β) + λ�β�1
+2: Initialization: set the iteration counter t ← 0 and
+choose β(0)∈Rd
+3: Repeat
+4:
+5:
+6:
+
+Choose stepsize αt according to Algorithm 2
+Repeat
+u(t)
+
+← β(t) + 1
+f�x�i β(t)��f��x�i β(t)�xi.
+← soft(u(t)
+
+· �n
+, λ/αt) for 1 ≤ i ≤ d.
+Until β(t+1) satisﬁes the acceptance criterion:
+
+β(t+1)
+i
+αt ← η · αt
+
+i=1�yi −
+
+nαt
+
+i
+
+β(t)�2
+
+φ(β(t+1)) ≤ max�φ(β(j))− ζ · αt/2·�β(t+1) −
+2 : max(t − M, 0) ≤ j ≤ t�
+Update the iteration counter t ← t + 1
+11:
+12: Until �β(t) − β(t−1)�2/�β(t)�2 is sufﬁciently small
+13: Output: �β ← β(t)
+
+Algorithm 2 The Barzilai-Borwein (BB) spectral approach
+for choosing αt in Line 1 of Algorithm 1.
+1: Input: the iteration counter t, δ(t) = β(t)− β(t−1) and
+2: if t = 0 then
+3: Output: αt = 1
+4: else
+
+g(t) = ∇L(β(t)) − ∇L(β(t−1))
+
+5: Output: αt = �δ(t), g(t)���δ(t), δ(t)� or αt =
+
+�g(t), g(t)���δ(t), g(t)�
+
+6: end if
+
+When f is known, it seems tempting to apply linear com-
+pressed sensing procedures to the inverted data {zi, xi}
+where zi = f−1(yi). If f is linear, say f (u) = au + b, then
+f−1(u) = a−1(u − b). In this case we have z = f−1(y) =
+x�β∗ + a−1�, which is exactly a linear model. However,
+this method does not work well for general nonlinear f.
+To see this, denote z = f−1(y) = f−1[f (x�β∗) + �] and
+µ = E[z|x] − x�β∗. Then we have model
+
+z = x�β∗ + µ + ξ,
+
+(2.4)
+
+where ξ is the remaining term that satisﬁes E[ξ|x] = 0.
+Note that both µ and ξ depend on β∗ implicitly. When
+treating (2.4) as a sparse linear model with intercept, we
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+discard such dependency and thus incur large estimation
+error. We numerically compare the proposed method with
+the linear approach that inverts f in §5 and show that our
+approach outperforms the linear framework.
+
+3. Theoretical Results
+In this section, we present the main theoretical results. The
+statistical model is deﬁned in (1.1). Hereafter we assume
+that � is sub-Gaussian with variance proxy σ2. By saying
+that a random vector z ∈ Rk is sub-Gaussian with zero
+mean and variance proxy τ 2 ≥ 0, we mean that E[z] = 0
+and
+
+E[exp(θ�z)] ≤ exp(�θ�2
+
+2τ 2/2) for all θ ∈ Rk.
+
+3.1. Theory of Parameter Estimation
+Before presenting the main results for parameter estima-
+
+i=1 xix�i , which are standard for sparse linear re-
+
+gression problems with ﬁxed design.
+Assumption 1. Sparse-Eigenvalue(s∗, k∗).
+
+tion, we ﬁrst state the following assumptions on �Σ =
+n−1�n
+For k ∈
+{1, . . . , d}, we denote the k-sparse eigenvalues of �Σ as
+ρ−(k) := inf�v��Σv : �v�0 ≤ k,�v�2 = 1� and
+ρ+(k) := sup�v��Σv : �v�0 ≤ k,�v�2 = 1�.
+
+ρ−(k) and ρ+(k) respectively, which are deﬁned as
+
+We assume that, for s∗ = �β∗�0, there exists a k∗ ∈ N such
+that k∗ ≥ 2s∗ and
+
+ρ+(k∗)/ρ−(2k∗ + s∗) ≤ 1 + 0.5k∗/s∗.
+
+(3.1)
+
+The condition ρ+(k∗)/ρ−(2k∗ + s∗) ≤ 1 + 0.5k∗/s∗ re-
+quires that the eigenvalue ratio ρ+(k)/ρ−(2k + s∗) grows
+sub-linearly in k. This condition, commonly referred to as
+sparse eigenvalue condition, is standard in sparse estima-
+tion problems and has been studied by (Zhang, 2010). This
+condition is weaker than the well-known restricted isome-
+try property (RIP) in compressed sensing (Cand`es & Tao,
+2005), which states that there exists a constant δ ∈ (0, 1)
+and integer s ∈ {1, . . . , d} such that for all s-sparse v ∈ Rd,
+we have
+
+(3.2)
+
+(1 − δ)�v�2
+
+2 ≤ v��Σv ≤ (1 + δ)�v�2
+
+2.
+
+Comparing (3.1) and (3.2), we see that (3.1) holds with
+k∗ = (s − s∗)/2 if the RIP condition holds with s ≥ 5s∗
+and δ = 1/3. As is shown in (Vershynin, 2010), RIP holds
+with high probability for sub-Gaussian random matrices.
+Therefore Assumption 1 holds at least when x1, . . . , xn
+are i.i.d. sub-Gaussian, which contains many well-known
+distributions as special cases.
+
+We note that although Assumption 3.1 holds since it does
+not depend on the nonlinear transfmration f, the restricted
+strong convexity (RSC) condition deﬁned in (Loh & Wain-
+wright, 2014; 2015) on the loss function L(β) does not
+directly hold in general in our setting since L(β) depends
+on the nonlinear transformation f.
+In addition to the sparse eigenvalue assumption, we need a
+
+elementwise �∞-norm.
+
+uniformly bounded.
+Assumption 2. Bounded-Design(D). We assume there ex-
+ists an absolute constant D that does not depends on n, d,
+
+regularity condition, which states that the elements of �Σ are
+or s∗ such that ��Σ�∞ ≤ D, where � · �∞ is the matrix
+If the population version of �Σ,
+i.e., Σ := E(xx�),
+has bounded elements and x has sub-Gaussian or sub-
+exponential tails, then by concentration inequalities we can
+prove that Assumption 2 holds with high probability with
+D = 2�Σ�∞. We verify this assumption for sub-Gaussian
+x in the appendix. This assumption is generally unneces-
+sary for high dimensional linear regression. However, it is
+required in our setting where it is used to control the effect
+of the nonlinear transform.
+We note that we do not make any further assumptions except
+Assumptions 1 and 2 on the distribution of x for the theory
+of parameter estimation to hold. These two assumptions are
+shown to be true when x is sub-Gaussian.
+We are now ready to present our main theorem for parame-
+ter estimation, which states that any stationary point of the
+�1-regularized optimization problem enjoys optimal statisti-
+cal rates of convergence and that Algorithm 1 successfully
+converges to a stationary point.
+Theorem 1. We assume that the univariate function f sat-
+isﬁes f (0) = 0 and is continuously differentiable with
+f�(x) ∈ [a, b],∀x ∈ R for some 0 < a < b. We further
+assume that Assumptions 1 and 2 hold. Then there exists
+a constant B such that �∇L(β∗)�∞ ≤ Bσ ·�log d/n
+λ = Cσ�log d/n with C ≥ max{L1B, L2},
+2 ≤ 0.1. Then for
+any stationary point �β satisfying ∇L��β� + λ · ξ = 0 with
+ξ ∈ ∂��β�1, it holds with probability at least 1 − d−1 that
+��β − β∗�2 ≤ 25/ρ−(k∗ + s∗) · a−2√s∗λ;
+��β − β∗�1 ≤ 25/ρ−(k∗ + s∗) · a−2s∗λ.
+
+with probability tending to one. Suppose we choose the
+regularization parameter λ in (1.2) as
+
+Furthermore, Algorithm 1 attains a stationary point with the
+statistical rates in (3.4).
+
+where L1 and L2 satisfy L−1
+
+1 + 3b√DL−1
+
+(3.4)
+(3.5)
+
+(3.3)
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+By our discussion under Assumption 1, we can take k∗ =
+Cs∗ for some constant C > 0. Then plugging (3.3) into
+
+(3.4), we obtain the rate of�s∗ log d/n in �2-norm and
+the rate of s∗�log d/n in �1-norm. Similar results are also
+
+established for sparse linear regression, and more generally,
+high-dimensional generalized linear models (Cand`es & Tao,
+2007; Zhang & Huang, 2008; Kakade et al., 2010). These
+rates are optimal in the sense that they cannot be improved
+even if f equals to the identity. Note that the lower bound
+a of f� shows up in the statistical rates of convergence in
+(3.4). If a is close to zero, we obtain a large statistical error.
+To see the intuition, we consider a worst case where f is
+constant, i.e., a = 0. Then it is impossible to consistently
+estimate β∗, since in this case the observations {yi, xi}n
+provide no information on β∗.
+The statistical rates of convergence are proportional to the
+noise level σ, which implies that the proposed method ex-
+actly recovers β∗ in the noiseless setting.
+In the noisy
+case, by (3.4),
+to get � accuracy of estimating β∗ in
+�2-norm with high probability, the sample complexity is
+n = O(�−2s∗ log d), which is of the same order as that of
+high-dimensional linear models.
+
+i=1
+
+3.2. Minimax Lower Bound
+To understand the optimality of the estimation result, we
+study the minimax lower bound of parameter estimation
+in our model, which reveals the fundamental limits of the
+estimation problem. We deﬁne the minimax risk as
+
+R∗f (s, n, d) = inf
+�β
+
+sup
+
+β∈B0(s)
+
+2,
+
+Eβ��β − β�2
+
+(3.6)
+
+where the expectation is taken over the probability model
+
+in (1.1) with parameter β and B0(s) :=�β ∈ Rd : �β�0 ≤
+s�. Here the supremum is taken over all s-sparse parame-
+ters and the inﬁmum is taken over all estimators �β based on
+i=1. We assume f is continuously differ-
+samples {(yi, xi)}n
+entiable with f�(u) ∈ [a, b],∀u ∈ R. The following theo-
+rem gives a lower bound on the minimax risk Rf (s, n, d),
+which implies the optimality of the proposed estimator.
+Theorem 2. For integer s and d satisfying 1 ≤ s ≤ d/8,
+the minimax risk deﬁned in (3.6) has the following lower
+bound
+
+R∗f (s, n, d) ≥
+
+σ2
+
+s log[1 + d/(2s)]
+
+192b2ρ+(2s)
+
+n
+
+.
+
+(3.7)
+
+By Theorem 2, if we consider a, b as constants and assume
+that k∗/s∗ is bounded, then the �2-statistical rate of conver-
+
+gence of �β in (3.4) matches the minimax lower bound in
+
+(3.7) in terms of order. This establishes the optimality of
+the proposed estimator.
+
+4. Connection to Prior Work
+The model we consider is closely related to the single index
+model where the function f is unknown. Both of these two
+models fall in the framework of sufﬁcient dimension reduc-
+tion with a one-dimensional subspace U (Li, 1991; 1992;
+Cook, 1998; Cook & Lee, 1999; Li, 2007). In low dimen-
+sional settings, most works in this direction use spectral
+methods, which rely on the Gaussian assumption and can
+only estimate θ∗ = β∗�β∗�−1
+2 because the norm of β∗ is
+not identiﬁable when f is unknown. As introduced in (Li,
+2007), many moment based sufﬁcient dimension reduction
+methods can be stated as a generalized eigenvalue problem
+Mnθi = λiNnθi for i = 1, . . . , d, where Mn and Nn are
+symmetric matrices computed from the data; θ1, . . . , θd are
+generalized eigenvectors such that θ�i Nnθj = 1
+{i=j} and
+λ1 ≥ ··· ≥ λd are the generalized eigenvalues. In addition,
+it is required that Mn and Nn are positive semideﬁnite and
+positive deﬁnite, respectively. Here Mn and Nn are the sam-
+ple versions of the corresponding population quantities M
+and N. For example, in sliced inverse regression (Li, 1991),
+
+we have M = Cov{E[x − E(x)|y]� and N = Cov(x) and
+Mn and Nn are their population analogs. When U is one-
+dimensional, θ∗ corresponds to the generalized eigenvector
+with the largest eigenvalue. In low dimensional settings, (Li,
+2007) showed that θ∗ can be estimated by the following
+optimization problem:
+
+maximize
+
+θ∈Rd
+
+θ�Mnθ subject to θ�Nnθ.
+
+(4.1)
+
+Since the works in this direction all require the matrix Nn,
+which is the sample covariance matrix of x in most cases,
+to be invertible, such methods cannot be generalized to
+high-dimensional settings where Nn is not invertible.
+For high-dimensional single index models, (Plan et al.,
+i=1 yixi
+onto a ﬁxed star-shaped closed subset K of Rd. Similarly,
+(Plan & Vershynin, 2015) propose a least-squares estimator
+with a geometric constraint:
+
+2014) proposes an estimator by projecting n−1�n
+
+minimize
+
+n�i=1
+
+(x�i θ − yi)2 subject to θ ∈ K.
+
+(4.2)
+
+Both of these methods rely on the assumption that xi is
+Gaussian to have good estimation of E(y · x). Under the
+Gaussian assumption, we achieve the same statistical rate,
+which is optimal. When x is not Gaussian, as shown in
+(Ai et al., 2014), their methods will have some extra terms
+in the error bound that may or may not tend to zero. Our
+method, however, works when x has a general distribution
+with optimal statistical rates of convergence.
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+5. Numerical Experiments
+In this section, we evaluate the ﬁnite sample performance
+of parameter estimation on both simulated data and a real-
+world dataset.
+
+For parameter estimation, we compute the �2-error ��β −
+β∗�2, where �β is the solution of Algorithm 1. In addition,
+
+we compare our method with the linear approach that inverts
+the nonlinear function. For the linear framework we apply
+the �1-regularized regresion (Lasso) (Tibshirani, 1996).
+
+5.1. Simulated Data
+Throughout this section, we sample independent data from
+model (1.1) with � ∼ N (0, 1) and x ∼ N (0, Σ) where Σ ∈
+Rd×d is a Toeplitz matrix with Σjk = 0.95|j−k|. The sparse
+parameter vector β∗ ∈ Rd is set to have nonzero values in
+the ﬁrst s∗ entries. That is, β∗j �= 0 for 1 ≤ j ≤ s∗ and
+β∗j = 0 otherwise. In addition, we consider the nonlinear
+function f (x) = 2x + cos(x). In this case the derivative
+f�(·) is bounded by a = 1 and b = 4.
+For parameter estimation, we compare the �2-error ��β −
+β∗�2 with �s∗ log d/n under two settings: (i) we ﬁx
+d = 256, s∗ = 6, 8, or 10, and vary n, and (2) ﬁx s∗ = 10,
+d = 128, 256 or 512, and vary n. For the parameter β∗, the
+ﬁrst s∗ entries are sampled independently from the uniform
+distribution on the interval [0, 2]. That is, β∗j ∼ U(0, 2)
+for 1 ≤ j ≤ s∗ and β∗j = 0 for j > s∗. We set the regu-
+larization parameter λ = 3σ ·�log d/n. The parameters
+of Algorithm 1 are chosen as αmin = 1/αmax = 1030,
+η = 2, M = 5, and ζ = tol = 10−5. The �2-errors re-
+ported are based on 100 independent experiments. We plot
+the �2-errors against the effective sample size�s∗ log d/n
+in Figure 1. The ﬁgure illustrates that ��β − β∗�2 grows
+sublinearly with�s∗ log d/n, which corroborates with our
+argument that ��β − β∗�2 ≤ C�s∗ log d/n for some abso-
+
+lute constant C.
+To compare Algorithm 1 with inverting f, we consider the
+settings where d = 256, s∗ = 8. We then apply Lasso to
+i=1 where the regularization
+the inverted data {f−1(yi), xi}n
+parameter of Lasso is selected via 5-fold cross-validation.
+The optimization problem of Lasso is also solved using Al-
+gorithm 1. We plot the �2-errors of these two techniques
+against the effective sample size in Figure 1-(c), which
+shows that the proposed method outperforms the linear ap-
+proach.
+
+5.2. Real Data Analysis
+To show the effectiveness of the proposed method, we study
+the Computer Audition Lab 500-Song (CAL500) dataset
+(Turnbull et al., 2008), which can be obtained from the pub-
+licly available Mulan data library (Tsoumakas et al., 2011).
+
+The CAL500 dataset consists of music annotations of 502
+popular music tracks. The attributes of this dataset consist of
+both continuous and binary subsets. The continuous features
+are obtained from the coefﬁcients of short time Fourier trans-
+forms on each music track. In speciﬁc, there are four types
+of continuous features: spectral centroids, spectral ﬂux, zero
+crossings and a time series of Mel-frequency cepstral coefﬁ-
+cient (MFCC). In addition, for each music track, the values
+of the binary features are assigned by human listeners to
+give semantic descriptions. For accuracy, each music track
+is annotated by at least three human listeners. See (Turnbull
+et al., 2008) for a more detailed introduction of the CAL500
+dataset. This dataset is previously analyzed in (Cheng et al.,
+2013; Yang et al., 2014), where they study the conditional
+independence of the attributes by ﬁtting graphical models.
+Similar to (Cheng et al., 2013), we study model (1.1) only
+using the continuous features. In speciﬁc, we use n random
+subsamples of the 502 instances of d = 68 continuous at-
+tributes, where n is an integer that will be speciﬁed later.
+We generate the response according model (1.1) with σ = 1,
+f (x) = 4x + cos(x). Moreover, we choose support of β∗
+uniformly over {1, . . . , d}.
+Given the response and the design matrix, we study the per-
+formance of the proposed estimator. Speciﬁcally, we com-
+
+setting where we ﬁx d = 68, s∗ = 4, 6, or 8, and vary n. In
+this setting, the nonzero entries of β∗ are sampled indepen-
+dently from the uniform distribution over [0, 2]. We set the
+
+pare the �2-error ��β − β∗�2 with�s∗ log d/n under the
+regularization parameter to be λ = 2σ�log d/n and the pa-
+rameters of Algorithm 1 the same as those in the simulation
+studies in §5.1. We plot the �2-errors against the effective
+sample size�s∗ log d/n in Figure 2-(a) based on 100 ran-
+dom experiments . The ﬁgure also shows that the estimation
+error ��β − β∗�2 grows sublinearly with�s∗ log d/n.
+
+In addition, we also study the setting where the nonzero
+entries of β∗ are set to a constant β0 > 0. In addition, we
+ﬁx d = 68, n = 50, and s∗ = 4, 6, or 8. The regularization
+parameter λ and the parameters of Algorithm 1 remain
+the same. In this case, the value of β0 corresponds to the
+magnitude of the signal parameter. Thus, estimation is
+easier for large β0 whereas the error is large for small β0.
+
+For presentation, we plot the �2-error ��β − β∗�2 against
+
+β0 based on 100 independent trials. As show in in Figure
+2-(b), as β0 grows, the estimation error gradually decreases,
+which coincides with the intuition.
+Moreover, similar to the simulation studies, we also com-
+pare the proposed method with the linear framework which
+inverts f. In particular, we ﬁx d = 68, s∗ = 4 and vary
+n. The support of β∗ is chosen uniformly with the nonzero
+entries sampled independently from U(0, 2). We compute
+
+the �2-error ��β − β∗�2 of the Lasso estimator obtained us-
+
+ing 5-fold cross-validation. In addition, for the proposed
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+d = 128
+d = 256
+d = 512
+
+linear
+nonlinear
+
+s$ = 6
+s$ = 8
+s$ = 10
+
+2
+
+k
+$
+-
+!
+b-
+k
+
+0.05
+0.04
+0.03
+0.02
+0.01
+0
+
+2
+
+k
+$
+-
+!
+b-
+k
+
+0.05
+0.04
+0.03
+0.02
+0.01
+0
+
+2
+
+k
+$
+-
+!
+b-
+k
+
+0.4
+0.3
+0.2
+0.1
+0
+
+0.6
+
+0.4
+
+ps$ log d=n
+
+(a). Fix d = 256.
+
+0.8
+
+0.4
+
+0.6
+
+ps$ log d=n
+
+(b). Fix s∗ = 10.
+
+0.8
+
+0.4
+
+0.6
+
+ps$ log d=n
+
+(c). Linear vs. Nonlinear.
+
+0.8
+
+Figure 1: Statistical errors ��β − β∗�2 plotted against the effective sample size�s∗ log d/n with d or s∗ ﬁxed and n varied
+
+are shown in (a) and (b), respectively. The comparison between the method of inverting f and the proposed method is shown
+in (c).
+
+method, the regularization parameter λ and the parameters
+of Algorithm 1 is the same as in the previous setting. In
+Figure 2-(c) we plot the �2-errors of these two estimators
+
+against the effective sample size�s∗ log d/n based on 100
+
+independent experiments. It clear that the error of the esti-
+mator constructed by the linear framework is much larger,
+which shows the superiority of the proposed method.
+
+6. Proof of the Statistical Rates
+In this section we sketch the proof of the statistical rates of
+convergence for the proposed estimator. We defer a more
+detailed proofs the main results in the appendix.
+Similar to the analysis of Lasso estimator, a main step of
+the proof is to show that the error vector lies in an �1-cone.
+
+In speciﬁc, for any stationary point �β of the optimization
+problem in (1.2), we denote δ = �β − β∗. Let S be the
+
+support of β∗, we show that
+
+�δS c�1 ≤ γ · �δS�1
+
+for some constant γ > 0. This is established by combining
+a upper and an lower bound for
+
+(6.1)
+
+�∇L(�β) − ∇L(β∗), β − β∗�.
+
+For an upper bound, by the optimality of �β we have
+∇L(�β) + λ · ξ = 0, where ξ ∈ ∂��β�1. Note that the
+support of β∗ is S, that is, S = {j : β∗j �= 0}. Also note
+that the optimality of �β implies that
+�ξS c ,�βS c� = ��βS c�1 = �δS c�1.
+By H¨older’s inequality, since �ξ�∞ ≤ 1 and β∗
+is bounded by
+�∇L(�β) − ∇L(β∗),�β − β∗�
+≤ −λ�δS c�1 + λ�δS��1 + �∇L(β∗)�∞�δ�1.
+
+S = 0, (6.1)
+
+(6.2)
+
+Moreover, by calculation, we have
+
+∇L(β∗) = −
+
+= −
+
+1
+n
+
+1
+n
+
+n�i=1
+n�i=1
+
+[yi − f (x�i β∗)] · f�(x�i β∗) · xi
+
+f�(x�i β∗) · xi · �i.
+
+Since f� is bounded and that �i’s are i.i.d. sub-Gaussian
+random variables, conditioning on {xi}n
+i=1, ∇L(β∗) is the
+mean of i.i.d. sub-Gaussian random variables (Vershynin,
+2010). Concentration of measure guarantees that ∇L(β∗)
+is not far away from its mean, which is 0. The following
+lemma shows that �∇L(β∗)�∞ is of order σ ·�log d/n
+
+with high probability.
+Lemma 3. Let L(β) be the least-square loss function de-
+ﬁned in (2.1), there exist an absolute constant B > 0
+that does not depend on n, d or s∗ and δ = δ(n, d) that
+tends to 0 as n → ∞ such that δ ≤ (2d)−1 and that
+�∇L(β∗)�∞ ≤ Bσ ·�log d/n with probability 1 − δ.
+�∇L(β∗)�∞ ≤ Bσ ·�log d/n, which holds with prob-
+ability at least 1 − (2d)−1 by Lemma 3. By the deﬁnition
+of λ and (6.2) we have
+
+follows, we condition on the event
+
+In what
+
+that
+
+�∇L(�β) − ∇L(β∗),�β − β∗�
+≤ −λ�δS c�1 + λ�δS�1 + L−1
+
+1 λ�δ�1.
+
+(6.3)
+
+Thus we derive an upper bound for (6.1). Moreover, the
+lemma establishes a lower bound (6.1).
+
+Lemma 4. Recall that �Σ := n−1�n
+i=1 xix�i . Under the
+Assumption Bounded-Design(D), it holds with probability
+at least 1 − (2d)−1 that, for any β ∈ Rd,
+�∇L(β) − ∇L(β∗), β−β∗� ≥ a2(β − β∗)��Σ(β − β∗)
+− 3bσ�D log d/n�β − β∗�1.
+
+2
+
+k
+$
+-
+!
+b-
+k
+
+0.45
+0.4
+0.35
+0.3
+0.25
+0.2
+0.15
+0.1
+0.05
+
+s$ = 4
+s$ = 6
+s$ = 8
+
+0.2
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+0.3
+
+0.25
+
+2
+
+0.2
+
+k
+$
+-
+!
+b-
+k
+
+0.15
+
+0.1
+
+0.05
+
+0.5
+
+0.2
+
+s$ = 4
+s$ = 6
+s$ = 8
+
+linear
+nonlinear
+
+5
+
+4
+
+2
+
+3
+
+k
+$
+-
+!
+b-
+k
+
+2
+
+1
+
+0
+0.2
+
+0.3
+
+0.6
+
+0.4
+-0
+
+0.4
+
+0.3
+
+ps$ log d=n
+
+(a). Compare �2-errors against�s∗ log d/n . (b). Compare �2-errors against β0.
+Figure 2: Statistical errors ��β − β∗�2 plotted against the effective sample size�s∗ log d/n and the magnitude of signal
+
+parameter β0 are shown in (a) and (b), respectively. We ﬁx s∗ and vary n in (a) and ﬁx s∗ = 4, n = 50 in (b). The
+comparison between the method of inverting f and the proposed method with s∗ = 4 and n varied is shown in (c).
+
+(c). Linear vs. Nonlinear.
+
+0.5
+
+0.6
+
+0.4
+
+ps$ log d=n
+
+Thus combining the upper bound and the lower bound for
+(6.1), we obtain that
+
+where µ = L−1
+
+a2δ��Σδ ≤ −λ(1 − µ)�δS c�1 + λ(1 + µ)�δS�1,
+��δS c�1 ≤ (1+µ)/(1−µ)�δS�1 ≤ 1.23�δS�1. This shows
+
+2 ≤ 0.1. Hence it follows that
+
+that the error vector lies in the �1-cone
+
+1 + 3b√DL−1
+
+(6.4)
+
+{v ∈ Rd : �vS c�1 ≤ 1.23�vS�1}.
+
+ﬁnal part of the proof is to compare this upper bound with a
+
+Note that by (6.4) we have a2δ��Σδ ≤ λ(1+µ)�δS�1. The
+bound of δ��Σδ from below, which is given in the following
+lemma to bound δ��Σδ from below.
+Lemma 5. For any η ∈ Rd and any index set S with |S| =
+s∗, let J be the set of indices of the largest k∗ entries of ηS c
+in absolute value and let I = J ∪ S. Here s∗ and k∗ are
+the same as those in Assumption Sparse-Eigenvalue(s∗, k∗).
+Assume that �ηS c�1 ≤ γ�ηS�1 for some γ > 0. Then we
+obtain that �η�2 ≤ (1 + γ)�ηI�2 and that
+
+η��Ση ≥ ρ−(s∗+k∗) ·��ηI�2−γ�s∗/k∗·
+�ρ+(k∗)/ρ−(s∗+2k∗) − 1 · �ηS�2� · �ηI�2.
+
+(6.5)
+
+Under Assumption 1, we have ρ+(k∗)/ρ−(s∗ + 2k∗) ≤ 1 +
+0.5k∗/s∗. By Lemma 5 we obtain that �δ�2 ≤ 2.23�δI�2
+and that
+
+Therefore we have
+
+�δI�2 ≤ 11/ρ−(s∗ + k∗) · a−2√s∗λ.
+
+where J is the set of indices of the largest k∗ entries of δS c
+in absolute value and I = J ∪S. Combining the upper and
+lower bounds for δ��Σδ we obtain
+��β − β∗�1 = �δ�1 ≤ 2.23�δS�1 ≤ 2.23√s∗�δS�2
+��β − β∗�2 = �δ�2 ≤ 2.23�δI�2
+
+≤ 25/ρ−(s∗ + k∗) · a−2s∗λ;
+≤ 25/ρ−(s∗ + k∗) · a−2√s∗λ.
+
+Thus we establish the statistical rates of convergence for the
+proposed estimator.
+
+7. Conclusion
+We study parameter estimation for high dimensional re-
+gression under known nonlinear transform. We propose
+an �1-regularized least-square estimator for estimation. Al-
+though the optimization problem is non-convex, we show
+that every stationary point converges to the true signal with
+the optimal statistical rate of convergence. We establish
+the optimality by deriving a minimax lower bound for the
+regression model. In addition, we propose an efﬁcient algo-
+rithm that successfully converges to a stationary point. Both
+simulation experiments and real data analysis are provided
+to back up the developed theory.
+
+δ��Σδ ≥�1 − 1.23√0.5� · ρ−(s∗ + k∗) · �δI�2
+
+≥ 0.1 · ρ−(s∗ + k∗) · �δI�2
+2,
+
+2
+
+References
+Ai, A., Lapanowski, A., Plan, Y., and Vershynin, R. One-
+bit compressed sensing with non-gaussian measurements.
+
+(6.6)
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+Linear Algebra and its Applications, 441:222–239, 2014.
+
+Aksoylar, C. and Saligrama, V. Sparse recovery with linear
+and nonlinear observations: Dependent and noisy data.
+arXiv preprint arXiv:1403.3109, 2014.
+
+Alquier, P. and Biau, G. Sparse single-index model. The
+Journal of Machine Learning Research, 14(1):243–280,
+2013.
+
+Barzilai, J. and Borwein, J. M. Two-point step size gradient
+methods. IMA Journal of Numerical Analysis, 8(1):141–
+148, 1988.
+
+Delecroix, M., Hristache, M., and Patilea, V. Optimal
+smoothing in semiparametric index approximation of re-
+gression functions. Technical report, Discussion Papers,
+Interdisciplinary Research Project 373: Quantiﬁcation
+and Simulation of Economic Processes, 2000.
+
+Delecroix, M., Hristache, M., and Patilea, V. On semipara-
+metric m-estimation in single-index regression. Journal
+of Statistical Planning and Inference, 136(3):730–769,
+2006.
+
+Eldar, Y. C. and Kutyniok, G. Compressed sensing: theory
+
+and applications. Cambridge University Press, 2012.
+
+Beck, A. and Eldar, Y. C. Sparsity constrained nonlinear op-
+timization: Optimality conditions and algorithms. SIAM
+Journal on Optimization, 23(3):1480–1509, 2013a.
+
+Eldar, Y. C. and Mendelson, S. Phase retrieval: Stability
+and recovery guarantees. Applied and Computational
+Harmonic Analysis, 36(3):473–494, 2014.
+
+Beck, A. and Teboulle, M. A fast iterative shrinkage-
+thresholding algorithm for linear inverse problems. SIAM
+journal on imaging sciences, 2(1):183–202, 2009.
+
+Beck, A. and Eldar, Y. C. Sparse signal recovery from non-
+linear measurements. In IEEE International Conference
+on Acoustics, Speech and Signal Processing (ICASSP),
+pp. 5464–5468. IEEE, 2013b.
+
+Eldar, Y. C., Sidorenko, P., Mixon, D. G., Barel, S., and
+Cohen, O. Sparse phase retrieval from short-time Fourier
+measurements. Signal Processing Letters, IEEE, 22(5):
+638–642, 2015.
+
+H¨ardle, W., Hall, P., and Ichimura, H. Optimal smoothing
+in single-index models. The Annals of Statistics, 21(1):
+157–178, 1993.
+
+Cai, T. T., Li, X., and Ma, Z. Optimal rates of convergence
+for noisy sparse phase retrieval via thresholded wirtinger
+ﬂow. arXiv preprint arXiv:1506.03382, 2015.
+
+Cand`es, E. and Tao, T. The Dantzig selector: Statistical
+estimation when p is much larger than n. The Annals of
+Statistics, 35(6):2313–2351, 2007.
+
+Cand`es, E. J. and Tao, T. Decoding by linear programming.
+IEEE Transactions on Information Theory, 51(12):4203–
+4215, 2005.
+
+Horowitz, J. L. Semiparametric and Nonparametric Meth-
+
+ods in Econometrics, volume 692. Springer, 2000.
+
+Ichimura, H. Semiparametric least squares (SLS) and
+weighted SLS estimation of single-index models. Journal
+of Econometrics, 58(1):71–120, 1993.
+
+Jaganathan, K., Oymak, S., and Hassibi, B. On robust
+phase retrieval for sparse signals. In 50th Annual Allerton
+Conference on Communication, Control, and Computing
+(Allerton), pp. 794–799. IEEE, 2012.
+
+Cand`es, E. J., Strohmer, T., and Voroninski, V. Phaselift:
+Exact and stable signal recovery from magnitude mea-
+surements via convex programming. Communications on
+Pure and Applied Mathematics, 66(8):1241–1274, 2013.
+
+Kakade, S., Shamir, O., Sindharan, K., and Tewari, A.
+Learning exponential families in high-dimensions: Strong
+convexity and sparsity. In International Conference on
+Artiﬁcial Intelligence and Statistics, pp. 381–388, 2010.
+
+Cand`es, E. J., Eldar, Y. C., Strohmer, T., and Voroninski, V.
+Phase retrieval via matrix completion. SIAM Review, 57
+(2):225–251, 2015.
+
+Cheng, J., Levina, E., and Zhu, J. High-dimensional mixed
+graphical models. arXiv preprint arXiv:1304.2810, 2013.
+
+Cook, R. D. Principal Hessian directions revisited. Journal
+of the American Statistical Association, 93(441):84–94,
+1998.
+
+Cook, R. D. and Lee, H. Dimension reduction in binary
+response regression. Journal of the American Statistical
+Association, 94(448):1187–1200, 1999.
+
+Kakade, S. M., Kanade, V., Shamir, O., and Kalai, A. Ef-
+ﬁcient learning of generalized linear and single index
+models with isotonic regression. In Advances in Neural
+Information Processing Systems, pp. 927–935, 2011.
+
+Kalai, A. T. and Sastry, R. The isotron algorithm: High-
+dimensional isotonic regression. In Conference on Learn-
+ing Theory, 2009.
+
+Li, K.-C. Sliced inverse regression for dimension reduction.
+Journal of the American Statistical Association, 86(414):
+316–327, 1991.
+
+Li, K.-C. On principal Hessian directions for data visu-
+alization and dimension reduction: Another application
+
+Sparse Nonlinear Regression: Parameter Estimation under Nonconvexity
+
+of Stein’s lemma. Journal of the American Statistical
+Association, 87(420):1025–1039, 1992.
+
+Li, L. Sparse sufﬁcient dimension reduction. Biometrika,
+
+94(3):603–613, 2007.
+
+Li, X. and Voroninski, V. Sparse signal recovery from
+quadratic measurements via convex programming. SIAM
+Journal on Mathematical Analysis, 45(5):3019–3033,
+2013.
+
+Loh, P.-L. and Wainwright, M. J. Support recovery without
+incoherence: A case for nonconvex regularization. arXiv
+preprint arXiv:1412.5632, 2014.
+
+Loh, P.-L. and Wainwright, M. J. Regularized m-estimators
+with nonconvexity: Statistical and algorithmic theory for
+local optima. Journal of Machine Learning Research, 16:
+559–616, 2015.
+
+McCullagh, P., Nelder, J. A., and McCullagh, P. Generalized
+linear models, volume 2. Chapman and Hall London,
+1989.
+
+Ohlsson, H. and Eldar, Y. C. On conditions for uniqueness in
+sparse phase retrieval. In IEEE International Conference
+on Acoustics, Speech and Signal Processing (ICASSP),
+pp. 1841–1845. IEEE, 2014.
+
+Ohlsson, H., Yang, A., Dong, R., and Sastry, S. Compressive
+phase retrieval from squared output measurements via
+semideﬁnite programming.
+In 16th IFAC Symposium
+on System Identiﬁcation, Brussels, Belgium, 11-13 July,
+2012, pp. 89–94, 2012.
+
+Shechtman, Y., Eldar, Y. C., Cohen, O., Chapman, H. N.,
+Miao, J., and Segev, M. Phase retrieval with application
+to optical imaging: a contemporary overview. Signal
+Processing Magazine, IEEE, 32(3):87–109, 2015.
+
+Sherman, R. P. U-processes in the analysis of a generalized
+semiparametric regression estimator. Econometric theory,
+10(02):372–395, 1994.
+
+Tibshirani, R. Regression shrinkage and selection via the
+Lasso. Journal of the Royal Statistical Society. Series B
+(Methodological), 58(1):267–288, 1996.
+
+Tsoumakas, G., Spyromitros-Xiouﬁs, E., Vilcek, J., and
+Vlahavas, I. Mulan: A java library for multi-label learn-
+ing. The Journal of Machine Learning Research, 12:
+2411–2414, 2011.
+
+Tu, S., Boczar, R., Soltanolkotabi, M., and Recht, B. Low-
+rank solutions of linear matrix equations via procrustes
+ﬂow. arXiv preprint arXiv:1507.03566, 2015.
+
+Turnbull, D., Barrington, L., Torres, D., and Lanckriet, G.
+Semantic annotation and retrieval of music and sound
+effects. IEEE Transactions on Audio, Speech, and Lan-
+guage Processing, 16(2):467–476, 2008.
+
+Vershynin, R. Introduction to the non-asymptotic analysis
+of random matrices. arXiv preprint arXiv:1011.3027,
+2010.
+
+Waldspurger, I., d’Aspremont, A., and Mallat, S. Phase
+recovery, maxcut and complex semideﬁnite programming.
+Mathematical Programming, 149(1-2):47–81, 2015.
+
+Plan, Y. and Vershynin, R. The generalized Lasso with non-
+linear observations. arXiv preprint arXiv:1502.04071,
+2015.
+
+Wright, S. J., Nowak, R. D., and Figueiredo, M. A. Sparse
+reconstruction by separable approximation. IEEE Trans-
+actions on Signal Processing, 57(7):2479–2493, 2009.
+
+Plan, Y., Vershynin, R., and Yudovina, E. High-dimensional
+estimation with geometric constraints. arXiv preprint
+arXiv:1404.3749, 2014.
+
+Xia, Y. and Li, W. On single-index coefﬁcient regression
+models. Journal of the American Statistical Association,
+94(448):1275–1285, 1999.
+
+Raskutti, G., Wainwright, M. J., and Yu, B. Minimax rates
+of estimation for high-dimensional linear regression over
+�q-balls. IEEE Transactions on Information Theory, 10
+(57):6976–6994, 2011.
+
+Rigollet, P., Tsybakov, A., et al. Exponential screening
+and optimal rates of sparse estimation. The Annals of
+Statistics, 39(2):731–771, 2011.
+
+Rumelhart, D. E., Hinton, G. E., and Williams, R. J. Learn-
+ing representations by back-propagating errors. Nature,
+323(6088):533–536, 1986.
+
+Shechtman, Y., Beck, A., and Eldar, Y. C. Gespar: Efﬁcient
+phase retrieval of sparse signals. IEEE Transactions on
+Signal Processing, 62(4):928–938, 2014.
+
+Xia, Y., Tong, H., and Li, W. On extended partially linear
+single-index models. Biometrika, 86(4):831–842, 1999.
+
+Yang, Z., Ning, Y., and Liu, H. On semiparametric
+exponential family graphical models. arXiv preprint
+arXiv:1412.8697, 2014.
+
+Zhang, C.-H. and Huang, J. The sparsity and bias of the
+Lasso selection in high-dimensional linear regression.
+The Annals of Statistics, pp. 1567–1594, 2008.
+
+Zhang, T. Analysis of multi-stage convex relaxation for
+sparse regularization. The Journal of Machine Learning
+Research, 11:1081–1107, 2010.
+
+

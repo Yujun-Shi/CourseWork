@@ -1,0 +1,1952 @@
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+Xingguo Li∗
+Tuo Zhao†
+Raman Arora†
+Han Liu‡
+Jarvis Haupt∗
+∗Department of Electrical and Computer Engineering, University of Minnesota, Minneapolis, MN 55455
+†Department of Computer Science, Johns Hopkins University, Baltimore, MD 21218
+‡Department of Operations Research and Financial Engineering, Princeton University, NJ 08544
+Xingguo Li and Tuo Zhao equally contributed.
+
+LIXX1661@UMN.EDU
+TZHAO5@JHU.EDU
+ARORA@CS.JHU.EDU
+HANLIU@PRINCETON.EDU
+JDHAUPT@UMN.EDU
+
+Abstract
+
+We propose a stochastic variance reduced opti-
+mization algorithm for solving a class of large-
+scale nonconvex optimization problems with car-
+dinality constraints, and provide sufﬁcient condi-
+tions under which the proposed algorithm enjoys
+strong linear convergence guarantees and opti-
+mal estimation accuracy in high dimensions. Nu-
+merical experiments demonstrate the efﬁciency
+of our method in terms of both parameter esti-
+mation and computational performance.
+
+1. Introduction
+High dimensionality is challenging from both the statisti-
+cal and computational perspectives. To make the analysis
+manageable, we usually assume that only a small number
+of variables are relevant for modeling the response variable.
+In the past decade, a large family of (cid:96)1 regularized or (cid:96)1
+constrained sparse estimators have been proposed, includ-
+ing Lasso (Tibshirani, 1996), Logistic Lasso (Van de Geer,
+2008), Group Lasso (Yuan & Lin, 2006), Graphical Lasso
+(Banerjee et al., 2008; Friedman et al., 2008), and more.
+The (cid:96)1 regularization serves as a convex surrogate for con-
+trolling the cardinality of the parameters, and a large family
+of algorithms such as proximal gradient algorithms (Nes-
+terov, 2013) have been developed for ﬁnding (cid:96)1 regular-
+ized estimators in polynomial time. However, techniques
+based on convex relaxation, using (cid:96)1 norm as a surrogate
+for (cid:96)0 constraint, often incur large estimation bias, and at-
+tain worse empirical performance than those based on the
+cardinality constraint (Fan & Li, 2001; Zhang, 2010; Zhao
+et al., 2014a; Zhao & Liu, 2016). This motivates us to study
+a family of cardinality constrained M-estimators. Formally,
+we consider the nonconvex problem:
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+w∈Rd F(w)
+min
+
+s.t. (cid:107)w(cid:107)0 ≤ k,
+
+(1.1)
+where F(w) is a smooth and nonstrongly convex loss func-
+tion, and (cid:107)w(cid:107)0 denotes the number of nonzero entries in w.
+To solve (1.1), a gradient hard thresholding (GHT) algo-
+rithm has been studied in the statistics as well as the ma-
+chine learning community over the past few years (Blu-
+mensath & Davies, 2009; Foucart, 2011; Yuan et al., 2013;
+Jain et al., 2014). GHT involves performing a gradient up-
+date followed by a hard thresholding operation. Let Hk(w)
+denote a hard thresholding operator that keeps the largest
+k entries in magnitude and sets the other entries equal to
+zero. Then, given a solution w(t+1) at the t-th iteration,
+GHT performs the following update:
+
+(cid:16)
+
+(cid:17)
+w(t+1) − η∇F(w(t+1))
+
+,
+
+w(t+1) = Hk
+
+where Hk(·) is the hard thresholding operator, which keeps
+the largest k (in magnitude) entries and sets the other en-
+tries equal to zero, ∇F(w(t+1)) is the gradient of the ob-
+jective at w(t+1) and η is a step size. Existing literature has
+shown that under suitable conditions, the GHT algorithm
+attains linear convergence to an approximately global opti-
+mum with optimal estimation accuracy with high probabil-
+ity (Yuan et al., 2013; Jain et al., 2014).
+The GHT algorithm, though enjoying good convergence
+rates, is not suitable for solving large-scale problems. The
+computational bottleneck stems from the fact that the GHT
+algorithm evaluates the (full) gradient at each iteration;
+its computational complexity therefore depends linearly on
+the number of samples. The GHT algorithm, therefore,
+becomes computationally expensive for high-dimensional
+problems with large sample size.
+To address the scalability issue, (Nguyen et al., 2014) con-
+siders a scenario that is a typical setting in machine learning
+wherein the objective function decomposes over samples,
+i.e. where the objective function F(w) takes an additive
+form over many smooth component functions:
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+fi(w) and ∇F(w) =
+
+1
+n
+
+∇fi(w),
+
+n(cid:88)
+
+i=1
+
+n(cid:88)
+
+i=1
+
+F(w) =
+
+1
+n
+
+and each fi(w) is associated with a few samples (i.e., the
+mini-batch setting).
+In such settings, we exploit the ad-
+ditive nature of F(w) and consider a stochastic gradient
+hard thresholding (SGHT) algorithm based on unbiased es-
+timates of the full gradient rather than computing it.
+In
+particular, the SGHT algorithm estimates the full gradient
+∇F(w(t+1)) by a stochastic gradient ∇fi(w(t+1)), where
+fi(w) is uniformly randomly sampled from all n compo-
+nent functions at each iteration. Though the SGHT algo-
+rithm greatly reduces the computational complexity in each
+iteration, it can only obtain an estimator with suboptimal
+estimation accuracy, owing to the variance of the stochas-
+tic gradient introduced by random sampling. Moreover, the
+theoretical analysis in (Nguyen et al., 2014) requires F(w)
+to satisfy the Restricted Isometry Property (RIP) with pa-
+rameter 1/7, i.e., the restricted condition number of the
+Hessian matrix ∇2F(w) cannot exceed 4/3 (see more de-
+tails in §3). Taking sparse linear regression as an exam-
+ple, such an RIP condition requires the design matrix to be
+nearly orthogonal, which is not satisﬁed by many simple
+random correlated Gaussian designs (Raskutti et al., 2010).
+To address the suboptimal estimation accuracy and the re-
+strictive requirement on F(w) in the stochastic setting, we
+propose a stochastic variance reduced gradient hard thresh-
+olding (SVR-GHT) algorithm. More speciﬁcally, we ex-
+ploit a semi-stochastic optimization scheme to reduce the
+variance introduced by the random sampling (Johnson &
+Zhang, 2013; Koneˇcn`y & Richt´arik, 2013; Zhao et al.,
+2014b). The SVR-GHT algorithm contains two nested
+loops: In each outer loop, SVR-GHT calculates the full
+gradient. In the subsequent inner loops, on each iteration
+the stochastic gradient update is adjusted by the full gradi-
+ent followed by hard thresholding. This simple modiﬁca-
+tion enables the algorithm to attain linear convergence to an
+approximately global optimum with optimal estimation ac-
+curacy, and meanwhile the amortized computational com-
+plexity remains similar to that of conventional stochastic
+optimization. Moreover, our theoretical analysis is appli-
+cable to an arbitrarily large restricted condition number of
+the Hessian matrix ∇2F(w).
+Several existing algorithms are closely related to our pro-
+posed algorithm, including the proximal stochastic vari-
+ance reduced gradient algorithm (Xiao & Zhang, 2014),
+stochastic averaging gradient algorithm (Roux et al., 2012)
+and stochastic dual coordinate ascent algorithm (Shalev-
+Shwartz & Zhang, 2013). However, these algorithms guar-
+antee global linear convergence only for strongly convex
+optimization problems. Several existing statistical meth-
+ods are also closely related to cardinality constrained M-
+estimators,
+including nonconvex constrained/regularized
+
+j |vj|, (cid:107)v(cid:107)2
+
+M-estimators (Shen et al., 2012; Loh & Wainwright,
+2013). These methods usually require somewhat compli-
+cated computational formulation and often involve many
+tuning parameters (see more details in §6).
+2. Algorithm
+Before we proceed with the proposed algorithm, we intro-
+we deﬁne vector norms: (cid:107)v(cid:107)1 =(cid:80)
+2 =(cid:80)
+duce some notation. Given an integer n ≥ 1, we deﬁne
+[n] = {1, . . . , n}. Given a vector v = (v1, . . . , vd)(cid:62)
+∈ Rd,
+j ,
+j v2
+and (cid:107)v(cid:107)∞ = maxj |vj|. Given an index set I ⊆ [d], we
+deﬁne I C as the complement set of I, and vI ∈ Rd, where
+Given two vectors v, w ∈ Rd, we use (cid:104)v, w(cid:105) =(cid:80)d
+[vI]j = vj if j ∈ I and [vI]j = 0 if j /∈ I. We use
+supp(v) to denote the index set of nonzero entries of v.
+i=1 viwi
+to denote the inner product. Given a matrix A ∈ Rn×d, we
+use A(cid:62) to denote the transpose, and Ai∗ (or A∗j) to de-
+note the i-th row (or j-th column) of A. Given an index
+set I ⊆ [d], we denote the submatrix of A with all row (or
+column) indices in I by AI∗ (or A∗I). Moreover, we use
+the common notations of Ω(·) and O(·) to characterize the
+asymptotics of two real sequences. We denote log(·) as the
+natural logarithm when we do not specify the base.
+We summarize the proposed stochastic variance reduced
+gradient hard thresholding (SVR-GHT) algorithm in Algo-
+rithm 1. Different from the SGHT algorithm proposed in
+(Nguyen et al., 2014), our SVR-GHT algorithm adopts the
+semi-stochastic optimization scheme proposed in (Johnson
+& Zhang, 2013), which can guarantee that the variance in-
+troduced by stochastic sampling over component functions
+diminishes with the optimization error.
+
+for r = 1, 2, . . .
+
+Algorithm 1 Stochastic Variance Reduced Gradient Hard
+Thresholding Algorithm.
+Input: update frequency m, step size parameter η, sparsity
+
+k, and initial solution (cid:101)w(0)
+(cid:80)n
+(cid:101)w = (cid:101)w(r−1),(cid:101)µ = 1
+i=1 ∇fi((cid:101)w), w(0) = (cid:101)w
+∇fit(w(t)) − ∇fit((cid:101)w) +(cid:101)µ(cid:1)
+(S2) ¯w(t+1) = w(t)−η(cid:0)
+for t = 0, 1, . . . , m − 1
+(S1) Randomly sample it from [n]
+(S3) w(t+1) = Hk( ¯w(t+1))
+(cid:101)w(r) = w(m)
+end for
+
+n
+
+end for
+
+3. Analysis
+Throughout the analysis, we assume that the objective
+function F(w) satisﬁes the restricted strong convexity
+(RSC) condition, and the component functions {fi(w)}n
+satisfy the restricted strong smoothness (RSS) condition.
+Deﬁnition 3.1 (Restricted Strong Convexity Condition). A
+differentiable function F is restricted ρ−
+s -strongly convex
+
+i=1
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+(cid:0)[n + κs] · log( 1
+
+ )(cid:1). In contrast, the over-
+
+complexity is O
+all computational complexity of GHT is O(κsn log( 1
+ )).
+Thus SVR-GHT gains a signiﬁcant improvement over GHT
+when κs and n are large.
+(II) Statistical Theory: We next present the statistical the-
+ory of constrained M-estimators obtained by the proposed
+SVR-GHT algorithm. Our analysis is applicable to a large
+family of statistical learning problems, including general-
+ized linear models, low-rank matrix estimation (where the
+cardinality constraint would be replaced by a rank con-
+straint) and sparse precision matrix estimation. We focus
+here on the most popular example: sparse linear regres-
+sion, and leave the exploration of other models to future
+investigation.
+We estimate the unknown sparse regression coefﬁcient vec-
+tor w∗
+∈ Rd from a noisy observation vector y ∈ Rn of
+linear measurements: y = Aw∗ + z, where A ∈ Rnb×d
+is a design matrix, and z ∈ Rnb ∼ N (0, σ2I). Here, we
+divide A into n submatrices, each of which contains b rows
+of A. We denote the i-th submatrix as ASi∗, where Si is
+the corresponding row indices of A with |Si| = b for all
+i = 1, ..., n. Then, the corresponding problem is
+
+1
+n
+
+1
+b(cid:107)ySi − ASi∗w(cid:107)2
+
+(3.7)
+min
+w∈Rd
+We assume that (cid:107)v(cid:107)0 ≤ s, v ∈ Rd, the design matrix A
+satisﬁes maxj (cid:107)A∗j(cid:107)2
+
+s.t. (cid:107)w(cid:107)0 ≤ k.
+
+i=1
+
+√
+
+2
+
+n(cid:88)
+
+ηρ
+
+s
+
+s
+
+.
+
+ρ
+
+(cid:107)2
+2.
+
+(cid:107)2
+2.
+
+αm(α−1)
+
+s )(αm−1)
+
+−
+s (1−6ηρ+
+
+(cid:105) ≤ ρ+
+
+s > 0 such
+
+4, Algorithm 1 returns
+
+s > 0 such that for any w, w(cid:48)
+
+(cid:107)0 ≤ s, we have
+2 (cid:107)w − w(cid:48)
+
+∈ Rd with (cid:107)w − w(cid:48)
+(cid:105) ≥ ρ−
+
+at sparsity level s if there exists a constant ρ−
+that for any w, w(cid:48)
+F(w) − F(w(cid:48)) − (cid:104)∇F(w(cid:48)), w − w(cid:48)
+(3.1)
+Deﬁnition 3.2 (Restricted Strong Smoothness Condition).
+For any i ∈ [n], a differentiable function fi is restricted ρ+
+s -
+strongly smooth at sparsity level s if there exists a uniform
+∈ Rd with (cid:107)w −
+constant ρ+
+w(cid:48)
+(cid:107)0 ≤ s, we have
+fi(w) − fi(w(cid:48)) − (cid:104)∇fi(w(cid:48)), w − w(cid:48)
+2 (cid:107)w − w(cid:48)
+(3.2)
+We also deﬁne the restricted condition number as κs = ρ+
+s
+−
+s
+(I) Computational Theory: We ﬁrst present our main re-
+sult characterizing the error of the objective value and esti-
+mation error of parameters.
+Theorem 3.3. Let w∗ be a sparse vector of the true model
+parameter such that (cid:107)w∗
+(cid:107)0 ≤ k∗. Suppose F(w) satisﬁes
+i=1 satisfy RSS condition with
+RSC condition and {fi(w)}n
+sk∗,
+s = 2k+k∗, and Algorithm 1 is invoked with k ≥ C1κ2
+C1, C2, C3 and C4. Deﬁne(cid:101)I = supp (H2k(∇F(w∗))) ∪
+s ∈ [C2, C3] and m ≥ C4κs for some constants
+ηρ+
+√
+supp(w∗). Then, given some α = 1 + 2
+k∗√
+k−k∗ satisfying
+F((cid:101)w(r)) − F(w∗)(cid:3)
+E(cid:2)
+(cid:0) 3
+F((cid:101)w(0)) − F(w∗)(cid:3) + g1(w∗),
+(cid:1)r(cid:2)
++ 6ηρ+
+s ≤ 3
+1−6ηρ+
+(cid:114)
+≤
+E(cid:107)(cid:101)w(r) − w∗
+4 )r[F((cid:101)w(0))−F(w∗)]
+(cid:113) 12η
+s )(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+(cid:17)(cid:109)
+
+(3.3)
++ g2(w∗),
+(3.4)
+2 and g2(w∗) =
+are pertur-
+bations depending on w∗. Moreover, given a constant
+δ ∈ (0, 1) and a pre-speciﬁed accuracy ε > 0, we need at
+most r =
+outer iterations such
+that with probability at least 1− δ, we have simultaneously
+(3.5)
+
+(cid:107)2 ≤
+where g1(w∗) =
+√
++ (cid:107)∇(cid:101)IF(w∗)(cid:107)2
+2
+(cid:16)F ((cid:101)w(0))−F (w∗
+(cid:113)
+) ≤ ε + g1(w∗
+2ε/ρ−
+(cid:107)2 ≤
+
+F((cid:101)w(r)) − F(w∗
+(cid:107)(cid:101)w(r) − w∗
+
+s + g2(w∗
+(I) Our
+Theorem 3.3 has three important implications:
+analysis for SVR-GHT allows κs to increase with (n, d, k∗)
+as long as F(w) and all fi(w)’s satisfy RSC and RSS at
+sk∗). In contrast, the analysis for
+sparsity level s = Ω(κ2
+3, which
+SGHT in (Nguyen et al., 2014) requires κ ≤ 4
+(II) Existing literature shows that di-
+can be restrictive;
+rectly calculating min(cid:107)w(cid:107)0≤k∗ F(w) is NP-hard (Natara-
+sk∗),
+jan, 1995). But with a suitably chosen k = Ω(κ2
+GHT; (III) To get (cid:101)w(r) satisfying (3.5) and (3.6), we need
+we can obtain a good approximation of w∗ by SVR-
+ )) outer iterations. Since within each outer itera-
+O(log( 1
+tion, we need to calculate a full gradient and m stochas-
+tic variance reduced gradients, the overall computational
+
+(1−6ηρ+
+
+s(cid:107)∇F (w∗
+
+(1−6ηρ+
+
+(3.6)
+
+(cid:108)
+
+4 log
+
+)(cid:107)∞
+
+−
+ρ
+s
+
+2( 3
+
+s )ρ
+
+−
+s
+
+ρ
+
+−
+s
+
+s
+
+4
+
+),
+
+).
+
+)
+
+εδ
+
+6η
+
+nb
+
+(cid:107)Av(cid:107)2
+(cid:107)ASi∗v(cid:107)2
+
+2
+
+2
+
+nb ≥ ψ1(cid:107)v(cid:107)2
+≤ ψ2(cid:107)v(cid:107)2
+b
+
+≤ 1 and
+2 − ϕ1
+2 + ϕ2
+
+log d
+nb (cid:107)v(cid:107)2
+1,
+log d
+b (cid:107)v(cid:107)2
+1, ∀i ∈ [n],
+
+(3.8)
+
+where ψ1, ψ2, ϕ1 and ϕ2 are constants that do not scale
+with (n, b, k∗, d). Existing literature has shown that (3.8) is
+satisﬁed by many common examples of sub-Gaussian ran-
+dom design (Raskutti et al., 2010; Agarwal et al., 2012).
+The next lemma shows (3.8) implies RSC and RSS.
+Lemma 3.4. Assume that the design matrix A satisﬁes
+(3.8). Given large enough n and b, there exist a constant
+i=1 sat-
+C5 and an integer k such that F(w) and {fi(w)}n
+isfy the RSC and RSS conditions with s = 2k + k∗, where
+
+≥ C1κ2
+
+s ≤ 2ψ2.
+
+k = C5k∗
+
+s ≥ ψ1/2, and ρ+
+∈ Rd in sparse linear model,
+2(cid:107)A(w − w(cid:48))(cid:107)2
+2.
+. Combining these with (3.8), we have ρ−
+
+sk∗, ρ−
+Proof Sketch. For any w, w(cid:48)
+we have ∇2F(w) = A(cid:62)A and
+F(w) − F(w(cid:48)) − (cid:104)∇F(w(cid:48)), w − w(cid:48)
+By (3.8), if b ≥ ϕ2s log d
+nb ≥ 2ϕ1s log d
+ψ1
+2 ψ1, and ρ+
+κs = ρ+
+s
+−
+ρ
+k = C5k∗
+
+, then we have
+s ≥
+s ≤ 2ψ2. By the deﬁnition of κ, this indicates
+, we have
+
+. Then for some C5 ≥ 16C1ψ2
+sk∗.
+
+(cid:105) = 1
+and n ≥ 2ϕ1ψ2
+
+s ≤ 4ψ2
+≥ C1κ2
+
+ψ1ϕ2
+
+ψ2
+1
+
+ψ2
+
+ψ1
+
+1
+
+2
+
+(cid:17)
+
+(cid:16)
+
+1 +
+
+(cid:107)2
+2 ≤
+
+(cid:107)w − w∗
+
+See detailed proof in Appendix A. Since Lemma 3.4 guar-
+i=1 satisfy the RSC and RSS
+antees that F(w) and {fi(w)}n
+conditions, Theorem 3.3 is applicable to the SVR-GHT al-
+gorithm for solving (3.7). This allows us to establish the
+following statistical guarantee for the obtained estimator.
+Theorem 3.5. Suppose that the design matrix A satisﬁes
+(3.8), and k, η and m are speciﬁed as in Theorem 3.3.
+Then given a constant δ ∈ (0, 1), a sufﬁciently small ac-
+curacy ε > 0, and large enough n and b, we need at most
+outer iterations such that
+r =
+with high probability, we have
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+2√k∗
+(cid:107)Hk(w) − w∗
+√k − k∗
+Proof Sketch. For notational convenience, deﬁne w(cid:48) =
+Hk(w). Let supp(w∗) = I
+∗, supp(w) = I, supp(w(cid:48)) =
+(cid:48), and w(cid:48)(cid:48) = w − w(cid:48) with supp(w(cid:48)(cid:48)) = I
+(cid:48)(cid:48). Clearly
+I
+(cid:48)
+(cid:48)(cid:48) = I, I
+(cid:48)
+we have I
+∩ I
+∪ I
+2 =
+(cid:107)w(cid:48)
+2 + (cid:107)w(cid:48)(cid:48)
+2. Then we have that
+(cid:107)2
+(cid:107)2
+− w∗
+2 − (cid:107)w − w∗
+2 = 2(cid:104)w(cid:48)(cid:48), w∗
+(cid:107)w(cid:48)
+(cid:107)2
+(cid:107)2
+(cid:105) − (cid:107)w(cid:48)(cid:48)
+If 2(cid:104)w(cid:48)(cid:48), w∗
+2 ≤ 0, then (4.1) holds naturally. We
+(cid:107)2
+(cid:105) − (cid:107)w(cid:48)(cid:48)
+will discuss when 2(cid:104)w(cid:48)(cid:48), w∗
+∗
+(cid:48) = I
+∗1 and I
+∗2, and denote
+Let I
+∩ I
+(w∗)I∗1 = w∗1, (w∗)I∗2 = w∗2, (w(cid:48))I∗1 = w1∗, and
+(w(cid:48)(cid:48))I∗2 = w2∗. Then we have that
+
+(cid:17)(cid:109)
+(cid:16)F ((cid:101)w(0))−F (w∗
+(cid:16)
+σ(cid:112)k∗ log d/(nb)
+
+(cid:48)(cid:48) = ∅, and (cid:107)w(cid:107)2
+(cid:105) − (cid:107)w(cid:48)(cid:48)
+(cid:107)2
+2.
+
+(cid:108)
+(cid:107)(cid:101)w(r) − w∗
+
+2 > 0.
+(cid:107)2
+(cid:48)(cid:48) = I
+
+(cid:107)2 = O
+sparse
+
+∩ I
+
+(cid:107)2
+2.
+
+(3.9)
+
+(4.1)
+
+(cid:17)
+
+4 log
+
+εδ
+
+∗
+
+.
+
+)
+
+2(cid:104)w(cid:48)(cid:48), w∗
+
+(cid:105) − (cid:107)w(cid:48)(cid:48)
+2 ≤ 2(cid:104)w2∗, w∗2(cid:105) − (cid:107)w2∗
+(cid:107)2
+(cid:107)2(cid:107)w∗2(cid:107)2 − (cid:107)w2∗
+≤ 2(cid:107)w2∗
+(cid:107)2
+2.
+
+(cid:107)2
+
+2
+
+(4.2)
+
+∗2| = k∗∗ and w2,max = (cid:107)w2∗
+Let |supp(w2∗)| = |I
+(cid:107)∞,
+then consequently we have (cid:107)w2∗
+(cid:107)2 = m· w2,max for some
+m ∈ [1,√k∗∗]. Notice that we are interested in 1 ≤ k∗∗
+≤
+k∗, because (4.1) holds naturally if k∗∗ = 0. We consider
+three cases to maximize the RHS of (4.2):
+Case 1: If (cid:107)w∗2(cid:107)2 ≤ w2,max, then the RHS of (4.2) is
+maximized when m = 1, i.e. w2∗ has only one nonzero
+element w2,max. By calculation, we have
+
+(cid:107)w(cid:48)
+
+− w∗
+
+2 − (cid:107)w − w∗
+(cid:107)2
+(cid:107)w − w∗(cid:107)2
+
+2
+
+(cid:107)2
+
+2
+
+≤
+
+1
+
+k − k∗ .
+
+(4.3)
+
+Case 2: If w2,max < (cid:107)w∗2(cid:107)2 < √k∗∗w2,max, then the
+
+(cid:107)w∗2(cid:107)2
+w2,max
+
+. By calcu-
+
+RHS of (4.2) is maximized when m =
+lation, we have
+− w∗
+2 − (cid:107)w − w∗
+(cid:107)2
+(cid:107)w − w∗(cid:107)2
+
+(cid:107)w(cid:48)
+
+(cid:107)2
+
+≤
+
+2
+
+2
+
+k∗∗
+
+k − k∗ + k∗∗ .
+
+(4.4)
+
+Case 3: If (cid:107)w∗2(cid:107)2 ≥ √k∗∗w2,max, then the RHS of (4.2)
+is maximized when m = √k∗∗. By calculation, we have
+(cid:107)w(cid:48)
+
+− w∗
+
+(cid:107)2
+
+2
+
+(cid:27)
+
+We have desired result from (4.3), (4.4) and (4.5).
+
+See detailed proof in Appendix C. Lemma 4.1 shows that
+the hard thresholding operator is nearly non-expansive
+√
+when k is much larger than k∗ such that
+k∗√
+k−k∗ is very
+2
+small (bounded away from 1).
+
+linear model, we
+
+Proof Sketch. For
+have
+∇F(w∗) = A(cid:62)z/(nb). Since z has i.i.d. N (0, σ2)
+entries, then A(cid:62)
+2/(nb)2) for
+(cid:19)
+any j ∈ [d]. Using the Mill’s inequality for tail bounds of
+Normal distribution, we have
+P
+= P
+
+∗jz/(nb) ∼ N (0, σ2(cid:107)A∗j(cid:107)2
+
+(cid:19)
+
+√
+nb log d
+(cid:107)A∗j(cid:107)2
+
+(cid:12)(cid:12)(cid:12)(cid:12) > 2σ
+
+(cid:18)(cid:12)(cid:12)(cid:12)(cid:12) A(cid:62)
+
+(cid:12)(cid:12)(cid:12)(cid:12) > 2
+
+∗j z
+nb
+
+(cid:113) log d
+(cid:16)
+− 4nb log d
+(cid:107)A∗j(cid:107)2
+
+nb
+
+2
+
+(cid:18)(cid:12)(cid:12)(cid:12)(cid:12) A(cid:62)
+(cid:17) (i)
+∗j z
+σ(cid:107)A∗j(cid:107)2
+≤ d−4√
+
+√
+
+(cid:107)A∗j(cid:107)2
+2πnb log d · exp
+
+nb
+
+nb
+
+nb
+
+(cid:13)(cid:13)(cid:13)2
+
+≤ 1. Then
+
+(cid:13)(cid:13)(cid:13) A(cid:62)z
+
+2π log d · d−4.
+1√
+
+2 ≤ s(cid:107)∇F(w∗)(cid:107)2∞ = s
+
+2π log d ,
+≤
+where (i) is from the assumption maxj (cid:107)A∗j(cid:107)2
+√
+2π log d · d−4
+1√
+with probability at least 1 −
+(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+∞ ≤ 4σ2s log d
+.
+When r is as speciﬁed, s = 2k + k∗ = (2C5 + 1) k∗ from
+Lemma 3.4 and (3.4) holds from Theorem 3.3, we have
+(3.9) with probability at least 1 − δ −
+See detailed proof in Appendix B. Theorem 3.5 guarantees
+that the obtained estimator attains the optimal rate of con-
+vergence in parameter estimation (Raskutti et al., 2011), re-
+gardless whether n is allowed to scale with (b, k∗, d) or not.
+In contrast (Nguyen et al., 2014) only considers a ﬁxed n
+setting, and shows that the estimator obtained by the SGHT
+
+algorithm only attains O(σ(cid:112)k∗ log d/b) with high proba-
+
+bility (See Corollary 5 in (Nguyen et al., 2014)). Hence
+their result is suboptimal w.r.t. n, while ours allow n to
+scale with (b, k∗, d).
+4. Main Proof
+We ﬁrst present two key technical lemmas that will be in-
+strumental in developing the computational theory for our
+proposed algorithm and throughout the rest of the paper.
+Lemma 4.1. Let w∗
+∈ Rd be a sparse vector such that
+(cid:107)w∗
+(cid:107)0 ≤ k∗, and Hk(·) : Rd → Rd be the hard threshold-
+ing operator, which keeps the largest k entries (in magni-
+tude) and sets the other entries equal to zero. Given k > k∗,
+for any vector w ∈ Rd, we have
+
+(cid:26)
+
+2 − (cid:107)w − w∗
+(cid:107)2
+(cid:107)w − w∗(cid:107)2
+k∗∗
+k−k∗+k∗∗ ,
+
+2
+
+≤ max
+
+√
+k∗∗
+4 k∗∗−√
+2
+2√k−k∗+ 5
+
+k∗∗
+
+. (4.5)
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+Remark 4.2. Though Lemma 4.1 looks similar to Lemma
+1 in (Jain et al., 2014), they are essentially different. We
+provide a ratio of the distances between w and a k∗-sparse
+vector w∗, before and after hard thresholding operation on
+w, which is more intuitive than what is presented in (Jain
+et al., 2014) that gives a ratio of the distance between w
+and Hk(w), and the distance between w and w∗. Besides,
+Lemma 4.1 is a also a key property that allow us to tol-
+erate a large condition number κs, compared with a small
+bounded κs in (Nguyen et al., 2014), as long as the hard
+thresholding parameter k is large enough.
+
+For notational simplicity, we denote the full gradient and
+the stochastic variance reduced gradient by
+
+(cid:101)µ = ∇F((cid:101)w) =
+
+1
+n
+
+n(cid:88)
+
+∇fi((cid:101)w)
+
+g(t)(w(t)) = ∇fit(w(t)) − ∇fit((cid:101)w) +(cid:101)µ.
+
+i=1
+
+and
+
+(cid:107)0 ≤ k∗, I
+
+The next lemma shows that g(t)(wt−1) is an unbiased es-
+timator of ∇F(wt−1) with a well controlled second order
+moment over a sparse support.
+Lemma 4.3. Suppose that F(w) and all fi(w)’s satisfy
+the RSC and RSS conditions with s = 2k + k∗. Let w∗
+∈
+Rd be a sparse vector with (cid:107)w∗
+∗ = supp(w∗),
+and w(t) be a sparse vector with (cid:107)w(t)(cid:107)0 ≤ k, I (t) =
+∗
+supp(w(t)). Then conditioning on w(t), for any I ⊇ (I
+∪
+(cid:2)
+F(w(t)) − F(w∗) + F((cid:101)w) − F(w∗)(cid:3)
+I (t)), we have E[g(t)(w(t))] = ∇F(w(t)) and
+E(cid:107)g(t)I (w(t))(cid:107)2
++3(cid:107)∇IF (w∗)(cid:107)2
+2.
+Eg(t)(w(t)) = E∇fit(w(t)) − E∇fit((cid:101)w) +(cid:101)µ = ∇F(w(t)).
+For any i ∈ [n] and w with supp(w) ⊆ I, consider
+φi(w) = fi(w) − fi(w∗
+), w − w∗
+
+Proof Sketch. It is straightforward that g(t)(w(t)) satisﬁes
+
+) − (cid:104)∇fi(w∗
+
+Since ∇φi(w∗) = ∇fi(w∗) − ∇fi(w∗) = 0, we have
+φi(w∗) = minw φi(w), which implies
+
+2 ≤ 12ρ+
+
+(4.6)
+
+(cid:105).
+
+s
+
+0 ≤ φi(w) −
+
+1
+s (cid:107)∇φi(w)(cid:107)2
+2,
+2ρ+
+
+This further results in
+
+2
+
+(cid:107)∇Ifi(w) − ∇Ifi(w∗
+2 ≤ (cid:107)∇fi(w) − ∇fi(w∗
+)(cid:107)2
+)(cid:107)2
+) − (cid:104)∇Ifi(w∗
+), w − w∗
+s [fi(w) − fi(w∗
+≤ 2ρ+
+(cid:105)] ,
+(cid:80)n
+i=1 (cid:107)∇Ifi(w) − ∇Ifi(w∗)(cid:107)2
+
+Since the sampling of i from [n] is uniform sampling, this
+implies
+E(cid:107)∇Ifi(w) − ∇Ifi(w∗)(cid:107)2
+s [F(w) − F(w∗) − (cid:104)∇IF(w∗), w − w∗
+≤ 2ρ+
+s [F(w) − F(w∗)],
+≤ 4ρ+
+
+2 = 1
+n
+
+(4.7)
+
+(cid:105)]
+
+2
+
+2
+
+By the deﬁnition of g(t)I , we can verify the second claim as
+≤ 3E(cid:107) [∇Ifit((cid:101)w) − ∇Ifit(w∗)] − ∇IF((cid:101)w) + ∇IF(w∗)(cid:107)2
+E(cid:107)g(t)I (w(t))(cid:107)2
++3E(cid:107)∇Ifit(w(t)) − ∇Ifit(w∗)(cid:107)2
+2 + 3(cid:107)∇IF(w∗)(cid:107)2
++3E(cid:107)∇Ifit((cid:101)w) − ∇Ifit(w∗)(cid:107)2
+≤ 3E(cid:107)∇Ifit(w(t)) − ∇Ifit(w∗)(cid:107)2
+
+2 + 3(cid:107)∇IF(w∗)(cid:107)2
+2.
+
+(i)
+
+2
+
+2
+
+2
+
+Then (i) results in (4.6) from (4.7).
+See detailed proof in Appendix D. When w∗ is a global
+minimizer, for convex problems, we have ∇F(w∗) = 0
+(or the differential of F(w∗) contains 0 in composite min-
+imization settings). However, we are working on a non-
+convex optimization problem without such a convenience.
+This eventually results in this additional (cid:107)∇IF(w∗)(cid:107)2
+2 on
+the R.H.S of (4.6), which is different from existing variance
+reduction results in (Johnson & Zhang, 2013; Koneˇcn`y &
+Richt´arik, 2013; Zhao et al., 2014b).
+Remark 4.4. w∗ can be arbitrary k∗ sparse vector (1.1) in
+our analysis. While in establishing the statistical properties
+
+of the obtained estimator (cid:101)w(r), if w∗ is the true model pa-
+rameter, we have the estimate of expected F((cid:101)w(r)) within
+the ε + c(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+which results in that our estimator (cid:101)w(r) is within the opti-
+2 distance to the expected F(w∗),
+mal statistical accuracy to the true model parameter w∗.
+Now we are ready to provide the proof of Theorem 3.3. We
+present the proof as two parts.
+Part 1: We ﬁrst demonstrate (3.3) and (3.4).
+let v =
+∗ =
+w(t)−ηg(t)I (w(t)) and I = I
+∪I (t)∪I (t+1), where I
+supp(w∗), I (t) = supp(w(t)) and I (t+1) = supp(w(t+1)).
+Conditioning on w(t), we have the following expectation
+E(cid:107)v − w∗
+2 = E(cid:107)w(t) − ηg(t)I (w(t)) − w∗
+(cid:107)2
+= E(cid:107)w(t) − w∗
+2 + η2E(cid:107)g(t)I (w(t))(cid:107)2
+(cid:107)2
+F(w(t)) − F(w∗)(cid:3)
+= E(cid:107)w(t) − w∗
+2 + η2E(cid:107)g(t)I (w(t))(cid:107)2
+(cid:107)2
+(cid:2)
+F(w(t)) − F(w∗) + F((cid:101)w) − F(w∗)(cid:3)
+≤ E(cid:107)w(t) − w∗
+2 + η2E(cid:107)g(t)I (w(t))(cid:107)2
+(cid:107)2
+≤ E(cid:107)w(t) − w∗
+2 + 12η2ρ+
+(cid:107)2
+s )(cid:2)
+s
+= E(cid:107)w(t) − w∗
+
+2 − 2η(cid:2)
+F(w(t)) − F(w∗)(cid:3) + 3η2(cid:107)∇IF(w∗)(cid:107)2
+−2η(cid:2)
+F(w(t)) − F(w∗)(cid:3)
+s [F((cid:101)w) − F(w∗)] + 3η2(cid:107)∇IF(w∗)(cid:107)2
+
+2 − 2η(cid:104)w(t) − w∗, Eg(t)I (w(t))(cid:105)
+2 − 2η(cid:104)w(t) − w∗,∇IF(w(t))(cid:105)
+
+2 − 2η(1 − 6ηρ+
+(cid:107)2
+
++12η2ρ+
+
+(4.8)
+
+(cid:107)2
+
+2,
+
+∗
+
+2
+
+2
+
+where the ﬁrst inequality follows from the RSC condition
+(3.2) and the second inequality follows from Lemma 4.3.
+Since w(t+1) = ¯w(t+1)
+= vk, i.e. w(t+1) is the best k-
+sparse approximation of v, then we have from Lemma 4.1,
+
+k
+
+(cid:107)w(t+1) − w∗
+
+(cid:107)2
+2 ≤
+
+1 +
+
+(cid:107)v − w∗
+
+2. (4.9)
+(cid:107)2
+
+(cid:32)
+
+(cid:33)
+
+2√k∗
+√k − k∗
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+2
+
+2
+
+−
+ρ
+s
+
+α−1
+
+α−1
+
+(4.11)
+
+(4.10)
+
++ 12η2ρ+
+
++ 12η2ρ+
+
+s (αm−1)
+α−1
+
+s (αm−1)
+α−1
+
+(cid:107)2
+2 + 12αη2ρ+
+
+2 − 2αη(1 − 6ηρ+
+
++3αη2(cid:107)∇IF(w∗)(cid:107)2
+
+where the last inequality follows from the RSC condition
+
+√
+k∗√
+k−k∗ . Combining (4.8) and (4.9), we have
+2 ≤ αE(cid:107)w(t) − w∗
+(cid:107)2
+
+Let α = 1 + 2
+s [F((cid:101)w) − F(w∗)]
+s )(cid:2)
+F(w(t)) − F(w∗)(cid:3) .
+E(cid:107)w(t+1) − w∗
+Notice that (cid:101)w = w(0) = (cid:101)w(r−1). By summing (4.10) over
+t = 0, 1, . . . , m − 1 and taking expectation with respect to
+F((cid:101)w(r)) − F(w∗)(cid:3)
+E(cid:2)
+all t’s, we have
+2 + 2η(1−6ηρ+
+s )(αm−1)
+E(cid:107)w(m) − w∗
+≤ αmE(cid:107)(cid:101)w(r−1) − w∗
+(cid:107)2
+α−1
+E(cid:2)
+F((cid:101)w(r−1)) − F(w∗)(cid:3)
+2 + 3η2(αm−1)
+E(cid:107)∇IF(w∗)(cid:107)2
+(cid:107)2
+F((cid:101)w(r−1)) − F(w∗)(cid:3) + 3η2(αm−1)
+E(cid:2)
+E(cid:2)
+F((cid:101)w(r−1)) − F(w∗)(cid:3),
+≤ 2αm
+≤ βE(cid:2)
+
+(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+(3.1) and the deﬁnition of(cid:101)I. It further follows from (4.11),
+E(cid:2)
+F ((cid:101)w(r)) − F (w∗)(cid:3)
+
+F ((cid:101)w(r−1)) − F (w∗)(cid:3)
+s )(cid:107)∇(cid:101)IF(w∗)(cid:107)2
++ 6ηρ+
+where β =
+1−6ηρ+
+recursively, we obtain (3.3) when β ≤ 3
+F(w∗) ≤ F((cid:101)w(r)) + (cid:104)∇F(w∗), w∗
+2 (cid:107)(cid:101)w(r) − w∗
+We then demonstrate (3.4). It follows from RSC condition
+F((cid:101)w(0)) − F(w∗)(cid:3) +
+Let ζ =(cid:0) 3
+(cid:1)r(cid:2)
+(cid:107)2
+2.
+(4.13)
+s )(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+2.
+E(cid:2)
+F((cid:101)w(r)) − ζ(cid:3)
+≤ E(cid:104)
+(cid:105)
+≤ F(w∗)
+F((cid:101)w(r)) + (cid:104)∇F(w∗), w∗
+2 (cid:107)(cid:101)w(r) − w∗
+− (cid:101)w(r)(cid:105) ≤ (cid:107)∇F(w∗)(cid:107)∞E(cid:107)(cid:101)w(r) − w∗
+Using the duality of norms, we have
+≤ √s(cid:107)∇F(w∗)(cid:107)∞E(cid:107)(cid:101)w(r) − w∗
+E(cid:104)∇F(w∗), w∗
+(cid:107)1
+(4.15)
+Combining (4.14), (4.15) and (E[x])2 ≤ E[x2], we have
+2 (E(cid:107)(cid:101)w(r) − w∗
+(cid:107)2)2 ≤ √s(cid:107)∇F(w∗)(cid:107)∞E(cid:107)(cid:101)w(r) − w∗
+ρ−
+(cid:107)2 + ζ.
+Let a = E(cid:107)(cid:101)w(r) − w∗
+(4.16)
+(cid:107)2. From (4.16), we solve the fol-
+
+− (cid:101)w(r)(cid:105) − ρ−
+
+− (cid:101)w(r)(cid:105) − ρ−
+
+Combining (3.3) and (4.13), we have
+
+. Apply (4.12)
+
+(cid:107)2
+.
+(4.14)
+
+2. (4.12)
+
+−
+s (1−6ηρ+
+
+s )(αm−1)
+
+αm(α−1)
+
+lowing quadratic function of a,
+
+(1−6ηρ+
+
+4 < 1.
+
+2(1−6ηρ+
+
+(cid:107)2.
+
++
+
+ηρ
+
+6η
+
+3η
+
+4
+
+s
+
+s
+
+2
+
+s
+
+s
+
+s
+
+ρ−
+s
+2
+
+a2 − √s(cid:107)∇F(w∗
+
+)(cid:107)∞a − ζ ≤ 0,
+
+which yields the bound (3.4).
+Now we show that with k, η and m speciﬁed in the the-
+orem, we have the guarantee that β ≤ 1 provided appro-
+priate choices of constants. More speciﬁcally, let η ≤
+
+, then we have
+
+18ρ+
+s
+
+C3
+ρ+
+
+s ≤ 1
+k ≥ C1κ2
+α ≤ 1 +
+
+sk∗ and η ≥ C2
+ρ+
+s
+2√
+and
+C1−1·κs
+
+αm(α−1)
+
+−
+s (1−6ηρ+
+
+s )(αm−1) ≤
+
+ηρ
+
+6ηρ+
+s
+1−6ηρ+
+
+s ≤ 6C3
+
+2.
+1−6C3 ≤ 1
+
+If
+with C2 ≤ C3, then we have that
+(cid:17)
+
+2√
+
+(cid:16)
+
+C1−1·κs
+2√
+
+)−m
+
+C1−1·κs
+
+2C2
+3κs
+
+1 − (1 +
+
+(cid:17) .
+
+(4.17)
+
+(cid:16)
+
+3
+
+=
+
+C2√C1 − 1
+
+1 − (1 +
+
+2√
+
+C1−1·κs
+
+)−m
+
+Then (4.17) is guaranteed to be strictly smaller than 1
+β < 1, if we have
+
+2, i.e.
+
+m ≥ log1+
+
+2√
+
+C1−1·κs
+
+C2√C1 − 1
+C2√C1 − 1 − 6
+
+.
+
+(4.18)
+
+log1+
+
+2√
+
+C1−1·κs
+
+Using the the fact that ln(1 + x) > x/2 for x ∈ (0, 1), it
+follows that
+
+√
+C1−1
+√
+log C2
+C1−1−6
+C2
+2√
+log 1 +
+C1−1·κs
+
+(cid:112)
+
+C1 − 1 · κs.
+
+=
+
+C2√C1 − 1
+C2√C1 − 1 − 6
+≤ log
+
+C2√C1 − 1
+C2√C1 − 1 − 6 ·
+(cid:112)
+
+Then (4.18) holds if m satisﬁes
+
+3η
+
+(cid:27)
+
+(cid:26)
+
+ξr = max
+
+2(1−6ηρ+
+
+m ≥ log
+
+20, C3 = 1
+
+C1 − 1 · κs
+
+18 and C4 =
+
+C2√C1 − 1
+C2√C1 − 1 − 6 ·
+If we choose C1 = 1612, C2 = 1
+222, then we have β ≤ 3
+4.
+Part 2: Next, we demonstrate (3.5) and (3.6). Let ξ1, ξ2,
+ξ3, . . . be a non-negative sequence of random variables,
+which is deﬁned as
+
+F((cid:101)w(r)) − F(w∗) −
+s )(cid:107)∇(cid:101)IF(w∗)(cid:107)2
+(cid:1)r(cid:2)
+F((cid:101)w(0)) − F(w∗)(cid:3)
+(cid:0) 3
+−1 F((cid:101)w(0)) − F(w∗)
+
+For a ﬁxed ε > 0, it follows from (3.3) and Markov in-
+equality,
+P (ξr ≥ ε) ≤
+For a given δ ∈ (0, 1), let the RHS of (4.19) be no greater
+than δ, which requires
+(cid:17)(cid:109)
+Therefore, we have that if r =
+,
+then (3.5) holds with probability at least 1−δ. Finally, (3.6)
+holds consequently via combining (3.4) and (3.5).
+
+(cid:16)F ((cid:101)w(0))−F (w∗
+
+Eξr
+ε ≤
+
+r ≥ log( 3
+4 )
+
+. (4.19)
+
+(cid:108)
+
+4 log
+
+2, 0
+
+εδ
+
+εδ
+
+ε
+
+4
+
+.
+
+.
+
+)
+
+5. Experiments
+We compare the empirical performance of the SVR-GHT
+algorithm with two other candidate algorithms: GHT pro-
+posed in (Jain et al., 2014) and SGHT proposed in (Nguyen
+et al., 2014) on both synthetic data and real data.
+
+Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+5.1. Simulated Data
+We consider a sparse linear regression problem. We gener-
+ate each row of the design matrix Ai∗ ∈ Rd independently
+from N (0, Σ). The response vector is generated from the
+linear model y = Aw∗ + , where w∗
+∈ Rd is the re-
+gression coefﬁcient vector, and  ∈ Rn is generated from
+N (0, σ2I) with σ = 1. We set nb = 10000, d = 25000,
+k∗ = 200 and k = 500. For Σ, we set Σii = 1 and
+Σij = c for some constant c ∈ (0, 1) for all i (cid:54)= j. The
+nonzero entries in w∗ are sampled independently from a
+uniform distribution over the interval (−2, +2). We divide
+10000 samples into n mini batches evenly, and each mini
+batch contains b = 10000/n samples.
+We compare the performance of GHT, SGHT, and SVR-
+GHT for four different settings: (1) (n, b) = (10000, 1),
+Σij = 0.1; (2) (n, b) = (10000, 1), Σij = 0.5; (3)
+(n, b) = (200, 50), Σij = 0.1; (4) (n, b) = (200, 50),
+Σij = 0.5. For simplicity, we choose m = n through-
+out our experiments1. Figure 1 illustrates the result of ob-
+jective value vs.
+iterations under settings when (n, b) =
+(10000, 1), and results for (n, b) = (200, 50) are anal-
+ogous. Since the SGHT and SVR-GHT algorithms are
+stochastic, we plot the objective values averaged over 50
+different runs. We illustrate step sizes η = 1/256, 1/512
+and 1/1024. The horizontal axis corresponds to the num-
+ber of passes over the entire dataset; computing a full gra-
+dient is counted as 1 pass, while computing a stochastic
+gradient is counted as 1/n-th of a pass. The vertical axis
+objective value using (cid:101)w(0) = 0. We further provide the
+corresponds to the ratio of current objective value over the
+optimal relative estimation error (cid:107)(cid:101)w(106) − w∗
+(cid:107)2/(cid:107)w∗
+(cid:107)2
+after 106 effective passes of the entire dataset for each set-
+ting of three algorithms in Table 1. The optimal estima-
+tion error is obtained by averaging over 50 different runs,
+each of which is chosen from a sequence of step sizes
+η ∈ {1/25, 1/26, . . . , 1/214}.
+We see that SVR-GHT uniformly outperforms the other
+two candidate algorithms in terms of the convergence rate
+under all settings. While GHT also enjoys linear converge
+guarantees, its computational complexity within each itera-
+tion is n times larger than SVR-GHT; consequently, it per-
+formances much worse than SVR-GHT. Besides, we also
+see that SGHT converges worse than SVR-GHT in all set-
+tings. This is perhaps because the largest eigenvalue of
+any 500 by 500 submatrix of the covariance matrix is large
+(larger than 50 or 250) such that the underlying design ma-
+trix violates the Restricted Isometry Property (RIP). This
+might explain the poor performance of SGHT. On the other
+
+1Larger m results in increasing number of effective passes of
+the entire dataset required to achieve the same decrease of objec-
+tive values, which is also observed in a closed related proximal
+gradient method with variance reduction (Xiao & Zhang, 2014)
+
+(a) (n, b)1, Σ1
+
+(b) (n, b)2, Σ1
+
+(c) (n, b)1, Σ2
+
+(d) (n, b)2, Σ2
+
+Figure 1. Comparison among three candidate algorithms under
+four different settings. We denote Σ1 : Σij = 0.1, Σ2 : Σij =
+0.5, (n, b)1 = (10000, 1) and (n, b)2 = (200, 50). The hori-
+zontal axis is the number of passes over the entire dataset. The
+vertical axis is the ratio of current objective value over the objec-
+
+tive value using (cid:101)w(0) = 0. For each algorithm, option 1, 2 and 3
+
+correspond to η = 1/256, 1/512 and 1/1024 respectively. It is
+evident from the plots that SVR-GHT uniformly outperforms the
+other candidate algorithms in terms of the iteration complexity
+(over effective passes of data) in all settings.
+
+Table 1. Comparison of optimal relative estimation errors be-
+tween the three candidate algorithms under four different set-
+tings on simulated data sets. We denote Σ1 : Σij = 0.1,
+Σ2 : Σij = 0.5, (n, b)1 = (10000, 1) and (n, b)2 = (200, 50).
+SVR-GHT achieves comparable result with GHT, both of which
+uniformly outperforms SGHT in each of the eight settings.
+
+Method
+
+GHT
+
+Σ1
+
+Σ2
+
+(n, b)1
+(n, b)2
+(n, b)1
+(n, b)2
+
+0.00851
+
+0.02940
+
+SGHT
+0.02490
+0.06412
+0.21676
+0.18764
+
+SVR-GHT
+0.00968
+0.00970
+0.02614
+0.02823
+
+hand, the optimal estimation error of SVR-GHT is compa-
+rable to GHT, both of which outperform SGHT uniformly,
+especially in noisy settings. It is important to note that with
+the optimal step size, the estimation of GHT usually be-
+comes stable after > 105 passes, while the estimation of
+SVR-GHT usually becomes stable within a few dozen to
+a few hundred passes, which validates the signiﬁcant im-
+provement of computational cost of SVR-GHT over GHT.
+
+5.2. Real Data
+We adopt a subset of RCV1 dataset with 9625 documents
+and 29992 distinct words, including the classes of “C15”,
+“ECAT”, “GCAT”, and “MCAT” (Cai & He, 2012). We ap-
+ply logistic regression to perform binary classiﬁcation for
+
+01002003000.10.31  SVR-GHT1SVR-GHT2SVR-GHT3GHT1GHT2GHT3SGHT1SGHT2SGHT301002003000.10.31  01002003000.10.31  01002003000.10.31  Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+(a) (n, b) = (5000, 1)
+
+(b) (n, b) = (100, 50)
+
+Figure 2. Comparison among the three candidate algorithms un-
+der two different settings on the RCV1 data set for class C15,
+ECAT, GCAT and MCAT. The horizontal axis corresponds to the
+number of passes over the entire dataset. The vertical axis cor-
+responds to misclassiﬁcation rate on the test data. It is evident
+from the plots that SVR-GHT uniformly outperforms the other
+candidate algorithms in both settings.
+
+all classes, each of which uses 5000 documents for train-
+ing, i.e., nb = 5000 and d = 29992, with the same propor-
+tion of documents from each class, and the rest for testing.
+We illustrates the computational performance of the GHT,
+SGHT, and SVR-GHT algorithms with two different set-
+tings for each class: Setting (1) has (n, b) = (5000, 1);
+Setting (2) has (n, b) = (100, 50). We choose k = 200
+and m = n for both settings of all classes. For all three
+algorithms, we plot their objective values and provide the
+optimal classiﬁcation errors averaged over 10 different runs
+using different data separations. Figure 2 demonstrates the
+result for “C15”, and the other classes have analogous per-
+formance. Similar to the synthetic numerical evaluations,
+SVR-GHT uniformly outperforms the other two candidate
+algorithms in terms of the convergence rate under both set-
+tings. We provide the optimal misclassiﬁcation rates of all
+classes for three algorithms in Table 2, where the optimal
+step size η for each algorithm is chosen from a sequence
+of values {1/25, 1/26, . . . , 1/214}.. Similar to the simu-
+lated data sets again, the optimal misclassiﬁcation rate of
+SVR-GHT is comparable to GHT, both of which outper-
+form SGHT uniformly. The estimation of GHT generally
+requires > 106 passes to become stable, while the estima-
+tion of SVR-GHT generally requires a few hundred to a
+few thousand passes to be stable, which validates the sig-
+niﬁcant improvement of computational cost of SVR-GHT
+over GHT for this real dataset.
+
+6. Discussion
+The SVR-GHT algorithm presented in this paper is closely
+related to some recent work on stochastic optimization al-
+gorithms, including Prox-SVRG algorithm (Xiao & Zhang,
+2014), stochastic averaging gradient (SAG) algorithm
+(Roux et al., 2012) and stochastic dual coordinate ascent al-
+gorithm (SDCA, (Shalev-Shwartz & Zhang, 2013)). How-
+ever, the focus in these previous works has been on es-
+tablishing global linear convergence for optimization prob-
+lems involving strongly convex objective with a convex
+
+Table 2. Comparison of optimal classiﬁcation errors among the
+three candidate algorithms for both settings of all four classes. We
+denote (n, b)1 = (5000, 1) and (n, b)2 = (100, 50). SVR-GHT
+achieves comparable result with GHT, both of which uniformly
+outperforms SGHT in all settings.
+
+Method
+
+C15
+
+ECAT
+
+GCAT
+
+MCAT
+
+(n, b)1
+(n, b)2
+(n, b)1
+(n, b)2
+(n, b)1
+(n, b)2
+(n, b)1
+(n, b)2
+
+GHT
+
+0.02844
+
+0.05581
+
+0.03028
+
+0.05703
+
+SGHT
+0.03259
+0.03361
+0.06851
+0.07179
+0.06263
+0.09142
+0.07638
+0.08228
+
+SVR-GHT
+0.02826
+0.02867
+0.05628
+0.05631
+0.03354
+0.03444
+0.05877
+0.05927
+
+constraint, whereas SVR-GHT guarantees linear conver-
+gence for optimization problems involving a nonstrongly
+convex objective with nonconvex cardinality constraint.
+Other related work includes nonconvex regularized M-
+estimators proposed by (Loh & Wainwright, 2013). In par-
+ticular, they consider the nonconvex optimization problem:
+
+w F(w) + Pλ,γ(w)
+min
+
+s.t. (cid:107)w(cid:107)1 ≤ R,
+
+(6.1)
+
+where Pλ,γ(w) is a nonconvex regularization function with
+tuning parameters λ and γ; Popular choices for Pλ,γ(w)
+are the SCAD (Fan & Li, 2001) and MCP (Zhang, 2010)
+regularization functions. (Loh & Wainwright, 2013) show
+that under restricted strong convexity and restricted strong
+smoothness conditions, similar to those studied here, the
+proximal gradient algorithm attains linear convergence to
+approximate global optima with optimal estimation accu-
+racy. Accordingly, one could adopt the Prox-SVRG algo-
+rithm to solve (6.1) in a stochastic fashion, and trim the
+analyses in (Xiao & Zhang, 2014) and (Loh & Wainwright,
+2013) to establish similar convergence guarantees. We re-
+mark, however, that Problem (6.1) involves three tuning pa-
+rameters, λ, γ, and R which, in practice, requires enormous
+tuning effort to attain good empirical performance. In con-
+trast, Problem (1.1) involves a single tuning parameter, k,
+which makes tuning more efﬁcient.
+
+Acknowledgements
+This research is supported by NSF CCF-1217751; NSF
+AST-1247885; DARPA Young Faculty Award N66001-
+14-1-4047; NSF DMS-1454377-CAREER; NSF IIS-
+1546482-BIGDATA; NIH R01MH102339; NSF IIS-
+1408910; NSF IIS-1332109; NIH R01GM083084.
+
+0123450.030.1 0.3 1   SVR-GHTGHTSGHT⇥10300.40.81.21.620.030.1 0.3 1   SVR-GHTGHTSGHT⇥104Stochastic Variance Reduced Optimization for Nonconvex Sparse Learning
+
+Shalev-Shwartz, Shai and Zhang, Tong. Stochastic dual coordi-
+nate ascent methods for regularized loss. JMLR, 14(1):567–
+599, 2013.
+
+Shen, Xiaotong, Pan, Wei, and Zhu, Yunzhang. Likelihood-based
+selection and sharp parameter estimation. Journal of the Amer-
+ican Statistical Association, 107(497):223–232, 2012.
+
+Tibshirani, Robert. Regression shrinkage and selection via the
+Journal of the Royal Statistical Society. Series B
+
+lasso.
+(Methodological), pp. 267–288, 1996.
+
+Van de Geer, Sara A. High-dimensional generalized linear models
+
+and the lasso. The Annals of Statistics, pp. 614–645, 2008.
+
+Xiao, Lin and Zhang, Tong. A proximal stochastic gradient
+method with progressive variance reduction. SIAM J. Opti-
+mization, 24(4):2057–2075, 2014.
+
+Yuan, Ming and Lin, Yi. Model selection and estimation in re-
+gression with grouped variables. Journal of the Royal Statis-
+tical Society: Series B (Statistical Methodology), 68(1):49–67,
+2006.
+
+Yuan, Xiao-Tong, Li, Ping, and Zhang, Tong. Gradient hard
+thresholding pursuit for sparsity-constrained optimization. In
+ICML, pp. 71–79. 2013.
+
+Zhang, Cun-Hui. Nearly unbiased variable selection under min-
+imax concave penalty. The Annals of Statistics, pp. 894–942,
+2010.
+
+Zhao, Tuo and Liu, Han. Accelerated path-following iterative
+shrinkage thresholding algorithm with application to semipara-
+metric graph estimation. Journal of Computational and Graph-
+ical Statistics, 2016. To appear.
+
+Zhao, Tuo, Liu, Han, and Zhang, Tong. A general theory of path-
+wise coordinate optimization. arXiv preprint arXiv:1412.7477,
+2014a.
+
+Zhao, Tuo, Yu, Mo, Wang, Yiming, Arora, Raman, and Liu, Han.
+Accelerated mini-batch randomized block coordinate descent
+method. In Advances in neural information processing systems,
+pp. 3329–3337, 2014b.
+
+References
+Agarwal, Alekh, Negahban, Sahand, and Wainwright, Mar-
+tin J. Fast global convergence of gradient methods for high-
+dimensional statistical recovery. Ann. Statist., 40(5):2452–
+2482, 2012.
+
+Banerjee, Onureena, El Ghaoui, Laurent, and d’Aspremont,
+Alexandre. Model selection through sparse maximum likeli-
+hood estimation for multivariate gaussian or binary data. The
+Journal of Machine Learning Research, 9:485–516, 2008.
+
+Blumensath, Thomas and Davies, Mike E. Iterative hard thresh-
+olding for compressed sensing. Appl. Comp. Harm. Anal., 27
+(3):594–607, 2009.
+
+Cai, Deng and He, Xiaofei. Manifold adaptive experimental de-
+sign for text categorization. Knowledge and Data Engineering,
+IEEE Transactions on, 24(4):707–719, 2012.
+
+Fan, Jianqing and Li, Runze. Variable selection via nonconcave
+penalized likelihood and its oracle properties. Journal of the
+American statistical Association, 96(456):1348–1360, 2001.
+
+Foucart, Simon. Hard thresholding pursuit: An algorithm for
+compressive sensing. SIAM J. Numer. Anal., 49(6):2543–2563,
+2011.
+
+Friedman, Jerome, Hastie, Trevor, and Tibshirani, Robert. Sparse
+inverse covariance estimation with the graphical lasso. Bio-
+statistics, 9(3):432–441, 2008.
+
+Jain, Prateek, Tewari, Ambuj, and Kar, Purushottam. On iterative
+hard thresholding methods for high-dimensional m-estimation.
+In NIPS, pp. 685–693. 2014.
+
+Johnson, Rie and Zhang, Tong. Accelerating stochastic gradient
+descent using predictive variance reduction. In NIPS, pp. 315–
+323. 2013.
+
+Koneˇcn`y, Jakub and Richt´arik, Peter. Semi-stochastic gradient
+
+descent methods. arXiv preprint arXiv:1312.1666, 2013.
+
+Loh, Po-Ling and Wainwright, Martin J.
+
+Regularized M-
+estimators with nonconvexity: Statistical and algorithmic the-
+ory for local optima. In Advances in Neural Information Pro-
+cessing Systems, pp. 476–484, 2013.
+
+Natarajan, Balas Kausik. Sparse approximate solutions to linear
+
+systems. SIAM journal on computing, 24(2):227–234, 1995.
+
+Nesterov, Yu. Gradient methods for minimizing composite func-
+
+tions. Mathematical Programming, 140(1):125–161, 2013.
+
+Nguyen, Nam, Needell, Deanna, and Woolf, Tina. Linear con-
+vergence of stochastic iterative greedy algorithms with sparse
+constraints. arXiv preprint arXiv:1407.0088, 2014.
+
+Raskutti, Garvesh, Wainwright, Martin J, and Yu, Bin. Restricted
+eigenvalue properties for correlated gaussian designs. The
+Journal of Machine Learning Research, 11:2241–2259, 2010.
+
+Raskutti, Garvesh, Wainwright, Martin J, and Yu, Bin. Mini-
+max rates of estimation for high-dimensional linear regression
+over-balls. Information Theory, IEEE Transactions on, 57(10):
+6976–6994, 2011.
+
+Roux, Nicolas L., Schmidt, Mark, and Bach, Francis R. A
+stochastic gradient method with an exponential convergence
+rate for ﬁnite training sets. In NIPS, pp. 2663–2671. 2012.
+
+

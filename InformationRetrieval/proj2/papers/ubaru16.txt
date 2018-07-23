@@ -1,0 +1,1245 @@
+Fast methods for estimating the Numerical rank of large matrices
+
+Shashanka Ubaru
+Yousef Saad
+Department of Computer Science and Engineering, University of Minnesota, Twin Cities, MN USA
+
+UBARU001@UMN.EDU
+SAAD@CS.UMN.EDU
+
+Abstract
+
+two computationally inexpensive
+We present
+techniques for estimating the numerical rank of
+a matrix, combining powerful tools from compu-
+tational linear algebra. These techniques exploit
+three key ingredients. The ﬁrst is to approximate
+the projector on the non-null invariant subspace
+of the matrix by using a polynomial ﬁlter. Two
+types of ﬁlters are discussed, one based on Her-
+mite interpolation and the other based on Cheby-
+shev expansions. The second ingredient employs
+stochastic trace estimators to compute the rank of
+this wanted eigen-projector, which yields the de-
+sired rank of the matrix. In order to obtain a good
+ﬁlter, it is necessary to detect a gap between the
+eigenvalues that correspond to noise and the rel-
+evant eigenvalues that correspond to the non-null
+invariant subspace. The third ingredient of the
+proposed approaches exploits the idea of spec-
+tral density, popular in physics, and the Lanczos
+spectroscopic method to locate this gap.
+
+1. Introduction
+In many machine learning, data analysis, scientiﬁc compu-
+tations and signal processing applications, the high dimen-
+sional data encountered generally have intrinsically low
+dimensional representations. A widespread tool used in
+these applications to exploit this low dimensional nature
+of data is the Principal Component Analysis (PCA) (Jol-
+liffe, 2002). PCA essentially takes the initial data matrix
+X ∈ Rd×n and replaces it by a rank-k version (a lower
+dimensional matrix), which has the effect of capturing the
+intrinsic information of X. Other well known techniques
+such as randomized low rank approximations (Halko et al.,
+2011; Ubaru et al., 2015) and low rank subspace esti-
+mations (Comon & Golub, 1990; Doukopoulos & Mous-
+takides, 2008) also exploit the ubiquitous low rank charac-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+ter of data. However, a difﬁculty with these approaches that
+is well-recognized in the literature is that, it is not known
+in advance how to select the reduced rank k. This prob-
+lem is aggravated in the applications of algorithms such as
+online PCA (Crammer et al., 2006), stochastic approxima-
+tion algorithms for PCA (Arora et al., 2012) and subspace
+tracking (Doukopoulos & Moustakides, 2008), where the
+dimension of the subspace of interest changes frequently.
+The rank estimation problem also arises in many useful
+methods employed in ﬁelds such as machine learning for
+example, where the data matrix X ∈ Rd×n is replaced
+with a factorization of the form U V (cid:62), where U ∈ Rd×k
+and V ∈ Rn×k. In these methods, the original problem
+is solved by ﬁxing the rank of the unknown matrix to a
+preselected value k (Haldar & Hernando, 2009). Similar
+rank estimation problems are encountered in reduced rank
+regression (Reinsel & Velu, 1998), when solving numer-
+ically rank deﬁcient linear systems of equations (Hansen,
+1998), and in numerical methods for eigenvalue problems
+that are used to compute the dominant subspace of a matrix,
+for e.g., subspace iteration (Saad, 2016).
+In the most common situation, the rank k required as input
+in the above applications is typically selected in an ad-hoc
+way. This is because standard rank estimation methods in
+the existing literature rely on expensive matrix factoriza-
+tions such as the QR (Chan, 1987), LDLT or SVD (Golub
+& Van Loan, 2012). Other methods also assume certain
+asymptotic behavior such as normal responses, for the in-
+put matrices (Camba-M´endez & Kapetanios, 2008; Perry
+& Wolfe, 2010). Many of the rank estimation methods pro-
+posed in the literature focus on speciﬁc applications, e.g., in
+econometrics and statistics (Camba-M´endez & Kapetanios,
+2008), statistical signal processing (Kritchman & Nadler,
+2009; Perry & Wolfe, 2010), reduced-rank regression (Bura
+& Cook, 2003), estimating the dimension of linear systems
+(Hannan, 1981) and others.
+Powerful and inexpensive tools from computational linear
+algebra can be developed to estimate the approximate ranks
+of large matrices. The goal of this paper is to present exam-
+ples of such methods. These methods require only matrix-
+vector products (‘matvecs’) and are inexpensive compared
+
+Fast methods for estimating the Numerical rank of large matrices
+
+to traditional methods. In addition, they do not make any
+particular statistical, or asymptotic behavior assumptions
+on the input matrices. Since the data matrix can be approx-
+imated in a low dimensional subspace, the only assumption
+is that there is a set of relevant eigenvalues in the spectrum
+that correspond to the eigenvectors that span this low di-
+mensional subspace, and that these are well separated from
+the smaller, noise-related eigenvalues.
+The rank estimation techniques presented in this paper
+combine three key ingredients. First, a polynomial ﬁlter is
+used to approximate a spectral projector, the trace of which
+is exactly the desired rank (see sec. 3). Second, stochastic
+trace estimators (Hutchinson, 1990) are exploited to esti-
+mate the rank of this projector. Finally, in order to deter-
+mine a good ﬁlter to use, we need to locate a gap in the
+spectrum and select a threshold that separates the smaller
+eigenvalues from the relevant ones that contribute to the
+rank. This paper discusses a simple method to estimate this
+threshold based on the spectral density function (Lin et al.,
+2016) of the matrix, see section 4 for details. Section 6 dis-
+cusses the performance of the rank estimation techniques
+on matrices from various applications. First, the key con-
+cepts that are required to develop the rank estimators are
+discussed in the following section.
+
+2. Key concepts
+This paper aims at estimating the ‘numerical’ rank of a
+symmetric positive semi-deﬁnite (PSD) matrix A. This ma-
+trix may be a covariance matrix associated with some data
+X, or may just be of the form1 A = X(cid:62)X or XX(cid:62) for the
+given data X, of which we seek the numerical rank.
+
+2.1. Numerical rank
+The numerical rank or approximate rank of a d × n matrix
+X, with respect to a positive tolerance ε is deﬁned as
+rε = min{rank(Y ) : Y ∈ Rd×n,(cid:107)X − Y (cid:107)2 ≤ ε},
+(1)
+where (cid:107).(cid:107)2 refers to the 2-norm or spectral norm. This is
+a standard deﬁnition that can be found, for example, in
+(Golub & Van Loan, 2012; Golub et al., 1976; Hansen,
+1998). Here, the matrix X is assumed to be a perturbed
+version of some original matrix of rank rε < {d, n}. Al-
+though the perturbed matrix is likely to have full rank, it
+can usually be well approximated by a rank-rε matrix. The
+singular values of a matrix X with approximate rank rε
+satisfy
+
+σrε > ε ≥ σrε+1.
+
+σrε and σrε+1 (Hansen, 1998). The issue of determining
+this gap, i.e., selecting the parameter ε in the deﬁnition of
+ε-rank, is one of the key tasks for estimating the approxi-
+mate rank. A few methods have been proposed in the sig-
+nal processing literature to address this issue (Kritchman &
+Nadler, 2009; Perry & Wolfe, 2010). In section 4, we de-
+scribe a different approach to locate the gap and choose a
+value for the tolerance or threshold ε based on the Lanczos
+spectroscopic approach.
+Once the gap is identiﬁed and the threshold ε is set, the
+simplest idea for estimating the rank is to count the num-
+ber of eigenvalues of A that are larger than ε. For this
+task, eigenvalue count methods can be invoked, see for e.g.,
+(Di Napoli et al., 2013). Recently, article (Zhang et al.,
+2015) discussed the communication complexities for such
+numerical rank estimations (assuming ε is given) in the
+distributed settings using deterministic and randomized al-
+gorithms. The randomized algorithm discussed in (Zhang
+et al., 2015) is based on the same idea of counting the
+eigenvalues above the given threshold ε ≥ 0, using a simi-
+lar algorithm to the one in (Di Napoli et al., 2013). In this
+paper, we address both the issues of determining a proper
+threshold ε to use, and that of estimating the rank once ε is
+determined.
+
+2.2. The dominant spectral projector
+Let A ∈ Rn×n be a symmetric semi-positive deﬁnite ma-
+trix with eigenvalues λ1 ≥ λ2 ≥ ··· ≥ λn and associ-
+ated orthonormal eigenvectors u1, u2, . . . , un, respectively.
+One of the main ideas explored in this paper is to compute
+the rank by estimating the trace of the eigen-projector:
+
+uiu(cid:62)
+i ,
+
+(3)
+
+(cid:88)
+
+P =
+
+λi ∈ [a, b]
+
+where the interval [a, b] is (implicitly or explicitly) se-
+lected so that it includes the relevant dominant eigenvalues
+that determine the rank. This idea of eigen-projectors is
+also used in the ‘eigenvalue count’ algorithm discussed in
+(Di Napoli et al., 2013). The eigenvalues of a projector are
+either zero or one and so the trace of P equals the num-
+ber of terms in the sum (3), i.e., the number of eigenvalues
+η[a, b] in [a, b],
+
+η[a,b] = Trace(P ) .
+
+Although P is typically not available, it can be inexpen-
+sively approximated in practice by a polynomial of A.
+First, we can interpret P as a step function of A given by
+
+(2)
+
+(cid:26) 1
+
+0
+
+if t ∈ [a, b]
+otherwise
+
+.
+
+(4)
+
+It is important to note that the notion of numerical rank
+rε is useful only when there is a well-deﬁned gap between
+
+P = h(A), where h(t) =
+
+1We will see that this matrix-matrix product need not be
+
+formed explicitly.
+
+Next, this step function h(t) can be approximated by a
+polynomial of degree m, say ψm(t) and the projector P
+
+Fast methods for estimating the Numerical rank of large matrices
+
+is expressed as P ≈ ψm(A).
+In this form, it becomes
+possible to estimate the trace of P by a stochastic estima-
+tor (Hutchinson, 1990). The issue of selecting a, b will be
+addressed in sections 3 and 4.
+
+2.3. The trace estimator
+
+Hutchinson’s unbiased estimator (Hutchinson, 1990) uses
+only matrix-vector products to approximate the trace of a
+generic matrix D. The method estimates the trace tr(D) by
+ﬁrst generating random vectors vl, l = 1, .., nv with equally
+probable entries ±1, and then computing the average over
+the samples of v(cid:62)
+
+l Dvl,
+
+Trace(D) ≈ 1
+nv
+
+v(cid:62)
+l Dvl.
+
+(5)
+
+nv(cid:88)
+
+l=1
+
+nv(cid:88)
+
+l=1
+
+It is known that any random vectors vl with mean of entries
+equal to zero and unit 2-norm can be used (Avron & Toledo,
+2011). Thus, substituting D with ψm(A) in (5), will yield
+the following estimate of the trace of P :
+
+Trace(P ) ≈ n
+nv
+
+v(cid:62)
+l ψm(A)vl.
+
+(6)
+
+Before we describe the types of polynomials ψm(t) that
+we propose to use, it is important to note that the above
+expression does not require to form the matrix ψm(A). All
+that is needed is to efﬁciently compute the vectors ψm(A)vl
+for any vl, and this can be accomplished by a sequence of
+matrix-by-vector products with the matrix A (see supple-
+mentary material for additional details).
+
+3. Polynomial ﬁlters
+In our approach, the projector P = h(A) in (4) is approxi-
+mated by ψm(A), where ψm(t) is a ‘ﬁlter’ polynomial. In
+practice, we only need ψm(t) to transform the larger rele-
+vant eigenvalues into a value close to one and the smaller
+eigenvalues to a value close to zero. We ﬁrst consider a sim-
+ple ﬁlter based on Hermite interpolation (sec. 3.1), which
+has a number of advantages relative to the more common
+Chebyshev ﬁlter, which is described in section. 3.2.
+
+3.1. The McWeeny ﬁlter
+
+The McWeeny transform (McWeeny, 1960) has been used
+in solid-state physics to develop ‘linear-scaling’ meth-
+ods (Li et al., 1993). It starts by scaling and shifting the
+matrix so that its eigenvalues are in the interval [0, 1]. This
+can be achieved by simply deﬁning B = A/λ1, where the
+largest eigenvalue λ1 can be inexpensively computed with
+a few steps of the Lanczos algorithm (Golub & Van Loan,
+2012).
+The McWeeny ﬁlter is a polynomial of cubic order whose
+
+goal is to push larger eigenvalues of B closer to one and
+smaller eigenvalues closer to zero.
+In fact it is simply a
+Hermite interpolation of a function that has the values y0 =
+0, y1 = 1 at x0 = 0, x1 = 1 and derivatives equal to zero
+at both points. This leads to
+
+ψ(t) = 3t2 − 2t3.
+
+(7)
+
+So a basic method for estimating the rank without using
+any parameter is to ﬁrst calculate λ1 and deﬁne B = A/λ1,
+then estimate the trace of ψ(B) using Hutchinson’s estima-
+tor. Here, the projector is approximated by
+
+P ≈ 3B2 − 2B3.
+
+Clearly, a degree 3 ﬁlter of this type is likely to give only
+a very rough estimate of the rank. We can extend the
+McWeeny ﬁlter to any degree by using Hermite interpola-
+tion at the points 0 and 1. In fact it is important to vary the
+degree of smoothness at zero and at one. It may be more
+important to have a higher degree of matching at point one
+since we wish the values of the ﬁlter to be very close to one
+for the larger singular values.
+Figure 1 shows four different ﬁlters using various degrees
+of matching at zero and one. These extended McWeeny ﬁl-
+ters have been studied in a different context (Saad, 2006).
+A systematic way of generating them is through interpo-
+lation in the Hermite sense, using two integer parameters
+m0, m1 that deﬁne the degree of matching or smoothness
+at two points τ0 and τ1 respectively. In the following, we
+denote by Θ[m0,m1] the interpolating (Hermite) polynomial
+that satisﬁes the following conditions:
+Θ[m0,m1](τ0) = 0; Θ(cid:48)
+[m0,m1](τ0) = 0
+Θ[m0,m1](τ1) = 1; Θ(cid:48)
+[m0,m1](τ1) = 0.
+Thus, Θ[m0,m1] has degree m0 + m1 − 1 and the two pa-
+rameters m0 and m1 deﬁne the degree of smoothness at the
+points τ0 and τ1 respectively. The polynomials Θ[m0,m1]
+can be easily determined by standard ﬁnite difference ta-
+bles. The paper (Saad, 2006) also gives a closed form ex-
+pression for Θ[m0,m1] when τ0 = −1 and τ1 = 1:
+(cid:82) t
+(cid:82) 1
+−1 (1 − s)m1−1(1 + s)m0−1 ds
+−1 (1 − s)m1−1(1 + s)m0−1 ds
+
+[m0,m1](τ0) = ··· = Θ(m0−1)
+[m0,m1](τ1) = ··· = Θ(m1−1)
+
+Θ[m0,m1] =
+
+(8)
+
+.
+
+Furthermore, when m0 + m1 > 2 (at least 3 conditions
+imposed), the function has an inﬂexion point at :
+
+m0 − m1
+m0 + m1 − 2
+
+.
+
+t =
+
+When translated back to the interval [0, 1] this point be-
+comes (t + 1)/2 = (m0 − 1)/(m0 + m1 − 2).
+Let us consider for example the choice: m0 = 2, m1 = 14.
+The inﬂexion point is at 1/14 and this can be viewed as a
+
+Fast methods for estimating the Numerical rank of large matrices
+
+Figure 1. Four different polynomial ﬁlters based on the McWeeny idea (ﬁrst curve corresponds to McWeeny ﬁlter).
+
+cut-off value. Recall that all singular values are scaled by
+σ1 so they are all ≤ 1. The ﬁlter will take all eigenvalues
+λi = (σi/σ1)2 that are larger than 1/14, and move them
+close to one. All other eigenvalues will be moved close
+to zero. In this case, the eigenvalues larger than 1/14 are
+deemed to contribute to the rank – and these are termed
+‘relevant’ in the sequel. Looking at the plot indicates that
+when the relevant eigenvalues are in the interval [0.35, 1],
+we will get an accurate approximation of the rank by us-
+ing this simple polynomial of degree 15. A good accuracy
+will be also obtained if all relevant eigenvalues are in the
+interval [0.25, 1]. The approximation will become poorer
+if there are eigenvalues below 0.2 and closer to the inﬂec-
+tion point. These cases can be handled by a higher degree
+polynomial. Thus, once the threshold ε is computed, say
+by the method in section 4, an appropriate degree for the
+polynomial can be easily selected. However, this may lead
+to a very large degree for smaller ε value.
+So far we have looked at polynomials Θ[m0,m1] based on
+the interpolation knots: τ0 = 0, τ1 = 1. A look at the
+curves reveals that to the right of t = 1 the polynomial
+stays close to one in an interval that extends well beyond
+the value t = 1. Therefore, we can take τ0 = 0, and τ1 < 1
+to reduce the degree m1. In fact we can move τ1 back to-
+ward 0.5 as far as possible before p(1) departs from 1 by
+a certain threshold. A little analysis shows that τ1 must be
+larger than 0.5. Thus, we can use dichotomy to ﬁnd the best
+value of τ1 and the degree m1 based on the ε value com-
+puted (details in sec. 4 and the supplementary material).
+
+3.2. Chebyshev ﬁlters
+
+Chebyshev polynomials are commonly used to expand the
+step function h, i.e., h(t) is approximately expanded as :
+
+γkTk(t),
+
+(9)
+
+k=0
+
+where each Tk is the k-degree Chebyshev polynomial of
+the ﬁrst kind, formally deﬁned as Tk(t) = cos(k cos−1(t)).
+Since Chebyshev polynomials are based on the interval
+[−1, 1] we will assume ﬁrst that A has eigenvalues be-
+tween −1 and 1. Let a, b such that −1 ≤ a < b ≤ 1. The
+expansion coefﬁcients γk for the polynomial to approxi-
+mate a step function h(t), which takes value 1 in [a, b] and
+
+h(t) ≈ m(cid:88)
+
+0 elsewhere, are known:
+
+(cid:40) 1
+(cid:16) sin(k cos−1(a))−sin(k cos−1(b))
+π (cos−1(a) − cos−1(b))
+
+γk =
+
+2
+π
+
+k
+
+(cid:17)
+
+: k = 0,
+
+: k > 0
+
+.
+
+Once the γk’s are known, the desired Chebyshev expan-
+sion of the projector P will be given by: P ≈ ψm(A) =
+
+(cid:80)m
+
+k=0 γkTk(A).
+
+The approximate matrix rank rε can be determined by set-
+ting the interval [a, b] = [ε, λ1]. As a result, the approxi-
+mate rank of a matrix A using the Chebyshev polynomial
+ﬁltering method is estimated by:
+
+(cid:35)
+
+(cid:34) m(cid:88)
+
+nv(cid:88)
+
+l=1
+
+k=0
+
+rε = η[ε,λ1] ≈ n
+nv
+
+γk(vl)(cid:62)Tk(A)vl
+
+.
+
+(10)
+
+It remains to determine the threshold ε and a method for
+this purpose will be be described in the next section. De-
+tails on the practicalities of Chebyshev polynomial approx-
+imation can be found in the supplementary material.
+
+4. Threshold selection
+The method we described so far requires a threshold param-
+eter ε that separates the small eigenvalues, those assumed
+to be perturbations of the zero eigenvalue, from the rele-
+vant larger eigenvalues that contribute to the rank. We now
+describe a method to select ε based on the Lanczos spec-
+troscopic method (LSM) and the spectral density. Related
+to this is the need to select appropriate polynomial degrees
+for the extended McWeeny and Chebyshev ﬁlters. This is
+discussed at the end of the section.
+
+4.1. LSM and spectral density
+
+The Lanczos spectroscopic approach (Lanczos, 1956) con-
+sists of representing the matrix spectrum as a collection of
+frequencies and computes these frequencies using Fourier
+analysis. Suppose the eigenvalues of A are in the interval
+[−1, 1], then LSM considers samples of the following con-
+tinuous function:
+
+f (t) =
+
+β2
+j cos(θjt),
+
+(11)
+
+j=1
+
+where θj’s are related to the eigenvalue of A by θj =
+cos−1 λj, and βj’s are scalars whose values depend on the
+
+n(cid:88)
+
+00.10.20.30.40.50.60.70.80.9100.20.40.60.811.21.4λp(λ)Polynomialfilter−type[2,2]00.10.20.30.40.50.60.70.80.9100.20.40.60.811.21.4λp(λ)Polynomialfilter−type[2,6]00.10.20.30.40.50.60.70.80.9100.20.40.60.811.21.4λp(λ)Polynomialfilter−type[2,10]00.10.20.30.40.50.60.70.80.9100.20.40.60.811.21.4λp(λ)Polynomialfilter−type[2,14]Fast methods for estimating the Numerical rank of large matrices
+
+Figure 2. Typical spectral density plots by LSM for a low rank (left) and a numerically low rank (right) matrices.
+
+function f (t) considered. The above function is sampled at
+t = 0, 1, . . . , m. Then, taking the Fourier transform of f (t)
+reveals the spectral information of A, i.e., with sufﬁcient
+number of samples, the Fourier transform of the sampled
+function will have peaks near cos−1 λj, j = 1, . . . , n. Re-
+cently, Lin et. al (Lin et al., 2016) showed that an approxi-
+mate spectral density can be obtained from this method.
+The spectral density or the Density of States (DOS) of a real
+symmetric matrix (popular in solid-state physics) is a prob-
+ability density distribution that measures the likelihood of
+ﬁnding eigenvalues of the matrix near a point on a real line.
+Given an n × n symmetric matrix A, the Density of States
+(DOS) is deﬁned as
+
+φ(t) =
+
+1
+n
+
+δ(t − λj),
+
+(12)
+
+n(cid:88)
+
+j=1
+
+where δ is the Dirac δ-function or Dirac distribution, and
+the λj’s are the eigenvalues of A. Efﬁcient algorithms for
+computing the DOS without computing all the eigenvalues
+of the matrix have been developed in the literature (Wang,
+1994; Lin et al., 2016).
+Back to the spectroscopic method, since the λj’s are not
+available, f (t) in (11) cannot be computed directly. How-
+ever, we observe that f (t) is closely related to the Cheby-
+shev polynomials. In particular, m + 1 uniform samples
+of f (t), say f (0), f (1), . . . , f (m) can be computed as the
+average of
+
+v(cid:62)
+l vl, v(cid:62)
+
+l T1(A)vl, . . . , v(cid:62)
+
+l Tm(A)vl,
+
+where vl, l = 1, . . . , nv are random starting vectors. For
+the DOS, we just need the mean of βj’s to be one. This
+fact helps us compute f (t) as the average of v(cid:62)
+l Tk(A)vl,
+see Theorem 3.1 in (Lin et al., 2016). The discrete cosine
+transform of f (t) is given by
+
+F (p) =
+
+1
+2
+
+(f (0) + (−1)pf (m)) +
+
+f (k) cos(
+
+kpπ
+m
+
+),
+
+for p = 0, . . . , m. An approximate spectral density φ(t)
+can be obtained from F (p) using an interpolation proce-
+dure (Lin et al., 2016). Next, we describe a method to es-
+timate the threshold ε based on the plot of spectral density
+φ(t) obtained by the LSM.
+
+m−1(cid:88)
+
+k=1
+
+4.2. Analyzing the spectral density plots
+
+In order to describe the threshold selection method, we will
+consider two matrices with the following spectral distribu-
+tions. The ﬁrst matrix has an exact low rank, and its DOS
+plot will serve as a motivation for the proposed technique
+for selecting the threshold. As an example we consider an
+n × n PSD matrix with rank k < n, that has k eigenval-
+ues uniformly distributed between 0.2 and 2.5, and whose
+remaining n − k eigenvalues are equal to zero. The sec-
+ond matrix is a typical numerically rank deﬁcient matrix
+(the kind of matrices observed in the applications) which
+has a large number of eigenvalues related to noise that are
+close to zero and a number of larger relevant eigenvalues
+(forming few clusters), that contribute to the approximate
+rank. The approximate spectral density plots of these two
+matrices obtained by LSM using Chebyshev polynomials
+of degree m = 40 are plotted in ﬁgure 2.
+In the left plot, since the matrix has a large number of
+eigenvalues equal to zero, the plot has a high value at zero,
+and then drops quickly to almost a zero value, representing
+the region where there are no eigenvalues. At 0.2, the plot
+increases again due to the presence of new eigenvalues. So,
+a gap in the matrix spectrum will correspond to a sharp drop
+to zero or a valley in the spectral density plot of the matrix.
+We observe a similar behavior in the numerically low rank
+matrix case (right plot of ﬁg. 2) as well. The spectral den-
+sity has a high value near zero and displays a fast decrease
+due to the gap between the noise related eigenvalues and
+the relevant eigenvalues. The curve increases again due the
+presence of larger relevant eigenvalue clusters.
+The rank k of the ﬁrst matrix can be estimated by count-
+ing the eigenvalues in the interval [ε, λ1] = [0.2, 2.5].
+The value λ1 = 2.5 is estimated as discussed earlier. The
+threshold value ε = 0.2, which is a cutoff point between
+zero eigenvalues and relevant ones is located at the point
+where the spectral density curve ceases to decrease, in the
+valley corresponding to the gap. That is, the point is a lo-
+cal minimum of the function φ(t). Thus, it can selected
+as the left most value of t for which the derivative of φ(t)
+becomes zero, i.e., ε can be deﬁned as:
+
+ε = min{t : φ(cid:48)(t) = 0, λn ≤ t ≤ λ1}.
+
+(13)
+
+0.511.5200.511.5DOS by LSM deg =40λφ(λ)Spectroscopic0.511.522.533.540.20.40.60.811.21.41.6DOS by LSM deg =40λφ(λ)SpectroscopicFast methods for estimating the Numerical rank of large matrices
+
+Since a numerically rank deﬁcient matrix is a perturbed
+version of some low rank matrix, the same idea based on
+the spectral density plot can be employed to determine its
+numerical rank. The threshold is now a cutoff point be-
+tween noise related eigenvalues and relevant ones, and this
+point must be in the valley corresponding to the ﬁrst lo-
+cal minimum in the DOS plot. Thus, equation (13) can be
+used to estimate the threshold ε as well. In our experiments,
+we observe that the spectral density plots obtained by LSM
+capture the local minima (the gaps) of DOS quite well. A
+more practical version of formula (13) is the following :
+
+ε = min{t : φ(cid:48)(t) ≥ tol, λn ≤ t ≤ λ1}.
+We found that tol = −0.01 works well in practice.
+
+(14)
+
+4.3. Choosing appropriate polynomial degrees
+
+Once the separation point ε is found, we can select appro-
+priate degrees and type of Θ, i.e., m0, and m1 in the case
+of extended McWeeny ﬁlters. For the Hermite ﬁlters, we
+always select m0 = 2 for a number of reasons. We found
+that adding in smoothness at τ0 does not help. Then in or-
+der for the inﬂexion point to be just around the gap center ε,
+we start by taking τ1 = 1 and m1 = (cid:100)1/ε(cid:101) and then use di-
+chotomy to choose an appropriate τ1 (between (0.5, 1]) and
+m1 (as low as possible) such that the inﬂexion is around ε
+and ψ(1) is close to 1.
+For the Chebyshev ﬁlters, the cut-off value ε dictates the
+choice of the interval [a, b] to use, but not the degree.
+The degree should be selected to reﬂect the sharpness of
+the ﬁlter. For example, if we have an interval [−1, ε0]
+which should contain small eigenvalues and a second in-
+terval [ε1, 1] which contains relevant eigenvalues, then we
+will select the cut-off value ε = (ε0 + ε1)/2 and then the
+degree m should be such that
+
+max
+
+max
+
+|ψm(t)| ≤ δ;
+
+|1 − ψm(t)| ≤ δ,
+t ∈ [−1, ε0]
+where δ ≥ 0 is a small number. When ε1 and ε0 are close,
+this condition will require a high degree polynomial. We
+choose ε0 = ε − δ and ε1 = ε + δ in our experiments.
+
+t ∈ [ε1, 1]
+
+5. Algorithm and analysis
+This section, describes the proposed algorithms and their
+computational costs. Convergence analysis for the methods
+is also brieﬂy discussed at the end of the section.
+Algorithm 1 describes our approach for estimating the ap-
+proximate rank rε by the two polynomial ﬁltering methods
+discussed earlier.
+
+Computational cost. The core of the computation in the
+two rank estimation methods is the matrix vector product of
+
+Algorithm 1 Numerical rank estimation by polynomial ﬁl-
+tering
+Input: An n × n symmetric PSD matrix A, λ1 and λn
+of A, and number nv of sample vectors to be used.
+Output: The numerical rank rε of A.
+1. Generate the random starting vectors vl
+1, . . . nv, such that (cid:107)vl(cid:107)2 = 1.
+2. Transform the matrix A to B = A/λ1, choose degree
+m for DOS and form the matvecs
+
+l =
+
+:
+
+Bkvl : l = 1, . . . , nv, k = 0, . . . , m.
+
+l Tk(B)vl using the above matvecs
+
+3. Form the scalars v(cid:62)
+and obtain the DOS ˜φ(t) by LSM.
+4. Estimate the threshold ε from ˜φ(t) using eq. (14).
+5. McWeeny ﬁlter: Estimate m1 and τ1 from ε. Com-
+pute Θ[m0,m1]vl using the above matvecs (compute addi-
+tional matvecs if required). Estimate the numerical rank
+rε using eq. (6).
+Chebyshev ﬁlter: Compute the degree m and estimate
+the coefﬁcients γk for the interval [ε, λ1]. Compute the
+numerical rank rε using (10) and the above matvecs.
+
+the form Tk(A)vl or in general Akvl for l = 1, . . . , nv, k =
+0, . . . , m (step 3). Note that no matrix-matrix products or
+factorizations are required.
+In addition, the matrix vec-
+tor products Akvl computed during the estimation of the
+threshold, for the spectral density, can be saved and reused
+for the rank estimation, and so the related matrix-by-vector
+products are computed only once. All remaining steps of
+the algorithm are essentially based on these ‘matvec’ oper-
+ations.
+For an n × n dense symmetric PSD matrix, the computa-
+tional cost of Algorithm 1 is O(n2mnv). For a sparse ma-
+trix, the computation cost will be O(nnz(A)mnv), where
+nnz(A) is the number of nonzero entries of A. This cost
+is linear in the number of nonzero entries of A for large
+matrices and it will be generally quite low when A is very
+sparse, e.g., when nnz(A) = O(n). These methods are
+very inexpensive compared to methods that require matrix
+factorizations such as QR or SVD.
+
+Remark 1 In some of the rank estimation applications, it
+is perhaps required to estimate the corresponding eigen-
+pairs or the singular triplets of the matrix, after the ap-
+proximate rank estimation. These can be easily computed
+using a Rayleigh-Ritz projection type methods, exploiting
+again the vectors Akvl generated for estimating the rank.
+
+On the convergence. The convergence analysis of the
+trace estimator
+is well documented in (Roosta-
+Khorasani & Ascher, 2014) for starting vectors with
+Rademacher (Hutchinson), Gaussian and uniform unit vec-
+
+(5)
+
+Fast methods for estimating the Numerical rank of large matrices
+
+Figure 3. Left: Spectral density plot by LSM. Middle: Numerical ranks estimated by McWeeny ﬁlter method for the example ukerbe1.
+Right: Numerical ranks estimated by Chebyshev ﬁlter method.
+
+tor probability distributions. The best known convergence
+√
+rate for (5) is O(1/
+nv) for Hutchinson and Gaussian dis-
+tributions (see Theorem 1 and 3 in (Roosta-Khorasani &
+Ascher, 2014), respectively).
+Theoretical analysis for approximating a step function as
+in (4) is not straightforward since we are approximating a
+discontinuous function. Convergence analysis on approxi-
+mating a step function is documented in (Alyukov, 2011).
+A convergence rate of O(1/m) can be achieved with any
+polynomial approximation (Alyukov, 2011). However, this
+rate is obtained for point by point analysis (at the vicinity
+of discontinuity points), and uniform convergence cannot
+be achieved due to the Gibbs phenomenon.
+Improved theoretical results can be obtained if we ﬁrst re-
+place the step function by a piecewise linear approxima-
+tion, and then employ polynomial approximation. Arti-
+cle (Saad, 2006) shows that uniform convergence can be
+achieved using Hermite polynomial approximation (as in
+sec. 3.1) when the ﬁlter is constructed as a spline (piece-
+wise linear) function. For example,
+
+0
+
+: f or t ∈ [0, ε0)
+: f or t ∈ [ε0, ε1)
+: f or t ∈ [ε1, 1]
+
+.
+
+(15)
+
+ψ(t) =
+
+Θ[m0.m1]
+1
+
+It is well known that uniform convergence can be achieved
+with Chebyshev polynomial approximation if the function
+approximated is continuous and differentiable, see The-
+orem 5.7 in (Mason & Handscomb, 2002). Further im-
+provement in the convergence rate can be accomplished,
+if the step function is replaced by a function whose p + 1st
+derivative exists, for example, ψ(t) can be a shifted ver-
+sion of tanh(pt) function. In this case, a convergence rate
+of O(1/mp) can be achieved with Chebyshev polynomial
+approximation, see Theorem 5.14 (Mason & Handscomb,
+2002). However, such complicated implementations are
+unnecessary in practice. The bounds achieved for both the
+trace estimator and the approximation of step functions dis-
+cussed above are too pessimistic, since in practice we can
+get accurate ranks for m ∼ 50 and nv ∼ 30.
+
+6. Numerical experiments
+In this section, we illustrate the performance of the rank
+estimation techniques on matrices from various typical ap-
+plications. In the ﬁrst experiment, we use a 5, 981 × 5, 981
+matrix named ukerbe1 from the AG-Monien group (the
+matrix is a Laplacian of an undirected graph), available in
+the University of Florida Sparse Matrix Collection (Davis
+& Hu, 2011) database. The performances of the Chebyshev
+Polynomial ﬁlter method and the extended McWeeny ﬁlter
+method for estimating the numerical rank of this matrix2
+are shown in ﬁgure 3.
+Figure 3 (Left) gives the spectral density plot obtained by
+LSM using Chebyshev polynomials of degree m = 50 and
+a number of samples nv = 30. Using this plot, the thresh-
+old ε estimated by the method described in section 4 was
+ε = 0.169. Figure 3 (Middle) plots the numerical ranks
+estimated by the McWeeny ﬁlter method with 30 sample
+vectors. The degrees [m0, m1] for the Hermite polyno-
+mials estimated were [2, 54]. In the plot, the circles indi-
+cate the approximate ranks estimated with the (cid:96)th sample
+vectors and the dark line is the cumulative (running) aver-
+age of these estimated approximate rank values. The aver-
+age numerical rank estimated over 30 sample vectors was
+equal to 4030.47. The exact number of eigenvalues above
+the threshold is 4030, indicated by the dotted line in the
+plot. Similarly, ﬁgure 3 (Right) plots the numerical ranks
+estimated by the Chebyshev ﬁlter method with nv = 30.
+The degree for the Chebyshev polynomials selected by the
+method in section 4.3 was m = 96. The average numerical
+rank estimated over 30 sample vectors is 4030.57.
+
+Timing Experiment : Here, we provide an example to
+illustrate how fast these methods can be. We consider a
+sparse matrix of size 1.25 × 105 called Internet from
+the UFL database, with nnz(A) = 1.5 × 106. The estima-
+tion of its rank by the Chebyshev ﬁlter method took only
+7.18 secs on average (over 10 trials) on a standard 3.3GHz
+Intel-i5 machine. Computing the rank of this matrix by an
+approximate SVD, for example using the svds/eigs func-
+tion matlab which relies on ARPACK, will be exceedingly
+
+2Matlab codes are available at http://www-users.cs.
+
+umn.edu/˜ubaru/codes/rank_estimation.zip
+
+12345678900.050.10.150.20.250.30.350.4DOS by LSM deg =50λφ(λ)Spectroscopic0102030390039504000405041004150Mc−WeenyfiltermethodNumberofvectors(1−>30)Estimed#eigenvaluesinintervalCumulativeAvg(rε)ℓExact0102030390039504000405041004150ChebyshevfiltermethodNumberofvectors(1−>30)Estimed#eigenvaluesinintervalCumulativeFilterExact(rε)ℓMatrices (Applications)
+
+Size
+
+Threshold
+
+Erdos992 (undirected graph)
+deter3 (linear programming)
+dw4096 (electromagnetics)
+California (web search)
+FA (Pajek network graph)
+qpband (optimization)
+
+6100
+7047
+8192
+9664
+10617
+20000
+
+ε
+
+3.39
+10.01
+79.13
+11.48
+0.51
+0.7
+
+Eigencount
+
+above ε
+
+748
+591
+512
+350
+471
+
+15000
+
+m1
+64
+58
+62
+78
+64
+42
+
+rε
+
+747.52
+592.59
+512.42
+348.83
+472.35
+15004.6
+
+time m
+106
+1.82
+72
+1.61
+68
+1.81
+3.61
+116
+98
+17.8
+0.62
+50
+
+rε
+
+747.68
+590.72
+512.21
+350.81
+470.31
+14997.1
+
+Fast methods for estimating the Numerical rank of large matrices
+
+Table 1. Numerical rank estimation of various matrices
+
+McWeeny Filter
+
+Chebyshev Filter
+
+time
+2.45
+1.72
+1.83
+4.56
+24.95
+0.91
+
+SVD
+time
+
+876.2 secs
+
+1.3 hrs
+1.2 hrs
+
+18.7 mins
+
+1.5 hrs
+2.9 hrs
+
+Figure 4. Left and middle: The spectroscopic plot by LSM and the numerical ranks estimated by Chebyshev ﬁltering method for the
+ORL dataset. Right: Eigenfaces recovered with rank k = 20 using randomized SVD.
+
+expensive.
+It took around 2 hours to compute 4000 sin-
+gular values of the matrix on the same machine. Methods
+based on rank-revealing QR factorizations or the standard
+SVD are not even possible for this problem on a standard
+workstation such as the one we used.
+Table 1 lists the threshold selected using spectroscopic plot,
+the degree of the polynomial used and the ranks estimated
+by the two ﬁltering methods for a set of matrices from vari-
+ous applications. All matrices were obtained from the UFL
+database (Davis & Hu, 2011). The matrices, their applica-
+tions and sizes are listed in the ﬁrst two columns of the ta-
+ble. The threshold ε, computed from the DOS plot by LSM
+and the actual number of eigenvalues above the threshold
+for each matrices are listed in the next two columns. The
+degrees for the polynomials estimated, the corresponding
+numerical ranks computed and the average time taken (in
+seconds, using Matlab cputime function) over 10 trials,
+by the extended McWeeny ﬁlter and the Chebyshev ﬁlter
+methods using nv = 30 are listed in the last six columns.
+We observe that the McWeeny ﬁlter requires lower de-
+gree polynomials than the Chebyshev ﬁlter in all examples.
+Moreover, all these methods accurately estimate the numer-
+ical ranks, with fewer computations compared to traditional
+methods requiring QR or SVD.
+
+Eigenfaces.
+It is well known that face images lie in a
+low-dimensional linear subspace and the low rank approx-
+imation methods are widely used in applications such as
+face recognition. Eigenfaces is a popular method used for
+face recognition which is based on Principal Component
+Analysis (PCA) (Turk & Pentland, 1991). Such PCA based
+techniques require the knowledge of the dimension of the
+smaller subspace. Here, we demonstrate how our rank es-
+
+timation methods can be combined with the randomized-
+SVD method (Halko et al., 2011) in the application of face
+recognition. As an illustration, we consider the ORL face
+dataset obtained from the AT&T Labs Cambridge database
+of faces (Cambridge, 2002). There are ten different images
+of each of 40 distinct subjects. The size of each image is
+92×112 pixels, with 256 gray levels per pixel. So, the input
+matrix is of size 400× 10304, which is formed by vectoriz-
+ing the images. The matrix is mean centered (required for
+eigenfaces method) and scaled.
+In ﬁgure 4 (left and middle plots) the DOS and the numer-
+ical rank are plotted for the ORL image matrix, both es-
+timated using Chebyshev polynomials of degree m = 50
+and nv = 30. The numerical rank estimated over 30 sam-
+ple vectors was found to be 18.90. There are 19 eigenval-
+ues above the threshold, estimated using (14) with tol =
+−0.01. The four images (on the right) in the ﬁgure are the
+eigenfaces of 4 individuals recovered using rank k = 20
+(top 20 singular vectors) computed using the randomized
+SVD algorithm (Halko et al., 2011).
+
+7. Conclusion
+We discussed two fast practical methods based on polyno-
+mial ﬁltering to estimate the numerical rank of large ma-
+trices. Numerical experiments with matrices from various
+applications demonstrated that the ranks estimated by these
+methods are fairly accurate. In addition, because they re-
+quire a relatively small number of matvecs, the proposed
+methods are quite inexpensive. As such, they can be easily
+incorporated into standard dimension reduction techniques
+such as PCA, online PCA, or the randomized SVD, that
+require the numerical rank of a matrix as input.
+
+10020030040050060000.511.522.533.544.55x10−3DOS by LSM deg =50λφ(λ)Spectroscopic0102030101520253035ChebyshevfiltermethodNumberofvectors(1−>30)Estimed#eigenvaluesinintervalCumulativeAvg(rε)ℓExactFast methods for estimating the Numerical rank of large matrices
+
+Acknowledgements
+This work was supported by NSF under grant NSF/CCF-
+1318597.
+
+References
+Alyukov, Sergey Viktorovich. Approximation of step functions
+in problems of mathematical modeling. Mathematical Models
+and Computer Simulations, 3(5):661–669, 2011.
+
+Arora, Rajkumar, Cotter, A, Livescu, Karen, and Srebro, Nathan.
+Stochastic optimization for PCA and PLS. In Communication,
+Control, and Computing (Allerton), 2012 50th Annual Allerton
+Conference on, pp. 861–868. IEEE, 2012.
+
+Avron, H. and Toledo, S.
+
+Randomized algorithms for es-
+timating the trace of an implicit symmetric positive semi-
+Journal of the ACM, 58(2):8, 2011. doi:
+deﬁnite matrix.
+10.1145/1944345.1944349. URL http://dl.acm.org/
+citation.cfm?id=1944349.
+
+Bura, Efstathia and Cook, R Dennis. Rank estimation in reduced-
+rank regression. Journal of Multivariate Analysis, 87(1):159–
+176, 2003.
+
+Camba-M´endez, Gonzalo and Kapetanios, George. Statistical
+tests and estimators of the rank of a matrix and their appli-
+cations in econometric modelling. 2008.
+
+Cambridge, AT&T Laboratories.
+
+The Database of Faces.
+2002. URL http://www.cl.cam.ac.uk/research/
+dtg/attarchive/facedatabase.html.
+
+Chan, Tony F. Rank revealing QR factorizations. Linear algebra
+
+and its applications, 88:67–82, 1987.
+
+Comon, P. and Golub, G.H. Tracking a few extreme singular
+values and vectors in signal processing. Proceedings of the
+IEEE, 78(8):1327–1343, Aug 1990.
+ISSN 0018-9219. doi:
+10.1109/5.58320.
+
+Crammer, Koby, Dekel, Ofer, Keshet, Joseph, Shalev-Shwartz,
+Shai, and Singer, Yoram. Online passive-aggressive algo-
+rithms. The Journal of Machine Learning Research, 7:551–
+585, 2006.
+
+Davis, Timothy A and Hu, Yifan. The University of Florida sparse
+matrix collection. ACM Transactions on Mathematical Soft-
+ware (TOMS), 38(1):1, 2011.
+
+Di Napoli, Edoardo, Polizzi, Eric, and Saad, Yousef. Efﬁcient
+estimation of eigenvalue counts in an interval. ArXiv preprint
+ArXiv:1308.4275, 2013.
+
+Doukopoulos, X.G. and Moustakides, G.V. Fast and stable sub-
+space tracking. IEEE Transactions on Signal Processing, 56
+(4):1452–1465, April 2008.
+
+Golub, Gene, Klema, Virginia, and Stewart, Gilbert W. Rank de-
+generacy and least squares problems. Technical report, DTIC
+Document, 1976.
+
+Golub, Gene H. and Van Loan, Charles F. Matrix computations,
+
+volume 3. JHU Press, 2012.
+
+Haldar, Justin P and Hernando, Diego. Rank-constrained solu-
+tions to linear matrix equations using power factorization. Sig-
+nal Processing Letters, IEEE, 16(7):584–587, 2009.
+
+Halko, N., Martinsson, P., and Tropp, J. Finding structure with
+randomness: Probabilistic algorithms for constructing approx-
+imate matrix decompositions. SIAM Review, 53(2):217–288,
+2011. doi: 10.1137/090771806. URL http://dx.doi.
+org/10.1137/090771806.
+
+Hannan, Edward. Estimating the dimension of a linear system.
+
+Journal of Multivariate analysis, 11(4):459–473, 1981.
+
+Hansen, P. Rank-Deﬁcient and Discrete Ill-Posed Problems. So-
+ciety for Industrial and Applied Mathematics, 1998.
+doi:
+10.1137/1.9780898719697. URL http://epubs.siam.
+org/doi/abs/10.1137/1.9780898719697.
+
+Hutchinson, Michael F. A stochastic estimator of the trace of
+the inﬂuence matrix for Laplacian smoothing splines. Com-
+munications in Statistics-Simulation and Computation, 19(2):
+433–450, 1990.
+
+Jolliffe, Ian. Principal component analysis. Wiley Online Library,
+
+2002.
+
+Kritchman, S. and Nadler, B. Non-Parametric Detection of the
+Number of Signals: Hypothesis Testing and Random Matrix
+IEEE Transactions on Signal Processing, 57(10):
+Theory.
+3930–3941, Oct 2009. ISSN 1053-587X. doi: 10.1109/TSP.
+2009.2022897.
+
+Lanczos, C. Applied analysis. Prentice-Hall, Englewood Cliffs,
+
+NJ, 1956.
+
+Li, X.-P., Nunes, R. W., and Vanderbilt, D. Density-matrix
+electronic-structure method with linear system-size scaling.
+Phys. Rev. B, 47:10891, 1993.
+
+Lin, Lin, Saad, Yousef, and Yang, Chao. Approximating Spectral
+Densities of Large Matrices. SIAM Review, 58(1):34–65, 2016.
+
+Mason, John C and Handscomb, David C. Chebyshev polynomi-
+
+als. CRC Press, 2002.
+
+McWeeny, R. Some recent advances in density matrix theory. Rev.
+
+Mod. Phys., 32:335–369, 1960.
+
+Perry, Patrick O and Wolfe, Patrick J. Minimax rank estimation
+for subspace tracking. Selected Topics in Signal Processing,
+IEEE Journal of, 4(3):504–513, 2010.
+
+Reinsel, Gregory C and Velu, Raja P. Multivariate reduced-rank
+
+regression. Springer, 1998.
+
+Roosta-Khorasani, Farbod and Ascher, Uri. Improved bounds on
+sample size for implicit matrix trace estimators. Foundations
+of Computational Mathematics, pp. 1–26, 2014.
+
+Saad, Yousef. Filtered conjugate residual-type algorithms with
+applications. SIAM Journal on Matrix Analysis and Applica-
+tions, 28(3):845–870, 2006.
+
+Saad, Yousef. Analysis of subspace iteration for eigenvalue
+SIAM Journal on Ma-
+doi:
+URL http://dx.doi.org/10.
+
+problems with evolving matrices.
+trix Analysis and Applications, 37(1):103–122, 2016.
+10.1137/141002037.
+1137/141002037.
+
+Fast methods for estimating the Numerical rank of large matrices
+
+Turk, Matthew and Pentland, Alex. Eigenfaces for recognition.
+
+Journal of cognitive neuroscience, 3(1):71–86, 1991.
+
+Ubaru, Shashanka, Mazumdar, Arya, and Saad, Yousef. Low
+rank approximation using error correcting coding matrices. In
+Proceedings of the 32nd International Conference on Machine
+Learning (ICML-15), pp. 702–710, 2015.
+
+Wang, Lin-Wang. Calculating the density of states and optical-
+absorption spectra of large quantum systems by the plane-wave
+moments method. Physical Review B, 49(15):10154, 1994.
+
+Zhang, Yuchen, Wainwright, Martin J, and Jordan, Michael I.
+Distributed estimation of generalized matrix rank: Efﬁcient al-
+gorithms and lower bounds. In Proceedings of The 32nd Inter-
+national Conference on Machine Learning, pp. 457–465, 2015.
+
+

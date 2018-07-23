@@ -1,0 +1,1552 @@
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Shiva Prasad Kasiviswanathan
+Samsung Research America, Mountain View, CA 94043
+Hongxia Jin
+Samsung Research America, Mountain View, CA 94043
+
+Abstract
+
+Dimensionality reduction is a popular approach
+for dealing with high dimensional data that leads
+to substantial computational savings. Random
+projections are a simple and effective method for
+universal dimensionality reduction with rigorous
+theoretical guarantees. In this paper, we theoret-
+ically study the problem of differentially private
+empirical risk minimization in the projected sub-
+space (compressed domain). We ask: is it pos-
+sible to design differentially private algorithms
+with small excess risk given access to only pro-
+jected data? In this paper, we answer this ques-
+tion in afﬁrmative, by showing that for the class
+of generalized linear functions, given only the
+projected data and the projection matrix, we can
+obtain excess risk bounds of ˜O(w(C)2/3/n1/3)
+
+under -differential privacy, and ˜O((cid:112)w(C)/n)
+
+under (, δ)-differential privacy, where n is the
+sample size and w(C) is the Gaussian width of
+the parameter space C that we optimize over. A
+simple consequence of these results is that, for a
+large class of ERM problems, in the traditional
+setting (i.e., with access to the original data), un-
+der -differential privacy, we improve the worst-
+case risk bounds of (Bassily et al., 2014).
+
+1. Introduction
+Curse of dimensionality is a well-established obstacle in
+machine learning affecting aspects such as the accuracy,
+computation time, storage space, and communication cost
+of many common tasks. Therefore, a general strategy
+for tackling many high-dimensional learning tasks is ﬁrst
+transforming from the data domain to some appropriate
+compressed measurement domain, and then performing the
+learning task in the measurement domain. This idea has led
+to the development of the ﬁeld of compressed learning (El-
+dar & Kutyniok, 2012), where the general goal is to per-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+KASIVISW@GMAIL.COM
+
+HONGXIA.JIN@SAMSUNG.COM
+
+form a machine learning task in the compressed measure-
+ment domain with almost the same performance guarantee
+as that achievable in the original data domain. Efﬁciency
+gains achievable through compressed learning have been
+well documented for variety of common machine learning
+tasks (Arriaga & Vempala, 2006; Davenport et al., 2006;
+Maillard & Munos, 2009; Fard et al., 2012; Kab´an, 2014;
+Calderbank et al., 2009; Wright et al., 2009). In addition
+to the efﬁciency gains, these techniques also work success-
+fully in situations where one cannot observe the data do-
+main because collecting data might be difﬁcult or expen-
+sive. In this case, by learning in the compressed domain,
+one avoids the cost of recovering back the data in the high-
+dimensional domain.
+A common approach for dimensionality reduction (com-
+is using the technique of random projec-
+pression)
+tions (Vempala, 2005; Mahoney, 2011), where the orig-
+inal high-dimensional data is projected onto a lower-
+dimensional subspace using some appropriately chosen
+random matrix. Random projections, such as the popular
+Johnson-Lindenstrauss transform and its variants, preserve
+the structure of the original data space, and hence can be
+used as a way to reduce the cost of the learning process per-
+ceptibly, while preserving the performance approximately.
+For high-dimensional data, a random projection can lead
+to substantial savings in resources such as storage space,
+transmission bandwidth, and processing time.
+Machine learning algorithms are frequently run on sensi-
+tive data, and this has motivated the study of learning al-
+gorithms that have good performance guarantees while sat-
+isfying a rigorous notion of privacy called differential pri-
+vacy (Dwork et al., 2006b). There currently exist differen-
+tially private algorithms for many statistical and machine-
+learning tasks such as classiﬁcation, regression, PCA, clus-
+tering, density estimation, among others. We refer the
+reader to recent surveys by Sarwate and Chaudhuri (Sar-
+wate & Chaudhuri, 2013), and by Dwork and Roth (Dwork
+& Roth, 2013) for an overview of recent developments in
+machine learning with differential privacy.
+In this paper, we theoretically study private compressed
+learning in the framework of Empirical Risk Minimiza-
+tion (ERM). In the traditional (uncompressed) empirical
+risk minimization framework, we are given n datapoints
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+(cid:80)n
+
+n
+
+z1, . . . , zn from some domain Z, and a closed, convex set
+C ⊆ Rd, and the goal is minimize 1
+i=1 f (θ; zi) over
+θ ∈ C. The loss function f : C × Z → R is the loss as-
+sociated with a single datapoint. We will generally assume
+that f (·; z) is convex and λ-Lipschitz1 for all z ∈ Z.
+In this paper, we focus on a popular class of loss func-
+tions, called generalized linear functions (Shalev-Shwartz
+et al., 2009; Jain & Thakurta, 2014; Ullman, 2015), where
+the loss function f (θ; z) has a generalized linear form:
+f (θ; z) = (cid:96)((cid:104)x, θ(cid:105); y), with z = (x, y) and Z ⊆ Rd × R.
+We will assume that (cid:96) : R × R → R is convex with re-
+spect to its ﬁrst argument (over domain R). This formula-
+tion, that has also been used in the previous works on dif-
+ferentially private convex ERM (Kifer et al., 2012; Jain &
+Thakurta, 2014; Bassily et al., 2014; Ullman, 2015), cap-
+tures the supervised learning of a linear predictor with a
+convex loss function, where (cid:96)((cid:104)x, θ(cid:105); y) is the loss of pre-
+dicting (cid:104)x, θ(cid:105) when the true target is y.
+Given n datapoints
+(x1, y1), . . . , (xn, yn)
+drawn from some universe Rd × R, the M-estimator ˆθ as-
+sociated with a given a function
+
+(samples),
+
+n(cid:88)
+
+i=1
+
+In the traditional (uncompressed) setting, when the algo-
+rithm gets access to the true data, private convex ERM
+mechanisms have been investigated extensively in the liter-
+ature under both - and (, δ)-differential privacy notions.
+Starting with the results of Chaudhuri et al. (Chaudhuri
+& Monteleoni, 2009; Chaudhuri et al., 2011) private con-
+vex ERM problems have been studied in various settings
+including the low-dimensional setting (Rubinstein et al.,
+2009; Kifer et al., 2012), high-dimensional sparse regres-
+sion setting (Kifer et al., 2012; Smith & Thakurta, 2013),
+online learning setting (Jain et al., 2012; Thakurta & Smith,
+2013; Jain & Thakurta, 2014; Mishra & Thakurta, 2015),
+local privacy setting (Duchi et al., 2013), interactive set-
+ting (Jain & Thakurta, 2013; Ullman, 2015), and streaming
+setting (Kasiviswanathan et al., 2016). Bassily et al. (Bass-
+ily et al., 2014) showed that for a general convex loss func-
+tion f (θ; z) that for every z is 1-Lipschitz the expected ex-
+cess empirical is at most ˜O(
+d/n) under (, δ)-differential
+privacy and O(d/n) under -differential privacy (ignoring
+the dependence on other parameters for simplicity).2 They
+also showed that these bounds cannot be improved in gen-
+eral, even for generalized linear functions. Talwar et al.
+(Talwar et al., 2015a;b) recently showed that for a large
+class of ERM problems, under (, δ)-differential privacy,
+the above worst-case bound can be improved by exploiting
+properties of the parameter space C. Somewhat surpris-
+ingly, even though based on different techniques, like our
+results, the bounds presented in (Talwar et al., 2015a;b) also
+depend on the, Gaussian width of C (a geometric quantity,
+deﬁned below). Understanding the exact role of Gaussian
+width in differentially private ERM is an interesting open
+question. In the non-private world, Gaussian width (some-
+times called, Gaussian complexity), plays an important role
+in statistical learning theory, and has been used as a mea-
+sure of complexity of a function class in statistical learning
+theory, see (Mendelson, 2004).
+
+√
+
+:
+
+Compressed Learning Problem Formulation. Let Φ ∈
+Rm×d be a random projection matrix.
+In this paper,
+we use the popular and wide class of subgaussian ma-
+trices for random projection. We deﬁne the measure-
+ment domain M as: M = {(Φx, y)
+(x, y) ∈
+In other words, M is a compressed representation
+Z}.
+of Z. Our goal is to output an estimator (while sat-
+isfying the constraints of differential privacy) that mini-
+mizes the empirical risk (2) given access to only to the
+compressed representation of (x1, y1), . . . , (xn, yn) (i.e.,
+(Φx1, y1), . . . , (Φxn, yn)) and Φ.3 This compressed set-
+ting is a strict generalization of the traditional setting where
+the algorithm gets access to (x1, y1), . . . , (xn, yn). Our re-
+sults also trivially hold for the traditional setting, as given
+(x1, y1), . . . , (xn, yn), we can pick Φ and generate the in-
+put (Φx1, y1), . . . , (Φxn, yn) for our proposed algorithm.
+
+2Better bounds can be achieved for strongly convex loss func-
+
+tions (Bassily et al., 2014; Talwar et al., 2015a).
+
+3In general, given Φx, it is not possible to reconstruct x with-
+
+out further assumptions on x.
+
+L(θ; (x1, y1), . . . , (xn, yn)) =
+
+1
+n
+
+(cid:96)((cid:104)xi, θ(cid:105); yi)
+
+is deﬁned as:
+
+ˆθ ∈ argminθ∈C L(θ; (x1, y1), . . . , (xn, yn)).
+
+(1)
+
+As mentioned above, this type of program captures a vari-
+ety of important learning problems, e.g., the MLE (Maxi-
+mum Likelihood Estimators) for linear regression is cap-
+tured by setting (cid:96)((cid:104)x, θ(cid:105); y) = (y − (cid:104)x, θ(cid:105))2.
+Simi-
+larly, the MLE for logistic regression is captured by set-
+ting (cid:96)((cid:104)x, θ(cid:105); y) = ln(1 + exp(−y(cid:104)θ, x(cid:105))). Another com-
+mon example is the support vector machine (SVM), where
+(cid:96)((cid:104)x, θ(cid:105); y) = hinge(y(cid:104)θ, x(cid:105)), where hinge(a) = 1 − a if
+a ≤ 1 and 0 otherwise.
+In the empirical risk minimization setting,
+the success
+of an algorithm is measured by worst-case (over inputs
+(x1, y1), . . . , (xn, yn)) excess empirical risk, deﬁned as:
+
+L(˜θ; (x1, y1), . . . , (xn, yn))
+
+− min
+θ∈C L(θ; (x1, y1), . . . , (xn, yn)),
+
+(2)
+
+where ˜θ is the output of the algorithm. We would like to
+guarantee that with high probability (or expectation over
+coin tosses of the algorithm) the excess empirical risk is
+small. For generalized linear functions, a bound on ex-
+cess empirical risk also translates into a bound on the
+generalization error, using a generic conversion theorem
+of (Shalev-Shwartz et al., 2009) (details omitted here).
+
+1Throughout this paper, we measure Lipschitzness with re-
+
+spect to L2-norm in the input space.
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+(, δ)-differential privacy
+w(C)(cid:107)C(cid:107)2log2(1/δ)
+
+√
+
+ψλ(cid:96)
+
+(cid:19)
+
+(cid:18)
+
+˜O
+
+Problem Setting
+
+Compressed Learning
+
+(under random projections)
+
+-differential privacy
+
+(cid:16) ψ4/3λ(cid:96)w(C)2/3(cid:107)C(cid:107)2
+(cid:17)
+(cid:16) λ(cid:96)w(C)2/3(cid:107)C(cid:107)2
+
+(n)1/3
+
+(cid:17)
+
+˜O
+
+(cid:18)
+
+√
+
+(cid:19)
+
+n
+(λ(cid:96)w(C))2/3 log2(1/δ)
+
+˜O
+
+Traditional (uncompressed) Learning
+
+(cid:80)n
+i=1 (cid:96)((cid:104)xi, θ(cid:105); yi) for
+Table 1. Upper bounds on the excess risk under differential privacy for the convex ERM problem: minθ∈C 1
+λ(cid:96)-Lipschitz convex (cid:96) and general convex set C. Here w(C) is the Gaussian width of C, (cid:107)C(cid:107)2 is the diameter of C, ψ is the subgaussian
+n
+norm of random vectors used in the projection matrix, and Γ(cid:96) is the curvature constant of (cid:96). For traditional (uncompressed) learning,
+under (, δ)-differential privacy, better bounds can be obtained for some speciﬁc C’s (Talwar et al., 2015a;b). All the uncited results
+appear in this paper.
+
+(n)2/3
+
+(n)1/3
+
+(Talwar et al., 2015b)
+
+Γ1/3
+
+(cid:96)
+
+˜O
+
+Our Contributions. We primarily make two contribu-
+tions in this paper. A summary of our results appear in
+Table 1. All the presented algorithms run in time polyno-
+mial in n and d.
+
+(a) Compressed Learning. A natural ﬁrst question is
+whether non-trivial4 private ERM algorithms exist that
+operate only with compressed data. In this paper, we an-
+swer this question in afﬁrmative. Using techniques from
+convex geometry and high-dimensional estimation, we
+present a generic mechanism that transforms any differ-
+entially private ERM algorithm to provide excess risk
+bounds from compressed data. The idea is to add noise
+for privacy in the compressed domain, and then “lift”
+the result back to the original domain. Our analysis
+is based on exploiting the geometric structure of C.
+The geometric parameter, Gaussian width, deﬁned as
+w(C) = Eg∈N (0,1)d [supθ∈C(cid:104)θ, g(cid:105)],5 plays an important
+role in our analysis, and shows up repeatedly as a geo-
+metric measure of the size of the set C. For the impor-
+tant class of generalized linear functions, using the pri-
+vate ERM algorithms from (Bassily et al., 2014), we ob-
+tain an excess empirical risk bound of ≈ w(C)2/3/n1/3
+
+for achieving -differential privacy, and ≈ (cid:112)w(C)/n
+
+for achieving (, δ)-differential privacy.
+
+(b) Traditional Learning (under -differential privacy).
+Our bounds on compressed learning also directly trans-
+late to the traditional ERM setting. We obtain the ﬁrst
+excess risk bounds, under -differential privacy, that go
+beyond the worst-case bounds of O(d/n) from (Bass-
+ily et al., 2014). The techniques presented by (Talwar
+et al., 2015a;b) provide only (, δ)-differential privacy
+guarantees (i.e., δ has to be greater than 0). There are
+many simple consequences of our result. For example,
+we obtain an -differentially private Lasso algorithm
+with excess risk ˜O(1/n1/3), assuming all the input dat-
+apoints have bounded L2-norm. Previous best bounds
+
+4There is a trivial private ERM algorithm that ignores the input
+and outputs any θ ∈ C. The excess empirical risk of this algorithm
+is 2λL(cid:107)C(cid:107)2, where λL is the Lipschitz constant of L. All bounds
+presented in this paper, as also true for all other previous results
+in the private ERM literature, are only interesting in the regime
+where they are less than this trivial bound.
+
+5For a C contained in a unit L2-ball, w(C) is at most O(
+
+√
+d),
+
+and in general is signiﬁcantly smaller, see Section 2.
+
+here (from (Bassily et al., 2014)) had a polynomial de-
+pendence on the dimension.
+
+(Kifer et al., 2012),
+
+Other Related Work.
+(Jain & Thakurta, 2014) gave
+dimension-independent expected excess risk bounds for the
+case generalized linear functions with a strongly convex
+regularizer and assuming that C = Rd (unconstrained op-
+timization). Note that in this paper, we do not make any
+strong convexity assumptions and our results hold for the
+more interesting constrained optimization.
+Kifer et al.
+and Smith and
+Thakurta (Smith & Thakurta, 2013) studied the problem of
+releasing Lasso estimator privately under certain assump-
+tions about the instance (restricted strong convexity and
+mutual incoherence). Under these assumptions, they ob-
+tain excess risk of O(polylog(d)/n). However, these as-
+sumptions on the data are rather strong and may not hold in
+practice (Talwar et al., 2015a;b). Without these data depen-
+dent assumptions, (Talwar et al., 2015a;b) present an (, δ)-
+differentially private Lasso algorithm with excess risk of
+˜O(log(d)/n1/3). However, the question of designing a pri-
+vate Lasso estimator under -differential privacy whose ex-
+cess risk grows logarithmically in the dimension size d was
+still open, which we resolve here. We perform a more de-
+tailed comparison with the results of Talwar et al. in Sec-
+tion 4.
+Random projections have been used as a tool to design (dif-
+ferentially) private algorithms in many other problem set-
+tings. Blocki et al. (Blocki et al., 2012) have shown that if
+Φ is a Gaussian Johnson-Lindenstrauss matrix of appropri-
+ate dimension, then ΦX is differentially private if the least
+singular value of X is “sufﬁciently” large. Here X ∈ Rn×d
+is a data matrix of n points in d dimensions. Note that
+ΦX does not reduce the dimensionality of the data but
+rather generates a set of fewer datapoints. The bound on
+the least singular value was recently improved by (Sheffet,
+2015). Wang et al. (Wang et al., 2015) show that for the
+problem of subspace clustering achieving, random projec-
+tions can be helpful for both computational efﬁciency and
+privacy protection. Kenthapadi et al. (Kenthapadi et al.,
+2013) use Johnson-Lindenstrauss transform to publish a
+private sketch that enables estimation of the distance be-
+tween users. Zhou et al. (Zhou et al., 2009b) provide a
+technique of generating synthetic data using random linear
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+or afﬁne transformations. Random projections have also
+been used to achieve various other weaker privacy guaran-
+tees (Duncan et al., 1991; Zhou et al., 2009a).
+
+2. Preliminaries
+Notation and Data Normalization. We denote [n] =
+{1, . . . , n}. Vectors are in column-wise fashion, denoted
+by boldface letters. For a vector v, (cid:107)v(cid:107)p for (1 ≤ p ≤ ∞)
+denotes its Lp-norm. For p = 2, we drop the subscript
+and use (cid:107)v(cid:107) to denote its Euclidean (L2-) norm. The d-
+dimensional unit ball in Lp-norm centered at origin is de-
+noted by Bd
+p, and the d-dimensional Euclidean unit sphere
+is denoted by Sd−1. For a variable n, we use poly(n) to de-
+note a polynomial function of n and polylog(n) to denote
+poly(log(n)).
+Throughout this paper, we assume that all the inputs are
+L2-normalized with (cid:107)x(cid:107)≤ 1 and |y|≤ 1. This is for sim-
+plicity, and our results extend to the case without this nor-
+malization (with probably an increased Lipschitz constant).
+Also as is typical in random projection based analyses, we
+assume that the xi’s are selected independent of the projec-
+tion matrix Φ.
+We refer the reader to (Boyd & Vandenberghe, 2004) for
+standard deﬁnitions in convex optimization. For a set of
+vectors, we deﬁne its diameter as the maximum attained
+L2-norm in the set.
+Deﬁnition 1. (Diameter of Set) The diameter of a closed
+set C ⊆ Rd, is deﬁned as (cid:107)C(cid:107)2= supθ∈C(cid:107)θ(cid:107).
+Deﬁnition 2. (Lipschitz Functions over θ) A loss function
+f : C × Z → R is λf -Lipschitz with respect to θ over
+the domain C, if for any z ∈ Z, and θa, θb ∈ C, we have
+|f (θa; z) − f (θb; z)|≤ λf(cid:107)θa − θb(cid:107).
+For a generalized linear function (cid:96)((cid:104)x, θ(cid:105); y), let λ(cid:96) denote
+the Lipschitz constant of (cid:96) in the ﬁrst argument. The fol-
+lowing claim easily follows from our normalization (proof
+in Appendix A, Supplementary material).
+Claim 2.1. Let function (cid:96)((cid:104)x, θ(cid:105); y) be λ(cid:96)-Lipschitz in the
+ﬁrst argument over the domain R. Then (cid:96) is λ(cid:96)-Lipschitz
+with respect to θ.
+
+For common loss functions, λ(cid:96) is small. For squared loss,
+used in linear regression, the loss function is 2((cid:107)C(cid:107)2+1)-
+Lipschitz; for logistic loss, used in logistic regression, the
+loss function is 1-Lipschitz; for hinge loss, used in SVM,
+the loss function is 1-Lipschitz.
+Subgaussian matrices are a popular choice for random pro-
+jections (matrix Φ).
+Deﬁnition 3 (Subgaussian Random Variable and Vector).
+We call a random variable a ∈ R subgaussian if there ex-
+ists a constant C > 0 if Pr[|a|> t] ≤ 2 exp(−t2/C 2) for
+all t > 0. We say that a random vector a ∈ Rd is subgaus-
+sian if the one-dimensional marginals (cid:104)a, b(cid:105) are subgaus-
+sian random variables for all b ∈ Rd.
+The class of subgaussian random variables includes many
+
+random variables that arise naturally in data analysis, such
+as Gaussian, Bernoulli, spherical, bounded (where the ran-
+dom variable a satisﬁes |a|≤ M almost surely for some
+ﬁxed M). The natural generalizations of these random vari-
+ables to higher dimension are all subgaussian random vec-
+tors. For many isotropic convex sets6 K (such as the hy-
+percube), a random vector a uniformly distributed in K is
+subgaussian.
+Deﬁnition 4 (Norm of Subgaussian Random Variable and
+Vector). The ψ2-norm of a subgaussian random variable
+a ∈ R, denoted by (cid:107)a(cid:107)ψ2 is:
+
+(cid:107)a(cid:107)ψ2= inf(cid:8)t > 0 : E[exp(|a|2/t2)] ≤ 2(cid:9) .
+
+The ψ2-norm of a subgaussian random vector a ∈ Rd is:
+
+(cid:107)a(cid:107)ψ2 = sup
+b∈Sd−1
+
+(cid:107)(cid:104)a, b(cid:105)(cid:107)ψ2 .
+
+Our analysis is based on exploiting the geometric proper-
+ties of C. We use the well-studied quantity of Gaussian
+width that captures the L2-geometric complexity of C.
+Deﬁnition 5 (Gaussian Width). Given a closed set S ⊆
+Rd, its Gaussian width w(S) is deﬁned as:
+
+w(S) = Eg∈N (0,1)d [sup
+a∈S
+
+(cid:104)a, g(cid:105)].
+
+d).
+
+log d), and the width of any ball Bd
+
+In particular, w(S)2 can be thought as the “effective di-
+mension” of S. Many popular convex sets have low Gaus-
+sian width, e.g., the width of both the unit L1-ball in Rd
+√
+(Bd
+1) and the standard d-dimensional probability simplex
+p for
+are both Θ(
+1 ≤ p ≤ ∞ is ≈ d1−1/p. For a set C contained in the
+√
+2, w(C) is always O(
+Bd
+Differential Privacy Background. Differential privacy
+is a rigorous notion of privacy that emerged from a long
+line of work in theoretical computer science (Dwork et al.,
+2006b). We say two datasets D and D(cid:48) of size n are neigh-
+bors if they differ in one entry.
+Deﬁnition 6.
+(Dwork et al., 2006b;a) A randomized algo-
+rithm Alg is (, δ)-differentially private if for all neighbor-
+ing datasets D, D(cid:48) and for all events R in the output space
+of Alg, we have Pr[Alg(D) ∈ R] ≤ exp()·Pr[Alg(D(cid:48)) ∈
+R] + δ, where the probability is taken over the random-
+ness of the algorithm. When δ = 0, the Algorithm is -
+differentially private.
+
+3. Algorithm for the Compressed Setting
+In this section, we present a generic mechanism (Mech-
+anism PROJERM) for private risk minimization on com-
+pressed data.
+Instantiating the generic mechanism with
+6A convex set K in Rd is called isotropic if a random vector
+chosen uniformly from K according to the volume is isotropic. A
+random vector a ∈ Rd is isotropic if for all b ∈ Rd, E[(cid:104)a, b(cid:105)2] =
+(cid:107)b(cid:107)2.
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+recent differentially private algorithms of (Bassily et al.,
+2014) provides our main upper bounds (Theorem 3.11).
+Remember that in the compressed setting the algorithm
+gets access (to only) (Φx1, y1), . . . , (Φxn, yn) and the ma-
+trix Φ, and the goal of the algorithm is to privately out-
+put an estimator that minimizes the empirical risk (2). In
+the next section, we discuss a simple extension of our re-
+sults to the traditional (uncompressed) setting and its con-
+sequences. Missing proofs from this section are presented
+in Appendix B (Supplementary material).
+We focus on a large class of optimization problems ex-
+pressed as a sum of a generalized linear loss function over
+individual datapoints.
+
+In the following,
+L(θ; (x1, y1), . . . , (xn, yn) = 1
+
+(cid:80)n
+let ˆθ be the true minimizer of
+i=1 (cid:96)((cid:104)xi, θ(cid:105); yi), i.e.,
+n(cid:88)
+
+(cid:96)((cid:104)xi, θ(cid:105); yi).
+
+(3)
+
+n
+
+ˆθ ∈ argminθ∈C
+
+1
+n
+
+i=1
+
+As a simple corollary to the above theorem it also follows
+that,
+Corollary 3.2. Under the setting of Theorem 3.1, there ex-
+ists a constant C(cid:48) > 0 such that for any 0 < γ, β < 1
+
+(cid:34)
+
+|(cid:104)Φa, Φb(cid:105) − (cid:104)a, b(cid:105)| ≥ γ(cid:107)a(cid:107)(cid:107)b(cid:107)
+
+Pr
+
+sup
+a,b∈S
+
+provided that m ≥ C(cid:48)ψ4
+
+γ2 max
+
+w(S)2, log
+
+(cid:110)
+
+(cid:35)
+(cid:17)(cid:111)
+
+(cid:16) 1
+
+β
+
+≤ β,
+
+.
+
+Throughout the rest of this paper, we are going to assume
+that γ < 1 (γ in fact will be set much smaller). Consider the
+following modiﬁed version of the optimization objective
+from (3),
+
+Lcomp(θ; (x1, y1), . . . , (xn, yn); Φ)
+
+n(cid:88)
+
+i=1
+
+=
+
+1
+n
+
+(cid:96)((cid:104)Φxi, Φθ(cid:105); yi).
+
+(4)
+
+Let (cid:96) be λ(cid:96)-Lipschitz in the ﬁrst argument. By Claim 2.1,
+(cid:96) is λ(cid:96)-Lipschitz with respect to θ over the domain C. The
+Lipschitz constant of L (λL) satisﬁes: λL ≤ λ(cid:96).
+One of the most celebrated result in geometry, the Johnson-
+Lindenstrauss (JL) Lemma, states that for any set S ⊆ Rd,
+given γ > 0 and m = Ω(log|S|/γ2), there exists a map
+that embeds the set into Rm, distorting all pairwise dis-
+tances within at most 1 ± γ factor. This transform has be-
+come a fundamental tool in dimensionality reduction, and
+there are several constructions of the map based on random
+projections (Bourgain et al., 2015).
+The bound on m in JL lemma is optimal for an arbitrary
+set S, however if S, has a special structure then the depen-
+dence of m can be improved. This was ﬁrst investigated by
+Gordon (Gordon, 1988), who showed that one can embed a
+set of points S in Rd into a much lower-dimensional space
+Rm using a Gaussian matrix while approximately preserv-
+ing the Euclidean norms of the vectors in S, provided that
+Gaussian width of S is small. This result has been used in
+several interesting applications in high-dimensional convex
+geometry, statistics, and compressed sensing.
+We use the following generalization of Gordon’s theorem
+by Dirksen (Dirksen, 2014), which is based on using sub-
+gaussian matrices for the projection.
+
+Theorem 3.1 ((Dirksen, 2014)). Let ˜Φ be an m × d ran-
+dom matrix, whose rows φ(cid:62)
+m are i.i.d., mean-zero,
+isotropic, subgaussian random vectors in Rd with ψ =
+√
+(cid:107)φi(cid:107)ψ2. Let Φ = ˜Φ/
+m. Let S be a set of points in Rd.
+There is a constant C > 0 such that for any 0 < γ, β < 1,
+
+1 , . . . , φ(cid:62)
+
+(cid:20)
+
+Pr
+
+sup
+a∈S
+
+(cid:21)
+(cid:12)(cid:12)(cid:107)Φa(cid:107)2−(cid:107)a(cid:107)2(cid:12)(cid:12) ≥ γ(cid:107)a(cid:107)2
+(cid:16) 1
+
+(cid:110)
+
+w(S)2, log
+
+γ2 max
+
+β
+
+≤ β,
+
+(cid:17)(cid:111)
+
+.
+
+provided that m ≥ Cψ4
+
+Since in the compressed setting, we have access to
+(Φxi, yi)’s, we can solve (4). Our idea will be to privately
+minimize (4) problem over the domain ΦC, and use the re-
+sult to bound the excess risk. Let ΦC = {ϑ ∈ Φθ : θ ∈ C}.
+Note for a convex C, ΦC is also convex.
+Let λLcomp denote the Lipschitz constant of the function
+(cid:96)((cid:104)Φx, ϑ(cid:105); y) with respect to ϑ over the domain ΦC:
+
+λLcomp =
+
+sup(x,y)∈(x1,y1),...,(xn,yn)
+
+ϑa,ϑb∈ΦC
+
+|(cid:96)((cid:104)Φx,ϑa(cid:105);y)−(cid:96)((cid:104)Φx,ϑb(cid:105);y)|
+
+(cid:107)ϑa−ϑb(cid:107)
+
+.
+
+Note that in the above deﬁnition of λLcomp, (x, y) is re-
+stricted to any ﬁxed collection of n elements. The follow-
+ing lemma shows for large enough m, with probability at
+least 1 − β, that λLcomp is at most 2λ(cid:96). Remember that the
+Lipschitz constant of L is at most λ(cid:96).
+Lemma 3.3. Let Φ be a random matrix as deﬁned in The-
+orem 3.1 with m = Θ((ψ4/γ2) log(n/β)) for β > 0. Then
+with probability, at least 1 − β, the Lipschitz constant of
+Lcomp (λLcomp) is at most 2λ(cid:96) with respect to ϑ over the
+domain ΦC.
+
+The following lemma follows from Lipschitz properties of
+(cid:96) and Theorem 3.1.
+Lemma 3.4. Let Φ be a random matrix as deﬁned in The-
+orem 3.1 with m = Θ((ψ4/γ2) log(n/β)) for β > 0. Then
+with probability at least 1 − β, for every (xi, yi)
+
+(cid:96)((cid:104)Φxi, Φˆθ(cid:105); yi) ≤ (cid:96)((cid:104)xi, ˆθ(cid:105); yi) + λ(cid:96)γ(cid:107)C(cid:107)2.
+
+From Lemma 3.4, the following lemma is immediate.
+Lemma 3.5. Let Φ be a random matrix as deﬁned in The-
+orem 3.1 with m = Θ((ψ4/γ2) log(n/β)) for β > 0. Then
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Mechanism 1 PROJERM
+
+Input: A random subgaussian matrix Φ ∈ Rm×d, and a dataset D = (Φx1, y1), . . . , (Φxn, yn) of n datapoints from the
+domain MΦ = {(Φx, y) : x ∈ Rd,(cid:107)x(cid:107)≤ 1, y ∈ R,|y|≤ 1}
+Output: θpriv a differentially private estimate of ˆθ ∈ argminθ∈C 1
+n(cid:88)
+1. Let ϑpriv ← Output of an (, δ)-differentially private or an -differentially private ERM algorithm solving the following
+problem:
+
+(cid:80)n
+i=1 (cid:96)((cid:104)xi, θ(cid:105); yi)
+
+n
+
+argminϑ∈ΦC
+
+(cid:96)((cid:104)Φxi, ϑ(cid:105); yi)
+
+1
+n
+
+i=1
+
+2. θpriv ← argminθ∈Rd (cid:107)θ(cid:107)C subject to Φθ = ϑpriv (can be solved with any convex programming technique)
+3. Return: θpriv
+
+with probability at least 1 − β,
+
+such that for any β > 0, with probability at least 1 − β,
+
+n(cid:88)
+
+i=1
+
+n(cid:88)
+
+i=1
+
+min
+θ∈C
+
+1
+n
+
+(cid:96)((cid:104)Φxi, Φθ(cid:105); yi) ≤ 1
+n
+
+(cid:96)((cid:104)xi, ˆθ(cid:105); yi)+λ(cid:96)γ(cid:107)C(cid:107)2.
+
+1
+n
+
+We now present a generic mechanism (Mechanism PRO-
+JERM) for privately releasing M-estimator based on min-
+imizing (4) under differential privacy. The mechanism is
+simple: it “solves” the private ERM problem in the pro-
+jected subspace, and then “lifts” back the result to the orig-
+inal dimension by solving a linear estimation problem. As
+we will see, working in the compressed domain has the
+added advantage that the noise added for privacy scales as
+
+≈ √
+
+m.
+
+Mechanism PROJERM is (, δ)- or -differentially private
+based on the algorithm used in Step 1. Post-processing of
+the output does not affect the differential privacy guarantee.
+Also note that Mechanism PROJERM is differentially pri-
+vate independent of the choice of Φ. However, the utility
+guarantee of Mechanism PROJERM (Theorem 3.11) will
+require Φ to be a subgaussian matrix (as in Theorem 3.1)
+with a lower bound on m that will depend among various
+parameters, the geometry of C.
+In the Step 1 of Mechanism PROJERM any (, δ)- or
+-differentially private ERM algorithm can be used.
+In
+Proposition 3.7, we provide bounds obtained by using the
+differentially private ERM algorithms of (Bassily et al.,
+2014). Their (, δ)-differentially private ERM algorithm
+is based on a noisy stochastic variant of the classic gradient
+descent algorithm. While their -differentially private ERM
+algorithm is based on a polynomial time implementation of
+the exponential mechanism of McSherry and Talwar (Mc-
+Sherry & Talwar, 2007).
+
+Theorem 3.6 ((Bassily et al., 2014), Theorem 2.4). Let
+f (θ; z) be a convex loss function that is λ-Lipschitz with
+respect to θ over the domain C ⊆ Rd.
+1. There exists an (, δ)-differentially private algorithm
+A,δ that on an input dataset z1, . . . , zn outputs ˜θ ∈ C
+
+n(cid:88)
+(cid:32)
+
+i=1
+
+= O
+
+n(cid:88)
+
+i=1
+
+1
+n
+
+f (˜θ; zi) − min
+θ∈C
+√
+λ
+
+d(cid:107)C(cid:107)2log3/2(n/δ)(cid:112)log(1/δ) polylog(1/β)
+
+f (θ; zi)
+
+1
+n
+
+i=1
+
+(cid:33)
+
+.
+
+n(cid:88)
+
+n
+
+2. There exists an -differentially private algorithm A that
+on an input dataset z1, . . . , zn outputs ˜θ ∈ C such that for
+any β > 0, with probability at least 1 − β,
+
+f (˜θ; zi) − min
+θ∈C
+
+1
+n
+
+n(cid:88)
+(cid:18) λd(cid:107)C(cid:107)2 polylog(1/β)
+
+f (θ; zi)
+
+i=1
+
+(cid:19)
+
+.
+
+= O
+
+n
+
+by
+
+follows
+
+following
+
+proposition
+
+The
+combining
+Lemma 3.5 with Theorem 3.6. The proposition shows that,
+even for a small projected dimension m, the value of the
+function Lcomp(θ; (x1, y1), . . . , (xn, yn); Φ) at θ = θpriv
+approximates the minimum empirical risk.
+Proposition 3.7. Let Φ be a random matrix as deﬁned in
+Theorem 3.1 with m = Θ((ψ4/γ2) log(n/β)) for β > 0.
+Then the output θpriv of Mechanism PROJERM,
+1. When invoked (in Step 1) with Algorithm A,δ from The-
+orem 3.6, with probability at least 1 − β satisﬁes:
+
+Lcomp(θpriv; (x1, y1), . . . , (xn, yn); Φ) − L(ˆθ; (x1, y1), . . . , (xn, yn))
+
+(cid:18) λLcomp
+
+√
+
+= O
+
+√
+
+m(cid:107)ΦC(cid:107)2log3/2(n/δ)
+n
+
+(cid:19)
+
+log(1/δ) polylog(1/β)
+
++ λ(cid:96)γ(cid:107)C(cid:107)2.
+
+2. When invoked (in Step 1) with Algorithm A from Theo-
+rem 3.6, with probability at least 1 − β satisﬁes:
+
+Lcomp(θpriv; (x1, y1), . . . , (xn, yn); Φ) − L(ˆθ; (x1, y1), . . . , (xn, yn))
+
+(cid:18) λLcompm(cid:107)ΦC(cid:107)2 polylog(1/β)
+
+(cid:19)
+
++ λ(cid:96)γ(cid:107)C(cid:107)2.
+
+= O
+
+n
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Existence of θpriv. To lift ϑpriv into the original d-
+dimensional space, we use recent results about reconstruc-
+tion from linear observations (Vershynin, 2014). Since
+ϑpriv ∈ ΦC, we know that there exists a θtrue ∈ C, such
+that Φθtrue = ϑpriv. Then the goal is to estimate θtrue from
+Φθtrue. Again geometry of C (Gaussian width) plays an im-
+portant role, as it controls the diameter of high-dimensional
+random sections of C (referred to as M (cid:63) bound (Ledoux &
+Talagrand, 2013; Vershynin, 2014)). We refer the reader
+to the excellent tutorial by Vershynin (Vershynin, 2014) for
+more details.
+We deﬁne Minkowski functional, as commonly used in ge-
+ometric functional analysis and convex analysis.
+Deﬁnition 7 (Minkowski functional). For any vector θ ∈
+Rd, the Minkowski functional of C (a closed set) is the non-
+negative number (cid:107)θ(cid:107)C deﬁned by the rule: (cid:107)θ(cid:107)C= inf{τ ∈
+R : θ ∈ τC}.
+For the typical situation in ERM problems, where C is a
+symmetric convex body, then (cid:107)·(cid:107)C deﬁnes a norm.
+The optimization problem solved in Step 2 of Mecha-
+nism PROJERM is convex if C is convex, and in fact is
+a linear program is C is a polytope, and hence can be ef-
+ﬁciently solved. The existence of θpriv follows from The-
+orem 3.8, which in fact can be used to bound the distance
+between θpriv and θtrue (Corollary 3.9).
+Theorem 3.8.
+(Vershynin, 2014; Mendelson et al., 2007)
+Let Φ be an m × d matrix, whose rows φ(cid:62)
+m are
+i.i.d., mean zero, isotropic and subgaussian random vectors
+in Rd with ψ = (cid:107)φi(cid:107)ψ2. Let C be a convex set. Given
+v = Φu and Φ, let ˆu be the solution to the following convex
+program: minu(cid:48)∈Rd (cid:107)u(cid:48)(cid:107)C subject to Φu(cid:48) = v. Then for
+(cid:33)
+any β > 0, with probability at least 1 − β,
+ψ4(cid:107)C(cid:107)2
+√
+
+(cid:112)log(1/β)
+
+(cid:107)u − ˆu(cid:107)= O
+
+1 , . . . , φ(cid:62)
+
+(cid:32)
+
+sup
+
++
+
+.
+
+u:v=Φu
+
+Corollary 3.9. If Φ ∈ Rm×d is a subgaussian matrix (as in
+Theorem 3.1), then for any β > 0, with probability at least
+1 − β, (cid:107)θtrue − θpriv(cid:107)= O
+.
+
+√
+ψ4(cid:107)C(cid:107)2
+√
+
+ψ4w(C)√
+
+(cid:19)
+
+log(1/β)
+m
+
+m +
+
+m
+
+ψ4w(C)√
+(cid:18)
+
+least 1 − β,
+
+L(θpriv; (x1, y1), . . . , (xn, yn))
+≤ Lcomp(θpriv; (x1, y1), . . . , (xn, yn); Φ) + λ(cid:96)γ(cid:107)C(cid:107)2.
+
+Using Lemma 3.10 and Proposition 3.7 provides the fol-
+lowing bounds on excess empirical risk. The parameter
+γ is chosen to balance various opposing factors. We will
+assume that γ = o(1), which in the following theorem
+happens when w(C) (cid:28) n (for achieving (, δ)-differential
+privacy) and w(C) (cid:28) √
+n (for achieving -differential pri-
+vacy). The running time for both these cases is polynomial
+in n and m.
+Theorem 3.11 (Utility of Mechanism PROJERM). Let Φ
+be a random matrix as deﬁned in Theorem 3.1.
+
+(cid:17)
+
+√
+log n)2 log(n/β)
+w(C)
+
+1. Then the output θpriv of Mechanism PROJERM when
+invoked with Algorithm A,δ from Theorem 3.6 and m =
+for β > 0, with probabil-
+Θ
+ity at least 1 − β satisﬁes:
+
+(cid:16) ψ2n(w(C)+
+(cid:32) ψ(cid:112)w(C)λ(cid:96)(cid:107)C(cid:107)2log3 n log2( 1
+
+L(θpriv; (x1, y1), . . . , (xn, yn)) − L(ˆθ; (x1, y1), . . . , (xn, yn))
+
+δ ) polylog( 1
+β )
+
+(cid:33)
+
+= O
+
+.
+
+√
+
+n
+
+(cid:16) ψ4/3(n)2/3(w(C)+
+
+2. Then the output θpriv of Mechanism PROJERM when
+invoked with Algorithm A from Theorem 3.6 and m =
+for β > 0, with
+Θ
+probability at least 1 − β satisﬁes:
+
+√
+w(C)4/3
+
+log n)2 log(n/β)
+
+(cid:17)
+
+L(θpriv; (x1, y1), . . . , (xn, yn)) − L(ˆθ; (x1, y1), . . . , (xn, yn))
+
+(cid:32) ψ4/3w(C)2/3λ(cid:96)(cid:107)C(cid:107)2log2 n polylog( 1
+
+(cid:33)
+
+β )
+
+.
+
+(n)1/3
+
+4. Algorithm for the Traditional Setting
+Mechanism PROJERM can also be directly utilized
+for solving the traditional private empirical risk mini-
+mization problem, where the algorithm gets access to
+(x1, y1), . . . , (xn, yn).
+This approach is illustrated in
+Mechanism STDERM.
+Mechanism STDERM is again (, δ)- or -differentially
+private based on how Mechanism PROJERM is invoked.
+The excess empirical risk bound of Mechanism STDERM
+follows from Theorem 3.11.
+Corollary 4.1 (of Theorem 3.11). The output θpriv of
+Mechanism STDERM has the same privacy and excess em-
+pirical risk guarantees as that of Mechanism PROJERM
+detailed in Theorem 3.11 with ψ = O(1).
+
+Under -differential privacy, these are the ﬁrst bounds that
+take the geometry of C into account to obtain lower excess
+
+m
+
+= O
+
+One last thing to be veriﬁed is that θpriv generated by
+Mechanism PROJERM is in C. This is simple as by def-
+inition of Minkowski functional, as for any closed set C =
+{θ ∈ Rd : (cid:107)θ(cid:107)C ≤ 1}. Hence, (cid:107)θtrue(cid:107)C≤ 1. By choice
+of θpriv in Step 2, ensures that (cid:107)θpriv(cid:107)C ≤ (cid:107)θtrue(cid:107)C ≤ 1,
+which (by deﬁnition) shows that θpriv ∈ C.
+Now that we have established that θpriv ∈ C exists,
+we lower bound Lcomp(θpriv; (x1, y1), . . . , (xn, yn); Φ) in
+terms of L(θpriv; (x1, y1), . . . , (xn, yn)). Later we will use
+this lower bound along with Proposition 3.7 to bound the
+excess empirical risk.
+Lemma 3.10. Let Φ be a random matrix as de-
+ﬁned in Theorem 3.1 with m = Θ((ψ4/γ2)(w(C) +
+√
+log n)2 log(n/β)) for β > 0. Then with probability at
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Mechanism 2 STDERM
+
+Input: A dataset D = (x1, y1), . . . , (xn, yn) of n datapoints from the domain Z = {(x, y) : x ∈ Rd,(cid:107)x(cid:107)≤ 1, y ∈
+R,|y|≤ 1}
+Output: θpriv a differentially private estimate of ˆθ ∈ argminθ∈C 1
+1. Generate ˜Φ ∈ Rm×d ← matrix whose m rows are i.i.d., mean-zero, isotropic, subgaussian random vectors in Rd with
+ψ2-norm equaling O(1)
+2. Φ ← ˜Φ√
+3. θpriv ← Output of Mechanism PROJERM invoked on the input (Φx1, y1), . . . , (Φxn, yn)
+4. Return: θpriv
+
+(cid:80)n
+i=1 (cid:96)((cid:104)xi, θ(cid:105); yi)
+
+m
+
+n
+
+1
+n
+
+(cid:80)n
+i=1(yi − (cid:104)xi, θ(cid:105))2 subject to θ ∈ cBd
+
+risk than the worst case bounds of (Bassily et al., 2014).
+A simple consequence is improved excess risk bound for
+releasing the Lasso estimator under -differential privacy.
+Given a dataset D = (x1, y1), . . . , (xn, yn) of n data-
+points from the domain Z = {(x, y) : x ∈ Rd,(cid:107)x(cid:107)≤
+1, y ∈ R,|y|≤ 1},7 the Lasso estimator is deﬁned as
+argminθ
+1 (where
+1 is the unit L1-ball in Rd, and c ∈ R with c > 0). Under
+Bd
+this setting, Theorem 3.11 (Part 2) implies that there exists
+an -differentially private algorithm for releasing the Lasso
+estimator, that with probability at least 1−β, has excess risk
+of O(c8/3 log1/3(d) log2(n) polylog(1/β)/(n)1/3),
+i.e.,
+has only a logarithmic dependence on the dimension d.
+We now compare our results with that of (Bassily et al.,
+2014; Talwar et al., 2015a;b).
+
+1
+n
+
+Comparison with the Lower Bound on Private
+(cid:80)n
+ERM Risk from (Bassily et al., 2014). Bassily et
+al. showed that a simple generalized linear problem
+i=1(cid:104)xi, θ(cid:105), has an (, δ)-
+of the form minθ∈Sd−1
+of Ω(min{√
+differentially private excess empirical risk lower bound
+(cid:112)w(C)/n (ignoring other parameters) from Theorem 3.11
+d/n, 1}) (ignoring other parameters). For
+this generalized linear problem our upper bound of ≈
+√
+always greater than the lower bound of Ω(min{√
+
+d), which is
+d/n, 1}),
+thereby is consistent with the lower bound. A similar situ-
+ation also holds for the case of -differential privacy.
+
+n as w(Sd−1) = Ω(
+
+(Part 1) equals d1/4/
+
+√
+
+Comparison with the Upper Bounds on Private ERM
+Risk of (Talwar et al., 2015a;b). Talwar et al. presented
+two (, δ)-differentially private algorithms, one based on
+mirror descent (Talwar et al., 2015a) and the other one
+based on Frank-Wolfe optimization technique.
+In both
+these cases, the upper bound on the excess empirical risk
+depends on the Gaussian width of C. We list the compari-
+son of these results with ours below.
+
+(1) Compressed setting: To our best knowledge, these bounds
+are the ﬁrst for private compressed learning, which as
+
+7The (, δ)-differentially private excess risk bounds of (Talwar
+et al., 2015a;b) for the Lasso estimator hold under a weaker L∞-
+normalization of xi’s.
+
+discussed in the Introduction (Section 1) is a desired
+framework for designing efﬁcient algorithms for high-
+dimensional problems. All previous private ERM algo-
+rithms, including that of Talwar et al. operate on the orig-
+inal d-dimensional input space.
+
+(2) Traditional setting (under -differential privacy): The
+bounds of Talwar et al. hold only under the weaker notion
+of (, δ)-differential privacy (Thakurta, 2016), whereas in
+this paper we establish bounds under both - and (, δ)-
+differential privacy.
+
+(cid:96)
+
+risk bound of O(λ(cid:96)w(C)(cid:112)maxθ∈C Ψ(θ) log(n/δ)/n),
+
+(3) Traditional setting (under (, δ)-differential privacy):
+Firstly note that the bound of Talwar et al. holds for
+all Lipschitz convex functions not just generalized lin-
+ear functions (the focus of this paper). Now translating
+the results of Talwar et al. to our setting, their mirror de-
+scent based algorithm has an expected excess empirical
+where Ψ : C → R needs to be picked to be 1-strongly
+convex with respect to (cid:107)·(cid:107)C norm. Talwar et al. also pro-
+vide few example instantiations of this algorithm by care-
+fully picking Ψ based on C. The Frank-Wolfe based algo-
+rithm of Talwar et al. has an expected excess empirical
+(λ(cid:96)w(C))2/3 log2(n/δ)/(n)2/3),
+risk bound of O(Γ1/3
+where Γ(cid:96) is the curvature constant of (cid:96) over the domain C.
+In general, because of the dependence on slightly differ-
+(cid:80)n
+ent parameters, it is hard to precisely compare the various
+excess risk bounds. Therefore, as an example, consider
+i=1(yi −
+the problem of linear regression: minθ∈C 1
+(cid:104)xi, θ(cid:105))2.
+n
+In this case, the expected excess risk bound
+(using the Frank-Wolfe approach) from Talwar et al.
+is ˜O((cid:107)C(cid:107)4/3
+2 w(C)2/3/(n)2/3), whereas the bound from
+Theorem 3.11 (Part 1) is ˜O((cid:107)C(cid:107)2
+n) (for sim-
+pliﬁcation: setting δ ≈ 1/poly(n)). For bounded (cid:107)C(cid:107)2, ,
+and in the regime of w(C) = o(n), when both our result
+and that of Talwar et al. are better than the trivial private
+risk bound of O(1), the bound of Talwar et al. is better
+than our bound by a factor of ≈ n1/6/w(C)1/6. So even
+under (, δ)-differential privacy, our bounds are close to
+that achieved by Talwar et al.. This along with previous
+points underscore the importance of our results.
+
+(cid:112)w(C)/
+
+√
+
+2
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Acknowledgments
+The ﬁrst author would like to thank his son, Tarun, who
+thoughtfully prolonged his stay in utero until after his father
+timely submitted this manuscript.
+
+References
+Arriaga, Rosa I and Vempala, Santosh. An algorithmic the-
+ory of learning: Robust concepts and random projection.
+Machine Learning, 63(2):161–182, 2006.
+
+Bassily, Raef, Smith, Adam, and Thakurta, Abhradeep.
+Differentially private empirical risk minimization: Efﬁ-
+cient algorithms and tight error bounds. In FOCS. IEEE,
+2014.
+
+Blocki, Jeremiah, Blum, Avrim, Datta, Anupam, and Shef-
+fet, Or. The johnson-lindenstrauss transform itself pre-
+serves differential privacy. In Foundations of Computer
+Science (FOCS), 2012 IEEE 53rd Annual Symposium
+on, pp. 410–419. IEEE, 2012.
+
+Bourgain, Jean, Sjoerd, Dirksen, and Nelson, Jelani. To-
+ward a uniﬁed theory of sparse dimensionality reduction
+in euclidean space. In Proceedings of the 47th ACM Sym-
+posium on Theory of Computing. Association for Com-
+puting Machinery, 2015.
+
+Boyd, Stephen and Vandenberghe, Lieven. Convex opti-
+
+mization. Cambridge university press, 2004.
+
+Calderbank, Robert, Jafarpour, Sina, and Schapire, Robert.
+Compressed learning: Universal sparse dimensional-
+ity reduction and learning in the measurement domain.
+preprint, 2009.
+
+Chaudhuri, Kamalika and Monteleoni, Claire. Privacy-
+In Advances in Neural
+
+preserving logistic regression.
+Information Processing Systems, pp. 289–296, 2009.
+
+Chaudhuri, Kamalika, Monteleoni, Claire, and Sarwate,
+Anand D. Differentially private empirical risk minimiza-
+tion. The Journal of Machine Learning Research, 12:
+1069–1109, 2011.
+
+Davenport, Mark A, Wakin, Michael B, and Baraniuk,
+Richard G. Detection and estimation with compressive
+measurements. Dept. of ECE, Rice University, Tech. Rep,
+2006.
+
+Dirksen, Sjoerd. Dimensionality reduction with sub-
+arXiv preprint
+
+gaussian matrices: a uniﬁed theory.
+arXiv:1402.3973, 2014.
+
+Duchi, John C, Jordan, Michael, Wainwright, Martin J,
+et al. Local privacy and statistical minimax rates.
+In
+Foundations of Computer Science (FOCS), 2013 IEEE
+54th Annual Symposium on, pp. 429–438. IEEE, 2013.
+Duncan, George T, Pearson, Robert W, et al. Enhanc-
+ing access to microdata while protecting conﬁdentiality:
+Prospects for the future. Statistical Science, 6(3):219–
+232, 1991.
+
+Dwork, Cynthia and Roth, Aaron. The algorithmic founda-
+tions of differential privacy. Theoretical Computer Sci-
+ence, 9(3-4):211–407, 2013.
+
+Dwork, Cynthia, Kenthapadi, Krishnaram, McSherry,
+Frank, Mironov, Ilya, and Naor, Moni. Our data, our-
+selves: Privacy via distributed noise generation. In EU-
+ROCRYPT, LNCS, pp. 486–503. Springer, 2006a.
+
+Dwork, Cynthia, McSherry, Frank, Nissim, Kobbi, and
+Smith, Adam. Calibrating noise to sensitivity in private
+data analysis. In TCC, volume 3876 of LNCS, pp. 265–
+284. Springer, 2006b.
+
+Eldar, Yonina C and Kutyniok, Gitta. Compressed sensing:
+theory and applications. Cambridge University Press,
+2012.
+
+Fard, Mahdi Milani, Grinberg, Yuri, Pineau, Joelle, and
+Precup, Doina. Compressed least-squares regression on
+sparse spaces. In AAAI, 2012.
+
+Gordon, Yehoram. On Milman’s inequality and random
+subspaces which escape through a mesh in Rn. Springer,
+1988.
+
+Jain, Prateek and Thakurta, Abhradeep. Differentially pri-
+In Proceedings of the 30th
+vate learning with kernels.
+International Conference on Machine Learning (ICML-
+13), pp. 118–126, 2013.
+
+Jain, Prateek and Thakurta, Abhradeep Guha.
+
+(near) di-
+mension independent risk bounds for differentially pri-
+vate learning. In Proceedings of The 31st International
+Conference on Machine Learning, pp. 476–484, 2014.
+
+Jain, Prateek, Kothari, Pravesh, and Thakurta, Abhradeep.
+Differentially private online learning. In COLT 2012, pp.
+24.1–24.34, 2012.
+
+Kab´an, Ata. New bounds on compressive linear least
+squares regression. In The 17-th International Confer-
+ence on Artiﬁcial Intelligence and Statistics (AISTATS
+2014), volume 33, pp. 448–456, 2014.
+
+Kasiviswanathan, Shiva, Nissim, Kobbi, and Jin, Hongxia.
+
+Private incremental regression, 2016.
+
+Kenthapadi, Krishnaram, Korolova, Aleksandra, Mironov,
+Ilya, and Mishra, Nina.
+Privacy via the johnson-
+lindenstrauss transform. Journal of Privacy and Con-
+ﬁdentiality, 5(1):39–71, 2013.
+
+Kifer, Daniel, Smith, Adam, and Thakurta, Abhradeep.
+Private convex empirical risk minimization and high-
+dimensional regression. Journal of Machine Learning
+Research, 1:41, 2012.
+
+Ledoux, Michel and Talagrand, Michel. Probability in Ba-
+nach Spaces: isoperimetry and processes, volume 23.
+Springer Science & Business Media, 2013.
+
+Efﬁcient Private Empirical Risk Minimization for High-dimensional Learning
+
+Ullman, Jonathan. Private multiplicative weights beyond
+linear queries. In Proceedings of the 34th ACM Sympo-
+sium on Principles of Database Systems, pp. 303–312.
+ACM, 2015.
+
+Vempala, Santosh S. The random projection method, vol-
+
+ume 65. American Mathematical Soc., 2005.
+
+Vershynin, Roman. Estimation in high dimensions: a ge-
+ometric perspective. arXiv preprint arXiv:1405.5103,
+2014.
+
+Wang, Yining, Wang, Yu-Xiang, and Singh, Aarti. A deter-
+ministic analysis of noisy sparse subspace clustering for
+dimensionality-reduced data. In Proceedings of the 32nd
+International Conference on Machine Learning (ICML-
+15), pp. 1422–1431, 2015.
+
+Wright, John, Yang, Allen Y, Ganesh, Arvind, Sastry,
+Shankar S, and Ma, Yi. Robust face recognition via
+sparse representation. Pattern Analysis and Machine In-
+telligence, IEEE Transactions on, 31(2):210–227, 2009.
+
+Zhou, Shuheng, Lafferty, John, and Wasserman, Larry.
+Compressed and privacy-sensitive sparse regression. In-
+formation Theory, IEEE Transactions on, 55(2):846–
+866, 2009a.
+
+Zhou, Shuheng, Ligett, Katrina, and Wasserman, Larry.
+In Information
+Differential privacy with compression.
+Theory, 2009. ISIT 2009. IEEE International Symposium
+on, pp. 2718–2722. IEEE, 2009b.
+
+Mahoney, Michael W. Randomized algorithms for matrices
+and data. Foundations and Trends in Machine Learning,
+3(2):123–224, 2011.
+
+Maillard, Odalric and Munos, R´emi. Compressed least-
+squares regression. In Advances in Neural Information
+Processing Systems, pp. 1213–1221, 2009.
+
+McSherry, Frank and Talwar, Kunal. Mechanism design via
+differential privacy. In FOCS, pp. 94–103. IEEE, 2007.
+
+Mendelson, Shahar. Geometric parameters in learning the-
+In Geometric aspects of functional analysis, pp.
+
+ory.
+193–235. Springer, 2004.
+
+Mendelson,
+
+Shahar,
+
+Pajor, Alain,
+
+and Tomczak-
+Jaegermann, Nicole. Reconstruction and subgaussian
+operators in asymptotic geometric analysis. Geometric
+and Functional Analysis, 17(4):1248–1282, 2007.
+
+Mishra, Nikita and Thakurta, Abhradeep.
+
+(nearly) opti-
+mal differentially private stochastic multi-arm bandits.
+In UAI, pp. 592–601, 2015.
+
+Rubinstein, Benjamin IP, Bartlett, Peter L, Huang, Ling,
+and Taft, Nina. Learning in a large function space:
+Privacy-preserving mechanisms for svm learning. arXiv
+preprint arXiv:0911.5708, 2009.
+
+Sarwate, Anand D and Chaudhuri, Kamalika. Signal pro-
+cessing and machine learning with differential privacy:
+Algorithms and challenges for continuous data. Signal
+Processing Magazine, IEEE, 30(5):86–94, 2013.
+
+Shalev-Shwartz, Shai, Shamir, Ohad, Srebro, Nathan, and
+Sridharan, Karthik. Stochastic convex optimization. In
+COLT, 2009.
+
+Sheffet, Or. Private approximations of the 2nd-moment ma-
+trix using existing techniques in linear regression. arXiv
+preprint arXiv:1507.00056, 2015.
+
+Smith, Adam and Thakurta, Abhradeep Guha. Differen-
+tially private feature selection via stability arguments,
+and the robustness of the lasso. In Conference on Learn-
+ing Theory, pp. 819–850, 2013.
+
+Talwar, Kunal, Thakurta, Abhradeep, and Zhang, Li. Pri-
+vate empirical risk minimization beyond the worst case:
+The effect of the constraint set geometry. arXiv preprint
+arXiv:1411.5417, 2015a.
+
+Talwar, Kunal, Thakurta, Abhradeep, and Zhang, Li.
+Nearly optimal private lasso. In Advances in Neural In-
+formation Processing Systems, pp. 3007–3015, 2015b.
+
+Thakurta, Abhradeep. Personal communication, 2016.
+
+Thakurta, Abhradeep Guha and Smith, Adam.
+
+(nearly)
+optimal algorithms for private online learning in full-
+information and bandit settings. In Advances in Neural
+Information Processing Systems, pp. 2733–2741, 2013.
+
+

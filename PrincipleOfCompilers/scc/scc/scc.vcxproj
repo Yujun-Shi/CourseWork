@@ -1,0 +1,314 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{465B30FB-DF73-4D75-B0A3-B577857DE97B}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>scc</RootNamespace>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v140</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\CourseStudying\cs164\Homework_Solution\scc\scc\Include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;_CRT_NON_CONFORMING_SWPRINTFS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="GrammarTree.h" />
+    <ClInclude Include="IdType.h" />
+    <ClInclude Include="Include\clex.h" />
+    <ClInclude Include="Include\cyacc.h" />
+    <ClInclude Include="Include\lex.h" />
+    <ClInclude Include="Include\milconv.h" />
+    <ClInclude Include="Include\miyconv.h" />
+    <ClInclude Include="Include\mlconv.h" />
+    <ClInclude Include="Include\mlex.h" />
+    <ClInclude Include="Include\myacc.h" />
+    <ClInclude Include="Include\myconv.h" />
+    <ClInclude Include="Include\wclex.h" />
+    <ClInclude Include="Include\wcyacc.h" />
+    <ClInclude Include="Include\wlconv.h" />
+    <ClInclude Include="Include\wlex.h" />
+    <ClInclude Include="Include\wmilconv.h" />
+    <ClInclude Include="Include\wmiyconv.h" />
+    <ClInclude Include="Include\wmlconv.h" />
+    <ClInclude Include="Include\wmlex.h" />
+    <ClInclude Include="Include\wmyacc.h" />
+    <ClInclude Include="Include\wmyconv.h" />
+    <ClInclude Include="Include\wyacc.h" />
+    <ClInclude Include="Include\wyconv.h" />
+    <ClInclude Include="Include\yacc.h" />
+    <ClInclude Include="Include\yybdefs.h" />
+    <ClInclude Include="Include\yyclex.h" />
+    <ClInclude Include="Include\yycpars.h" />
+    <ClInclude Include="Include\yyglobal.h" />
+    <ClInclude Include="Include\yylex.h" />
+    <ClInclude Include="Include\yymlex.h" />
+    <ClInclude Include="Include\yympars.h" />
+    <ClInclude Include="Include\yypars.h" />
+    <ClInclude Include="Include\yytdefs.h" />
+    <ClInclude Include="Include\yywclex.h" />
+    <ClInclude Include="Include\yywcpars.h" />
+    <ClInclude Include="Include\yywlex.h" />
+    <ClInclude Include="Include\yywmlex.h" />
+    <ClInclude Include="Include\yywmpars.h" />
+    <ClInclude Include="Include\yywpars.h" />
+    <ClInclude Include="mylexer.h" />
+    <ClInclude Include="myparser.h" />
+    <ClInclude Include="NodeType.h" />
+    <ClInclude Include="Source\yydefs.h" />
+    <ClInclude Include="TableNode.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="GrammarTree.cpp" />
+    <ClCompile Include="mylexer.cpp" />
+    <ClCompile Include="myparser.cpp" />
+    <ClCompile Include="Source\yyacback.cpp" />
+    <ClCompile Include="Source\yyaccpya.cpp" />
+    <ClCompile Include="Source\yyacdci.cpp" />
+    <ClCompile Include="Source\yyacdcic.cpp" />
+    <ClCompile Include="Source\yyacdela.cpp" />
+    <ClCompile Include="Source\yyacdisc.cpp" />
+    <ClCompile Include="Source\yyacdop.cpp" />
+    <ClCompile Include="Source\yyacdpop.cpp" />
+    <ClCompile Include="Source\yyacecho.cpp" />
+    <ClCompile Include="Source\yyacgetc.cpp" />
+    <ClCompile Include="Source\yyacgtok.cpp" />
+    <ClCompile Include="Source\yyacinp.cpp" />
+    <ClCompile Include="Source\yyaclcln.cpp" />
+    <ClCompile Include="Source\yyaclcon.cpp" />
+    <ClCompile Include="Source\yyaclcre.cpp" />
+    <ClCompile Include="Source\yyacldbg.cpp" />
+    <ClCompile Include="Source\yyacldes.cpp" />
+    <ClCompile Include="Source\yyaclerr.cpp" />
+    <ClCompile Include="Source\yyacless.cpp" />
+    <ClCompile Include="Source\yyaclex.cpp" />
+    <ClCompile Include="Source\yyaclexc.cpp" />
+    <ClCompile Include="Source\yyaclvts.cpp" />
+    <ClCompile Include="Source\yyaclvtv.cpp" />
+    <ClCompile Include="Source\yyacnewa.cpp" />
+    <ClCompile Include="Source\yyacoutp.cpp" />
+    <ClCompile Include="Source\yyacpar.cpp" />
+    <ClCompile Include="Source\yyacpcln.cpp" />
+    <ClCompile Include="Source\yyacpcon.cpp" />
+    <ClCompile Include="Source\yyacpcre.cpp" />
+    <ClCompile Include="Source\yyacpdbg.cpp" />
+    <ClCompile Include="Source\yyacpdes.cpp" />
+    <ClCompile Include="Source\yyacperr.cpp" />
+    <ClCompile Include="Source\yyacpop.cpp" />
+    <ClCompile Include="Source\yyacpp.cpp" />
+    <ClCompile Include="Source\yyacpush.cpp" />
+    <ClCompile Include="Source\yyacres.cpp" />
+    <ClCompile Include="Source\yyacserr.cpp" />
+    <ClCompile Include="Source\yyacsin.cpp" />
+    <ClCompile Include="Source\yyacsofw.cpp" />
+    <ClCompile Include="Source\yyacsskp.cpp" />
+    <ClCompile Include="Source\yyacsssz.cpp" />
+    <ClCompile Include="Source\yyacstsz.cpp" />
+    <ClCompile Include="Source\yyacstv.cpp" />
+    <ClCompile Include="Source\yyacsup.cpp" />
+    <ClCompile Include="Source\yyacsusz.cpp" />
+    <ClCompile Include="Source\yyactofw.cpp" />
+    <ClCompile Include="Source\yyacucin.cpp" />
+    <ClCompile Include="Source\yyacunp.cpp" />
+    <ClCompile Include="Source\yyacuofw.cpp" />
+    <ClCompile Include="Source\yyacvtlv.cpp" />
+    <ClCompile Include="Source\yyacvts.cpp" />
+    <ClCompile Include="Source\yyacwip.cpp" />
+    <ClCompile Include="Source\yyacwrap.cpp" />
+    <ClCompile Include="Source\yyacwrk.cpp" />
+    <ClCompile Include="Source\yyacwrkc.cpp" />
+    <ClCompile Include="Source\yywcback.cpp" />
+    <ClCompile Include="Source\yywccpya.cpp" />
+    <ClCompile Include="Source\yywcdci.cpp" />
+    <ClCompile Include="Source\yywcdcic.cpp" />
+    <ClCompile Include="Source\yywcdela.cpp" />
+    <ClCompile Include="Source\yywcdisc.cpp" />
+    <ClCompile Include="Source\yywcdop.cpp" />
+    <ClCompile Include="Source\yywcdpop.cpp" />
+    <ClCompile Include="Source\yywcecho.cpp" />
+    <ClCompile Include="Source\yywcgetc.cpp" />
+    <ClCompile Include="Source\yywcgtok.cpp" />
+    <ClCompile Include="Source\yywcinp.cpp" />
+    <ClCompile Include="Source\yywclcln.cpp" />
+    <ClCompile Include="Source\yywclcon.cpp" />
+    <ClCompile Include="Source\yywclcre.cpp" />
+    <ClCompile Include="Source\yywcldbg.cpp" />
+    <ClCompile Include="Source\yywcldes.cpp" />
+    <ClCompile Include="Source\yywclerr.cpp" />
+    <ClCompile Include="Source\yywcless.cpp" />
+    <ClCompile Include="Source\yywclex.cpp" />
+    <ClCompile Include="Source\yywclexc.cpp" />
+    <ClCompile Include="Source\yywclvts.cpp" />
+    <ClCompile Include="Source\yywclvtv.cpp" />
+    <ClCompile Include="Source\yywcnewa.cpp" />
+    <ClCompile Include="Source\yywcoutp.cpp" />
+    <ClCompile Include="Source\yywcpar.cpp" />
+    <ClCompile Include="Source\yywcpcln.cpp" />
+    <ClCompile Include="Source\yywcpcon.cpp" />
+    <ClCompile Include="Source\yywcpcre.cpp" />
+    <ClCompile Include="Source\yywcpdbg.cpp" />
+    <ClCompile Include="Source\yywcpdes.cpp" />
+    <ClCompile Include="Source\yywcperr.cpp" />
+    <ClCompile Include="Source\yywcpop.cpp" />
+    <ClCompile Include="Source\yywcpp.cpp" />
+    <ClCompile Include="Source\yywcpush.cpp" />
+    <ClCompile Include="Source\yywcres.cpp" />
+    <ClCompile Include="Source\yywcserr.cpp" />
+    <ClCompile Include="Source\yywcsin.cpp" />
+    <ClCompile Include="Source\yywcsofw.cpp" />
+    <ClCompile Include="Source\yywcsskp.cpp" />
+    <ClCompile Include="Source\yywcsssz.cpp" />
+    <ClCompile Include="Source\yywcstsz.cpp" />
+    <ClCompile Include="Source\yywcstv.cpp" />
+    <ClCompile Include="Source\yywcsup.cpp" />
+    <ClCompile Include="Source\yywcsusz.cpp" />
+    <ClCompile Include="Source\yywctofw.cpp" />
+    <ClCompile Include="Source\yywcucin.cpp" />
+    <ClCompile Include="Source\yywcunp.cpp" />
+    <ClCompile Include="Source\yywcuofw.cpp" />
+    <ClCompile Include="Source\yywcvtlv.cpp" />
+    <ClCompile Include="Source\yywcvts.cpp" />
+    <ClCompile Include="Source\yywcwipe.cpp" />
+    <ClCompile Include="Source\yywcwrap.cpp" />
+    <ClCompile Include="Source\yywcwrk.cpp" />
+    <ClCompile Include="Source\yywcwrkc.cpp" />
+    <ClCompile Include="TableNode.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

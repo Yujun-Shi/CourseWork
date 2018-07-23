@@ -1,0 +1,1191 @@
+The knockoff ﬁlter for FDR control in group-sparse and multitask regression
+
+Ran Dai
+Department of Statistics, University of Chicago, Chicago IL 60637 USA
+Rina Foygel Barber
+Department of Statistics, University of Chicago, Chicago IL 60637 USA
+
+RANDAI@UCHICAGO.EDU
+
+RINA@UCHICAGO.EDU
+
+Abstract
+
+We propose the group knockoff ﬁlter, a method
+for false discovery rate control in a linear regres-
+sion setting where the features are grouped, and
+we would like to select a set of relevant groups
+which have a nonzero effect on the response. By
+considering the set of true and false discoveries
+at the group level, this method gains power rela-
+tive to sparse regression methods. We also apply
+our method to the multitask regression problem
+where multiple response variables share similar
+sparsity patterns across the set of possible fea-
+tures. Empirically, the group knockoff ﬁlter suc-
+cessfully controls false discoveries at the group
+level in both settings, with substantially more
+discoveries made by leveraging the group struc-
+ture.
+
+method to ﬁnd a model as large as possible while bounding
+FDR. In this work, we will extend the knockoff ﬁlter to the
+group sparse setting, and will ﬁnd that by considering fea-
+tures, and constructing knockoff copies, at the group-wise
+level, we are able to improve the power of this method at
+detecting true signals. Our method can also extend to the
+multitask regression setting (Obozinski et al., 2006), where
+multiple responses exhibit a shared sparsity pattern when
+regressed on a common set of features. As for the knockoff
+method, our work applies to the setting where n ≥ p.
+
+2. Background
+We begin by giving background on several models and
+methods underlying our work.
+
+2.1. Group sparse linear regression
+
+1. Introduction
+In a high-dimensional regression setting, we are faced with
+many potential explanatory variables (features), often with
+most of these features having zero or little true effect on the
+response. Model selection methods can be applied to ﬁnd
+a small submodel containing the most relevant features, for
+instance, via sparse model ﬁtting methods such as the lasso
+(Tibshirani, 1996), or in a setting where the sparsity re-
+spects a grouping of the features, the group lasso (Yuan
+& Lin, 2006). In practice, however, we may not be able to
+determine whether the set of features (or set of groups of
+features) selected might contain many false positives. For
+the (non-grouped) sparse setting, the knockoff ﬁlter (Bar-
+ber & Candès, 2015) creates “knockoff copies” of each
+variable to act as a control group, detecting whether the
+lasso (or another model selection method) is successfully
+controlling the false discovery rate (FDR), and tuning this
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+We consider a linear regression model, Y = Xβ +z, where
+y ∈ Rn is a vector of responses and X ∈ Rn×p is a
+known design matrix. In a grouped setting, the p features
+are partitioned into m groups of variables, G1, . . . , Gm ⊆
+{1, . . . , p}, with group sizes p1,··· , pm. The noise dis-
+tribution is assumed to be z ∼ N (0, σ2In). We assume
+sparsity structure in that only a small portion of βGi’s are
+nonzero, where βGi ∈ Rpi is the subvector of β corre-
+sponding to the ith group of features. When not taking
+group into consideration, a commonly used method to ﬁnd
+a sparse vector of coefﬁcients β is the lasso (Tibshirani,
+1996), an (cid:96)1-penalized linear regression, which minimizes
+the following objective: function
+
+(cid:98)β(λ) = arg min
+
+β
+
+(cid:8)(cid:107)y − Xβ(cid:107)2
+
+2 + λ(cid:107)β(cid:107)1
+
+(1)
+
+(cid:9) .
+
+To utilize the feature grouping, so that an entire group of
+features is selected simultaneously, Yuan & Lin (2006) pro-
+posed following grouped lasso penalties:
+
+(cid:98)β(λ) = arg min
+where (cid:107)β(cid:107)group = (cid:80)m
+
+(2)
+i=1(cid:107)βGi(cid:107)2. This penalty promotes
+sparsity at the group level; for large λ, few groups will
+
+(cid:8)(cid:107)y − Xβ(cid:107)2
+
+2 + λ(cid:107)β(cid:107)group
+
+(cid:9) .
+
+β
+
+Knockoffs for group-sparse and multitask regression
+
+be selected (i.e. βGi will be zero for many groups), but
+within any selected group, the coefﬁcients will be dense
+(all nonzero). The (cid:96)2 norm penalty on βGi may sometimes
+be rescaled relative to the size of the group.
+
+2.2. Multitask learning
+
+In a multitask learning problem with a linear regression
+model, we consider the model
+
+Y = XB + E
+
+(3)
+where the response Y ∈ Rn×r contains r many response
+variables measured for n individuals, X ∈ Rn×p is the
+design matrix, B ∈ Rp×r is the coefﬁcient matrix, and
+E ∈ Rn×r is the error matrix, with rows ei
+iid∼ N (0, Σ)
+for some unknown covariance structure Σ ∈ Rr×r. If the
+number of features p is large, we may believe that only a
+few of the features are relevant; in that case, most rows of
+B will be zero—that is, B is row-sparse.
+In a low-dimensional setting, we may consider the multi-
+variate normal model, with likelihood determined by both
+the coefﬁcient matrix B and the covariance matrix Σ.
+in
+a high-dimensional setting, combining this likelihood with
+a sparsity-promoting penalty may be computationally chal-
+lenging, and so a common approach is to ignore the covari-
+ance structure of the noise and to simply use a least-squares
+loss together with a penalty,
+
+(cid:98)B = arg min
+norm in the penalty is given by (cid:107)B(cid:107)(cid:96)1/(cid:96)2 =(cid:80)
+
+(4)
+where (cid:107)·(cid:107)Fro is the Frobenius norm,and where the (cid:96)1/(cid:96)2
+ij.
+j B2
+
+(cid:27)
+(cid:113)(cid:80)
+
+i
+This penalty promotes row-wise sparsity of B.
+It is common to reformulate this (cid:96)1-penalized multitask lin-
+ear regression as a group lasso problem. We form a vector
+response y ∈ Rnr by stacking the columns of Y :
+y = vec(Y ) = (Y11, . . . , Yn1, . . . , Y1r, . . . , Ynr)(cid:62) ∈ Rnr,
+and a new larger design matrix by repeating X in blocks:
+
+Fro + λ(cid:107)B(cid:107)(cid:96)1/(cid:96)2
+
+(cid:107)Y − XB(cid:107)2
+
+(cid:26) 1
+
+2
+
+B
+
+,
+
+ X 0
+
+0
+0
+
+. . .
+0 X . . .
+. . .
+. . . X
+
+0
+
+0
+
+ ∈ Rnr×pr.
+
+X = Ir ⊗ X =
+
+(Here ⊗ is the Kronecker product.) Deﬁne the coefﬁcient
+vector β = vec(B) ∈ Rpr and noise vector  = vec(E) ∈
+Rnr. Then the multitask model (3) can be rewritten as
+
+where  follows a Gaussian model,  ∼ N (0, Σ1Σ), for
+
+y = Xβ + ,
+
+ Σ11In
+
+. . .
+
+Σr1In
+
+. . . Σ1rIn
+. . .
+. . . ΣrrIn
+
+. . .
+
+(5)
+
+ .
+
+Σ1Σ = Σ ⊗ In =
+
+The group sparse structure of β is determined by groups
+
+Gj = {j, j + p, . . . , j + (r − 1)p}
+
+for j = 1, . . . , p; this corresponds to the row sparsity of B
+in the original formulation (3). Then, the multitask learning
+problem has been reformulated into a group-sparse regres-
+sion problem—and so, the multitask lasso (4) can equiva-
+lently be solved by the group lasso optimization problem
+
+(cid:27)
+
+(cid:98)β = arg min
+
+β
+
+(cid:26) 1
+
+2
+
+(cid:107)y − Xβ(cid:107)2
+
+2 + λ(cid:107)β(cid:107)group
+
+.
+
+(6)
+
+2.3. The group false discovery rate
+
+The original deﬁnition of false discovery rate (FDR) is the
+expected proportion of incorrectly selected features among
+all selected features. When the group rather than individual
+feature is of interest, we prefer to control the false discov-
+ery rate at the group level. Mathematically, we deﬁne the
+group false discovery rate (FDRgroup) as
+
+(cid:34)
+
+(cid:35)
+
+#{i : βi = 0, i ∈ (cid:98)S}
+#{i : i ∈ (cid:98)S} ∨ 1
+
+FDRgroup = E
+
+(7)
+
+tually false discoveries. Here (cid:98)S = {i : (cid:98)βi (cid:54)= 0} is the
+
+the expected proportion of selected groups which are ac-
+set of all selected group of features, while a ∨ b denotes
+max{a, b}.
+
+2.4. The knockoff ﬁlter for sparse linear regression
+
+In the sparse (rather than group-sparse) setting, the lasso (1)
+provides an accurate estimate for the coefﬁcients in a sparse
+linear model, but performing inference on the results, for
+testing the accuracy of these estimates or the set of fea-
+tures selected, remains a challenging problem. The knock-
+off ﬁlter (Barber & Candès, 2015) addresses this ques-
+tion, and provides a method controlling the false discov-
+ery rate (FDR) of the selected set at some desired level q
+(e.g. q = 0.2).
+To run this method, there are two main steps: constructing
+knockoffs, and ﬁltering the results. First a set of p knockoff
+features is constructed: for each feature Xj, j = 1, . . . , p, it
+
+is given a knockoff copy (cid:101)Xj, where the matrix of knockoffs
+(cid:101)X = [(cid:101)X1 . . . (cid:101)Xp] satisﬁes, for some vector s ≥ 0,
+(cid:101)X(cid:62)(cid:101)X = X(cid:62)X, (cid:101)X(cid:62)X = X(cid:62)X − diag{s}.
+sponse y and 2p many features X1, . . . , Xp, (cid:101)X1, . . . , (cid:101)Xp:
+(cid:111)
+(cid:98)β(λ) = arg min
+
+(cid:110)(cid:107)y − [X (cid:101)X]b(cid:107)2
+
+Next, the lasso is run on an augmented data set with re-
+
+2 + λ(cid:107)β(cid:107)1
+
+(8)
+
+.
+
+b∈R2p
+
+This is run over a range of λ values decreasing from +∞
+(a fully sparse model) to 0 (a fully dense model). If Xj is a
+
+Knockoffs for group-sparse and multitask regression
+
+into the lasso path for each feature and knockoff:
+
+However, if Xj is null—that is, βj = 0 in the true model—
+
+true signal—that is, it has a nonzero effect on the response
+y—then this should be evident in the lasso: Xj should enter
+
+the model earlier (for larger λ) than its knockoff copy (cid:101)Xj.
+then it is equally likely to enter before or after (cid:101)Xj.
+Next, to ﬁlter the results, let λj and(cid:101)λj be the time of entry
+λj = sup{λ : (cid:98)β(λ)j (cid:54)= 0},(cid:101)λj = sup{λ : (cid:98)β(λ)j+p (cid:54)= 0},
+and let(cid:98)S(λ),(cid:101)S(λ) ⊆ {1, . . . , p} be the sets of original fea-
+(cid:98)S(λ) = {j : λj >(cid:101)λj ∨ λ} and (cid:101)S(λ) = {j :(cid:101)λj > λj ∨ λ}.
+Estimate the proportion of false discoveries in (cid:98)S(λ) as
+
+tures, and knockoff features, which have entered the lasso
+path before time λ, and before their counterparts:
+
+FDP(λ) ≈ (cid:100)FDP(λ) =
+
+|(cid:101)S(λ)|
+|(cid:98)S(λ)| ∨ 1
+
+.
+
+(9)
+
+To understand why, note that since Xj and (cid:101)Xj are equally
+then j is equally likely to fall into either (cid:98)S(λ)
+or (cid:101)S(λ). Therefore, the numerator |(cid:101)S(λ)| should be an
+(over)estimate of the number of nulls in (cid:98)S(λ)—thus, the
+
+likely to enter in either order if Xj is null (no real ef-
+fect),
+
+ratio estimates the FDP. Alternately, we can choose a more
+conservative deﬁnition
+
+FDP(λ) ≈ (cid:100)FDP+(λ) =
+
+1 + |(cid:101)S(λ)|
+|(cid:98)S(λ)| ∨ 1
+
+.
+
+(10)
+
+q}, where q is the desired bound on FDR level, and then
+
+Finally, the knockoff ﬁlter selects(cid:98)λ = min{λ : (cid:100)FDP(λ) ≤
+outputs the set (cid:98)S((cid:98)λ) as the set of “discoveries”. The
+knockoff+ variant does the same with (cid:100)FDP+(λ). Theo-
+mFDR = E(cid:104) (# of false discoveries)
+
+rems 1 and 2 of (Barber & Candès, 2015) prove that the
+knockoff procedure bounds a modiﬁed form of the FDR,
+, while the knockoff+ pro-
+
+(cid:105)
+
+(# of discoveries)+q−1
+
+cedure bounds the FDR.
+
+3. The knockoff ﬁlter for group sparsity
+In this section, we extend the knockoff method to the group
+sparse setting. This involves two key modiﬁcations:
+the
+construction of the knockoffs at a group-wise level rather
+than for individual features, and the “ﬁlter” step where the
+knockoffs are used to select a set of discoveries. Through-
+out the remainder of the paper, “knockoff” refers to the
+original knockoff method, while “group knockoff’ (or, later
+on, “multitask knockoff”) refers to our new method.
+
+3.1. Group knockoff construction
+
+knockoff ﬁlter then loses power as it is hard to distinguish
+
+X(cid:62)X − diag{s}, that is, all off-diagonal entries are equal.
+When the features are highly correlated, this construction
+is only possible for vectors s with extremely small entries;
+
+The original knockoff construction requires that (cid:101)X(cid:62)X =
+that is, (cid:101)Xj and Xj are themselves highly correlated, and the
+between a real signal Xj and its knockoff copy (cid:101)Xj.
+requirement on (cid:101)X(cid:62)X, thereby improving our power.
+
+In a group-sparse setting, we will see that we can relax this
+In
+particular, the best gain will be in situations where within-
+group correlations are high but between-group correlations
+are low; this may arise in many applications, for exam-
+ple, when genes related to the same biological pathways
+are grouped together, we expect to see the largest correla-
+tions occuring within groups rather than between genes in
+different groups.
+To construct the group knockoffs, we require the following
+
+condition on the matrix (cid:101)X ∈ Rn×p:
+(cid:101)X(cid:62)(cid:101)X = Σ := X(cid:62)X, and (cid:101)X(cid:62)X = Σ − S,
+(11)
+meaning that SGi,Gj = 0 for any two distinct groups i (cid:54)= j.
+Abusing notation, write S = diag{S1, . . . , Sm} where
+Si (cid:23) 0 is the pi × pi matrix for the ith group block,
+meaning that SGi,Gi = Si for each i while SGi,Gj = 0
+for each i (cid:54)= j. Extending the construction of (Barber
+& Candès, 2015),1 we construct these knockoffs by ﬁrst
+selecting S = diag{S1, . . . , Sm} that satisﬁes the condi-
+
+tion S (cid:22) 2Σ, then setting (cid:101)X = X(Ip − Σ−1S) + (cid:101)U C,
+where (cid:101)U is a n × p orthonormal matrix orthogonal to the
+
+where S (cid:23) 0 is group-block-diagonal,
+
+span of X, while C(cid:62)C = 2S − SΣ−1S is a Cholesky
+decomposition. Now, we still need to choose the matrix
+S (cid:23) 0, which has group-block-diagonal structure, so that
+the condition S (cid:22) 2Σ is satisﬁed (this condition ensures
+the existence of the Cholesky decomposition deﬁning C).
+To do this, we choose the following construction: we set
+S = diag{S1, . . . , Sm} where we choose Si = γ · ΣGi,Gi;
+the scalar γ ∈ [0, 1] is chosen to be as large as possible so
+that S (cid:22) 2Σ still holds, which amounts to choosing
+
+γ = min{1, 2 · λmin (DΣD)}
+
+, . . . , Σ
+
+−1/2
+G1,G1
+
+−1/2
+Gm,Gm
+
+where D = diag{Σ
+}. This construc-
+tion can be viewed as an extension of the “equivariant”
+knockoff construction of Barber & Candès (2015); their
+SDP construction, which gains a slight power increase
+in the non-grouped setting, may also be extended to the
+grouped setting but we do not explore this here.
+
+1This construction is for the setting n ≥ 2p; see (Barber &
+
+Candès, 2015) for a simple trick to extend to n ≥ p.
+
+Knockoffs for group-sparse and multitask regression
+
+Looking back at the group knockoff matrix condition (11),
+
+we see that any knockoff matrix (cid:101)X satisfying (8) would
+ﬂexibility in constructing (cid:101)X, and therefore, will enable
+more separation between a feature Xj and its knockoff (cid:101)Xj,
+
+necessarily also satisfy this group-level condition. How-
+ever, the group-level condition is weaker; it allows more
+
+which in turn can increase power to detect the true signals.
+
+(non-group) knockoffs; the second is a modiﬁcation mov-
+ing to the group sparse setting.
+Deﬁnition 1. The statistic W is said to obey the sufﬁciency
+property if it only depends on the Gram matrix and feature-
+
+response inner products, that is, for any X, (cid:101)X, y,
+w([X (cid:101)X], y) = f ([X (cid:101)X](cid:62)[X (cid:101)X], [X (cid:101)X](cid:62)y)
+
+(12)
+
+3.2. Filter step
+
+for some function f.
+
+(cid:111)
+
+2 + λ(cid:107)b(cid:107)group
+
+.
+
+After constructing the group knockoff matrix, we then se-
+lect a set of discoveries (at the group level) as follows. First,
+we apply the group lasso (2) to the augmented data set,
+
+(cid:98)β = arg min
+
+(cid:110)(cid:107)y − [X (cid:101)X]b(cid:107)2
+
+b∈R2p
+
+Here, with the augmented design matrix [X (cid:101)X], we now
+original design matrix, and one group (cid:101)Gi = {j + p : j ∈
+(cid:80)m
+i=1(cid:107)bGi(cid:107)2 +(cid:80)m
+
+have 2m many groups: one group Gi for each group in the
+Gi} corresponding to the same group within the knock-
+off matrix; the penalty norm is then deﬁned as (cid:107)b(cid:107)group =
+
+i=1(cid:107)b(cid:101)Gi
+
+(cid:107)2.
+
+then deﬁne the selected groups and knockoff groups as
+
+The ﬁlter process then proceeds exactly as for the original
+knockoff method, with groups of features in place of indi-
+vidual features. First we record the time when each group
+or knockoff group enters the lasso path,
+
+λi = sup{λ : (cid:98)β(λ)Gi (cid:54)= 0},(cid:101)λi = sup{λ : (cid:98)β(λ)(cid:101)Gi
+(cid:98)S(λ) = {i : λi >(cid:101)λi ∨ λ} and (cid:101)S(λ) = {i :(cid:101)λi > λi ∨ λ}
+estimate the proportion of false discoveries in(cid:98)S(λ) exactly
+as in (9), and deﬁne(cid:98)λ = min{λ : (cid:100)FDP(λ) ≤ q} as before;
+the ﬁnal set of discovered groups is given by (cid:98)S((cid:98)λ). (For
+
+(note that these sets are subsets of {1, . . . , m}, the list of
+groups, rather than counting individual features). Finally,
+
+(cid:54)= 0},
+
+group knockoff+, we use the more conservative estimate of
+the group FDP, as for the knockoff.)
+
+3.3. Theoretical Results
+
+Here we turn to a more general framework for the group
+knockoff, working with the setup introduced in Barber &
+Candès (2015). Let W ∈ Rm be a vector of statistics, one
+for each group, with large positive values for Wi indicat-
+ing strong evidence that group i may have a nonzero effect
+design matrix [X (cid:101)X] and the response y, which we write
+(i.e. βGi (cid:54)= 0). W is deﬁned as a function of the augmented
+as W = w([X (cid:101)X], y). In the group lasso setting described
+above, the statistic is given by Wi = (λi∨(cid:101)λi)·sign(λi−(cid:101)λi).
+
+In general, we require two properties for this statistic: suf-
+ﬁciency and group-antisymmetry. The ﬁrst is exactly as for
+
+=
+
+j
+
+Xj,
+
+if 1 ≤ j ≤ p and j (cid:54)∈ Gi,
+if 1 ≤ j ≤ p and j ∈ Gi,
+
+Before deﬁning the group-antisymmetry property, we in-
+troduce some notation. For any group i = 1, . . . , m, let
+
+[X (cid:101)X]swap(i) be the matrix with
+(cid:40)
+(cid:16)
+(cid:17)
+[X (cid:101)X]swap(i)
+(cid:101)Xj,
+(cid:40)(cid:101)Xj,
+(cid:17)
+and(cid:16)
+[X (cid:101)X]swap(i)
+with the same columns of (cid:101)X.
+antisymmetry property if swapping two groups Xi and (cid:101)Xi
+
+if 1 ≤ j ≤ p and j (cid:54)∈ Gi,
+if 1 ≤ j ≤ p and j ∈ Gi,
+for each j = 1, . . . , p. In other words, the columns corre-
+sponding to Gi in the original component X, are swapped
+
+Deﬁnition 2. The statistic W is said to obey the group-
+
+has the effect of switching the sign of Wi with no other
+change to W , that is,
+
+Xj,
+
+j+p
+
+=
+
+w([X (cid:101)X]swap(i), y) = I±
+
+i
+
+· w([X (cid:101)X], y),
+
+where I±
+and +1 in all other diagonal entries.
+
+is the diagonal matrix with a −1 in entry (i, i)
+
+i
+
+Next,
+to run the group knockoff or group knockoff+
+method, we proceed exactly as in (Barber & Candès, 2015);
+we change notation here for better agreement with the
+group lasso setting. Deﬁne
+
+(cid:98)S(t) = {i : Wi ≥ t} and (cid:101)S(t) = {i : Wi ≤ −t}.
+
+Then estimate the FDP as in (9) for the knockoff method,
+or as in (10) for knockoff+ (with parameter t in place of the
+
+lasso penalty path parameter λ); then ﬁnd(cid:98)t, the minimum
+t ≥ 0 with (cid:100)FDP(t) (or (cid:100)FDP+(t)) no larger than q, and
+output the set (cid:98)S = (cid:98)S((cid:98)t) of discovered groups.
+
+This procedure offers the following theoretical guarantee:
+Theorem 1. If the vector of statistics W satisﬁes the sufﬁ-
+ciency and group-antisymmetry assumption, then the group
+knockoff procedure controls a modiﬁed group FDR,
+
+(cid:34)
+
+#{i : βi = 0, i ∈ (cid:98)S}
+#{i : i ∈ (cid:98)S} + q−1
+
+(cid:35)
+
+≤ q,
+
+mFDRgroup = E
+
+while the group knockoff+ procedure controls the group
+FDR, FDRgroup ≤ q.
+
+Knockoffs for group-sparse and multitask regression
+
+The proof of this result follows the original knockoff proof
+of Barber & Candès (2015), and we do not reproduce it
+here; the result is an immediate consequence of their main
+lemma, moved into the grouped setting:
+Lemma 1. Let  ∈ {±1}m be a sign sequence independent
+of W , with i = 1 for all non-null groups i and i ∼ {±1}
+independently with equal probability for all null groups i.
+Then we have
+
+(W1,··· , Wm) =d (W11,··· , Wmm),
+
+(13)
+
+where =d denotes equality in distribution.
+
+This lemma can be proved via the sufﬁciency and group-
+antisymmetry properties, exactly as for the individual-
+feature-level result of Barber & Candès (2015).
+
+4. Knockoffs for multitask learning
+For the multitask learning problem, the reformulation as
+a group lasso problem (6) suggests that we can apply the
+group-wise knockoffs to this problem as well. However,
+there is one immediate difﬁculty: the model for the noise
+ in (6) has changed—the entries of  are not independent,
+but instead follow a multivariate Gaussian model with co-
+variance Σ1Σ. In fact, we will see shortly that we can work
+even in this more general setting. Reshaping the data to
+form a group lasso problem as in (5), we will work with the
+vectorized response y ∈ Rnr and the repeated-block design
+matrix X ∈ Rnr×pr. We will also construct a repeated-
+block knockoff matrix,
+
+(cid:101)X = Ir ⊗ (cid:101)X =
+
+
+
+(cid:101)X 0
+
+0
+
+(cid:101)X . . .
+
+. . .
+
+. . .
+. . .
+
+ ,
+
+0
+0
+
+(cid:101)X
+
+0
+
+0
+
+where (cid:101)X ∈ Rn×p is any matrix satisfying the original
+methodology with this data (X, y) and knockoff matrix(cid:101)X,
+
+knockoff construction conditions (8) with respect to the
+original design matrix X. Applying the group knockoff
+
+we obtain the following result:
+Theorem 2. For the multitask learning setting with an ar-
+bitrary covariance structure Σ ∈ Rr×r, the knockoff or
+knockoff+ methods control the modiﬁed group FDR or the
+group FDR, respectively, at the level q.
+
+Proof. In order to apply the result for the group-sparse set-
+ting to this multitask scenario, we need to address two ques-
+
+tions: ﬁrst, whether (cid:101)X satisﬁes the group knockoff matrix
+We ﬁrst check the conditions (11) for(cid:101)X. let (cid:101)X ∈ Rn×p be
+
+conditions (11), and second, how to handle the issue of the
+non-i.i.d. structure of the noise .
+
+a knockoff matrix for X, satisfying (8), and let Σ = X(cid:62)X.
+
+Then we see that
+
+(cid:101)X(cid:62)(cid:101)X = Ir ⊗ ((cid:101)X(cid:62)(cid:101)X) = Ir ⊗ Σ = X(cid:62)X, and
+(cid:101)X(cid:62)X = Ir ⊗ ((cid:101)X(cid:62)X) = Ir ⊗ (Σ − diag{s})
+
+= X(cid:62)X − Ir ⊗ diag{s}
+
+where s is deﬁned as in (8). Since the difference Ir ⊗
+
+diag{s} is a diagonal matrix, we see that (cid:101)X satisﬁes the
+
+group knockoff condition (11);
+stronger (ungrouped) knockoff condition (8).
+Next we turn to the issue of the non-identity covariance
+structure Σ1Σ for the noise term  ∈ Rnr. First, write
+
+it satisﬁes the
+
+in fact,
+
+Σ1Σ−1/2 = Σ−1/2 ⊗ In
+
+to denote an inverse square root for Σ1Σ. Note also that
+Σ1Σ−1/2 · X = (Σ−1/2 ⊗ In) · (Ir ⊗ X) = Σ−1/2 ⊗ X
+
+= (Ir ⊗ X) · (Σ−1/2 ⊗ Ip) = X · Σ1Σ
+
+(14)
+for Σ1Σ∗ = Σ ⊗ Ip. Taking our vectorized multitask regres-
+sion model (5), multiplying both sides by Σ1Σ−1/2 on the left,
+and applying (14), we obtain a “whitened” reformulation of
+our model,
+
+−1/2
+∗
+
+,
+
+ywh = X · (Σ1Σ
+
+−1/2
+∗
+
+β) + wh for
+
+ywh = Σ1Σ−1/2y,
+wh = Σ1Σ−1/2,
+
+(15)
+
+(cid:40)
+
+where wh ∼ N (0, Inm) is the “whitened” noise. Now we
+are back in a standard linear regression setting, and can ap-
+ply the knockoff method—note that we are working with a
+new setup: while the design matrix X is the same as in (5),
+we now work with response vector ywh and coefﬁcient vec-
+tor Σ1Σ
+β. The group sparsity of the coefﬁcient vector has
+not changed, due to the block structure of Σ1Σ−1/2; we have
+
+−1/2
+∗
+
+−1/2
+∗
+
+(Σ1Σ
+
+β)Gj = Σ1Σ
+
+−1/2
+Gj ,Gj
+
+βGj
+
+for each j = 1, . . . , p, and so the “null groups” for the
+original coefﬁcient vector β (i.e. groups j with βGj = 0)
+are preserved in this reformulated model.
+We need to check only that the group lasso output, namely
+
+(cid:98)β, depends on the data only through the sufﬁcient statistics
+
+X(cid:62)X and X(cid:62)ywh; here we use the “whitened” response ywh
+rather than the original response vector y since the knock-
+off theory applies to linear regression with i.i.d. Gaussian
+noise, as in the model (15) for ywh. When we apply the
+group lasso, as in the optimization problem (6), it is clear
+
+that the minimizer(cid:98)β depends on the data X, y only through
+
+X(cid:62)X and X(cid:62)y. Furthermore, we can write
+
+X(cid:62)y = X(cid:62)Σ1Σ1/2ywh = Σ1Σ
+
+1/2∗ · (X(cid:62)ywh),
+
+Knockoffs for group-sparse and multitask regression
+
+Figure 1. Results for the group-sparse regression simulation, comparing group knockoff and knockoff+ against the original knockoff and
+knockoff+ methods.
+
+1/2∗ exactly as in (14)
+
+before. Therefore,(cid:98)β, depends on the data only through the
+
+where we can show Σ1Σ1/2 · X = X · Σ1Σ
+sufﬁcient statistics X(cid:62)X and X(cid:62)ywh, as desired.
+Our statistics for the knockoff ﬁlter therefore will satisfy
+the sufﬁciency property. The group-antisymmetry property
+is obvious from the deﬁnition of the method. Therefore,
+applying our main result Theorem 1 for the group-sparse
+setting to the whitened model (15), we see that the (modi-
+ﬁed or unmodiﬁed) group FDR control result holds for this
+setting.
+
+5. Simulated data experiments
+We test our methods in the group sparse and multitask set-
+tings. All experiments were carried out in Matlab (MAT-
+LAB, 2015) and R (R Core Team, 2015), including the
+grpreg package in R (Breheny & Huang, 2015).
+
+5.1. Group sparse setting
+
+To evaluate the performance of our method in the group
+sparse setting, we compare it empirically with the (non-
+group) knockoff using simulated data from a group sparse
+linear regression, and examine the effects of sparsity level
+and feature correlations within and between groups.
+
+To study the effects of sparsity level and feature correla-
+tion, we then vary these default settings as follows (in each
+experiment, one setting is varied while the others remain at
+their default level):
+
+• Sparsity level: we vary the number of groups with
+
+nonzero effects, k ∈ {10, 12, 14, . . . , 50}.
+
+• Between-group correlation: we ﬁx within-group cor-
+relation ρ = 0.5, and set the between-group corre-
+lation to be γρ, with γ ∈ {0, 0.1, 0.2, . . . , 0.9}. We
+then draw the rows of X ∈ Rn×p independently from
+a multivariate normal distribution with mean 0 and co-
+variance matrix Σ, with diagonal entries Σjj = 1,
+within-group correlations Σjk = ρ for j (cid:54)= k in the
+same group, and between-group correlations Σjk =
+γρ for j, k in different groups. Afterwards, we nor-
+malize the columns of X.
+• Within-group correlation:
+
+as above, but we ﬁx
+γ = 0 (so that between-group correlation is always
+zero) and vary within-group correlation, with ρ ∈
+{0, 0.1, . . . , 0.9}.
+
+For each setting, we use target FDR level q = 0.2 and re-
+peat each experiment 100 times.
+
+5.1.1. DATA
+
+5.1.2. RESULTS
+
+To generate the simulation data, we use the sample size
+n = 3000 with number of features p = 1000. In our basic
+setting, the number of groups is m = 200 with correspond-
+ing number of features per group set as pi = 5 for each
+group i. To generate features, as a default we use an uncor-
+related setting, drawing the entries of X as i.i.d. standard
+normals, then normalize the columns of X. Our default
+sparsity level is k = 20 (that is, 20 groups with nonzero
+signal); βj, for each j inside a signal group, i.i.d. chosen
+randomly from {±3.5}.
+
+Our results are displayed in Figure 1, which displays power
+(the proportion of true signals which were discovered) and
+FDR at the group level, averaged over all trials. We see that
+all four methods successfully control FDR at the desired
+level. Across all settings, the group knockoff is more pow-
+erful than the knockoff, showing the beneﬁt of leveraging
+the group structure. The group knockoff+ and knockoff+
+are each slightly more conservative than their respective
+methods without the “+” correction. From the experiments
+with zero between-group correlation and increasing within-
+group correlation ρ, we see that knockoff has rapidly de-
+
+Sparsity level (k)1016222834404600.20.400.20.40.60.81FDRgroupPower●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●KnockoffKnockoff+Group KnockoffGroup Knockoff+Correlation ratio (γ)0.00.20.40.60.81.000.20.400.20.40.60.81FDRgroupPower●●●●●●●●●●●●●●●●●●●●●●Within group correlation (ρ)0.00.20.40.60.800.20.400.20.40.60.81FDRgroupPower●●●●●●●●●●●●●●●●●●●●Knockoffs for group-sparse and multitask regression
+
+Figure 2. Results for the multitask regression simulation, comparing multitask knockoff with the pooled and parallel knockoff methods.
+
+creasing power as ρ increases, while group knockoff does
+not show much power loss. This highlights the beneﬁt of
+the group-wise construction of the knockoff matrix; for the
+original knockoff, high within-group correlation forces the
+
+knockoff features (cid:101)Xj to be nearly equal to the Xj’s, but
+
+this is not the case for the group knockoff construction and
+the greater separation allows high power to be maintained.
+
+5.2. Multitask regression setting
+
+To evaluate the performance of our method in the multi-
+task regression setting, we next perform a simulation to
+compare the multitask knockoff with the knockoff.
+(For
+clarity in the ﬁgures, we do not present results for the
+knockoff+ versions of these methods; the outcome is pre-
+dictable, with knockoff+ giving slightly better FDR control
+but lower power.) For the multitask knockoff, we imple-
+ment the method exactly as described in Section 4. The
+jth feature is considered a discovery if the corresponding
+group is selected. For the knockoff, we use reformula-
+tion (5) of the multitask model, and apply the knockoff
+method to the reshaped data set (X, y); we call this the
+“pooled” knockoff. We also run the knockoff separately
+on each of the r responses (that is, we run the knockoff
+with data (X, Yj) where Yj is the jth column of Y , sepa-
+rately for j = 1, . . . , r). We then combine the results: the
+jth feature is considered a discovery if it is selected in any
+of the r individual regressions; this version is the “parallel”
+knockoff.
+
+5.2.1. DATA
+
+√
+
+To generate the data, our default settings for the multitask
+model given in (3) are as follows: we set the sample size
+n = 150, the number of features p = 50, with m = 5 re-
+sponses. The true matrix of coefﬁcients B has its k = 10
+rows nonzero, which are chosen as 2
+m times a random
+unit vector. The design matrix X is generated by draw-
+ing i.i.d. standard normal entries and then normalizing the
+columns, and the entries of the error matrix E are also i.i.d.
+standard normal. We set the target FDR level at q = 0.2
+and repeat all experiments 100 times. These default set-
+tings will then be varied in our experiments to examine the
+roles of the various parameters (only one parameter is var-
+
+ied at a time, with all other settings at their defaults):
+
+• Sparsity level: the number of nonzero rows of B is
+
+varied, with k ∈ {2, 4, 6, . . . , 20}.
+
+• Number of responses: the number of responses r is
+
+varied, with r ∈ {1, 2, 3, 4, 5}.
+
+• Feature correlation:
+
+the rows of X are i.i.d. draws
+from a N (0, ΣX ) distribution, with a tapered covari-
+ance matrix which has entries (ΣX )jk = (ρX )|j−k|,
+with ρX ∈ {0, 0.1, 0.2, . . . , 0.9}. (The columns of X
+are then normalized.)
+
+• Response correlation:
+
+the rows of the noise E are
+i.i.d. draws from a N (0, ΣY ) distribution, with a
+equivariant correlation structure which has entries
+(ΣY )jj = 1 for all j, and (ΣY )jk = ρY for all j (cid:54)= k,
+with ρY ∈ {0, 0.1, 0.2, . . . , 0.9}.
+
+5.2.2. RESULTS
+
+Our results are displayed in Figure 2. For each method, we
+display the resulting FDR and power for selecting features
+with true effects in the model. The parallel knockoff is not
+able to control the FDR. This may be due to the fact that this
+method combines discoveries across multiple responses; if
+the true positives selected for each response tend to over-
+lap, while the false positives tend to be different (as they are
+more random), then the false discovery proportion in the
+combined results may be high even though it should be low
+for each individual responses’ selections. Therefore, while
+it is more powerful than the other methods, it does not lead
+to reliable FDR control. Turning to the other methods, both
+multitask knockoff and pooled knockoff generally control
+FDR at or near q = 0.2 except in the most challenging
+(lowest power) settings, where as expected from the the-
+ory, the FDR exceeds its target level. Across all settings,
+multitask knockoff is more powerful than pooled knockoff.
+Overall we see the advantage in the multitask formulation,
+with which we are able to identify a larger number of dis-
+coveries while maintaining FDR control.
+
+Sparsity level (k)246810121416182000.20.400.20.40.60.81FDRPowerlllllllllllllllllllllMultitaskPooledParallelNumber of responses (r)1234500.20.400.20.40.60.81FDRPowerllllllllllFeature correlation (rX)0.00.20.40.60.800.20.400.20.40.60.81FDRPowerllllllllllllllllllllResponse correlation (rY)0.00.20.40.60.800.20.400.20.40.60.81FDRPowerllllllllllllllllllllKnockoffs for group-sparse and multitask regression
+
+6. Real data experiment
+We next apply the knockoff for multitask regression to a
+real data problem. We study a data set that seeks to iden-
+itify drug resistant mutations in HIV-1 (Rhee et al., 2006).
+This data set was analyzed by (Barber & Candès, 2015) us-
+ing the knockoff method. Each observation, sampled from
+a single individual, identiﬁes mutations along various posi-
+tions in the protease or reverse transcriptase (two key pro-
+teins) of the virus, and measures resistance against a range
+of different drugs from three classes: protease inhibitors
+(PIs), nucleoside reverse transcriptase inhibitors (NRTIs),
+and nonnucleoside reverse transcriptase inhibitors (NNR-
+TIs). In (Barber & Candès, 2015) the data for each drug
+was analyzed separately; the response y was the resistance
+level to the drug while the features Xj were markers for
+the presence or absence of the jth mutation. Here, we
+apply the multitask knockoff to this problem:
+for each
+class of drugs, since the drugs within the class have re-
+lated biological mechanisms, we expect the sparsity pattern
+(i.e. which mutations confer resistance to that drug) to be
+similar across each class. We therefore have a matrix of re-
+sponses, Y ∈ Rn×r, where n is the number of individuals
+and r is the number of drugs for that class. We compare our
+results to those obtained with the knockoff method where
+drugs are analyzed one at a time (the “parallel” knockoff
+from the multitask simulation).
+
+6.1. Data
+
+Data is analyzed separately for each of the three drug types.
+To combine the data across different drugs, we ﬁrst remove
+any drug with a high proportion of missing drug resistance
+measurements; this results in two PI drugs and one NRTI
+drug being removed (each with over 35% missing data).
+The remaining drugs all have < 10% missing data; many
+drugs have only 1 − 2% missing data. Next we remove
+data from any individual that is missing drug resistance in-
+formation from any of the (remaining) drugs. Finally, we
+keep only those mutations which appear ≥ 3 times in the
+sample. The resulting data set sizes are:
+
+Class
+
+PI
+
+NRTI
+NNRTI
+
+# drugs (r)
+
+5
+5
+3
+
+# observations (n)
+
+701
+614
+721
+
+# mutations (p)
+
+198
+283
+308
+
+6.2. Methods
+For each of the three drug types, we form the n × r re-
+sponse matrix Y by taking the log-transformed drug resis-
+tance measurement for the n individuals and the r drugs,
+and the n × p feature matrix X recording which of the p
+mutations are present in each of the n individuals. We then
+apply the multitask knockoff as described in Section 4, with
+
+Figure 3. Results on the HIV-1 drug resistance data set. For each
+drug class, we plot the number of protease positions (for PI) or
+reverse transcriptase (RT) positions (for NRTI or NNRTI) which
+were selected by the multitask knockoff or knockoff method. The
+color indicates whether or not the selected position appears in the
+treatment selected mutation (TSM) panel, and the horizontal line
+shows the total number of positions on the TSM panel.
+
+target FDR level q = 0.2. We use the equivariant construc-
+tion for the knockoff matrix for both methods. We perform
+the analysis 100 times and we consider a mutant is selected
+if it has been selected by more than 60 times.
+
+6.3. Results
+
+We report our results by comparing the discovered muta-
+tions, within each drug class, against the treatment-selected
+mutation (TSM) panel (Rhee et al., 2005), which gives mu-
+tations associated with treatment by a drug from that class.
+As in (Barber & Candès, 2015) we report the counts by
+position rather than by mutation, i.e. combinining all muta-
+tions discovered at a single position, since multiple muta-
+tions at the same position are likely to have related effects.
+To compare with the knockoff method, for each drug class
+we consider mutation j to be a discovery for that drug class,
+if it was selected for any of the drugs in that class. The re-
+sults are displayed in Figure 3. In this experiment, we see
+that the multitask knockoff seems to show slightly better
+agreement with the TSM panel. As in the multitask simula-
+tion, this may be due to the fact that the knockoff combines
+discoveries across several drugs; a low false discovery pro-
+portion for each drug individually can still lead to a high
+false discovery proportion once the results are combined.
+
+7. Discussion
+We have presented a knockoff ﬁlter for the group sparse
+regression and multitask regression problems, where shar-
+ing information within each group or across the set of re-
+sponse variables allows for a more powerful feature selec-
+tion method. Extending the knockoff framework to other
+structured estimation problems, such as non-linear regres-
+sion or to low-dimensional latent structure other than spar-
+sity, would be interesting directions for future work.
+
+Multitask  KnockoffKnockoff05101520253035404550PI drugsMultitask  KnockoffKnockoff05101520253035404550NRTI drugsMultitask  KnockoffKnockoff05101520253035404550NNRTI drugsIn TSM panelNot in TSM panelKnockoffs for group-sparse and multitask regression
+
+References
+Barber, Rina Foygel and Candès, Emmanuel J. Con-
+trolling the false discovery rate via knockoffs. Ann.
+Statist., 43(5):2055–2085, 10 2015.
+doi: 10.1214/
+URL http://dx.doi.org/10.
+15-AOS1337.
+1214/15-AOS1337.
+
+Breheny, Patrick and Huang, Jian. Group descent algo-
+rithms for nonconvex penalized linear and logistic re-
+gression models with grouped predictors. Statistics and
+computing, 25(2):173–187, 2015.
+
+MATLAB. Version 8.6.0 (R2015b). The MathWorks Inc.,
+
+Natick, Massachusetts, 2015.
+
+Obozinski, Guillaume, Taskar, Ben, and Jordan, Michael.
+Multi-task feature selection. Statistics Department, UC
+Berkeley, Tech. Rep, 2006.
+
+R Core Team. R: A Language and Environment for Sta-
+tistical Computing. R Foundation for Statistical Com-
+puting, Vienna, Austria, 2015. URL http://www.
+R-project.org/.
+
+Rhee, S-Y., Fessel, W. J., Zolopa, A. R., Hurley, L., Liu, T.,
+Taylor, J., Nguyen, D. P., Slome, S., Klein, D., Horberg,
+M., et al. HIV-1 protease and reverse-transcriptase muta-
+tions: correlations with antiretroviral therapy in subtype
+B isolates and implications for drug-resistance surveil-
+lance. Journal of Infectious Diseases, 192(3):456–465,
+2005.
+
+Rhee, S-Y., Taylor, J., Wadhera, G., Ben-Hur, A., Brut-
+lag, D.L., and Shafer, R. W. Genotypic predictors of
+human immunodeﬁciency virus type 1 drug resistance.
+Proceedings of the National Academy of Sciences, 103
+(46):17355–17360, 2006.
+
+Tibshirani, Robert. Regression shrinkage and selection via
+the lasso. Journal of the Royal Statistical Society. Series
+B (Methodological), pp. 267–288, 1996.
+
+Yuan, Ming and Lin, Yi. Model selection and estimation in
+regression with grouped variables. Journal of the Royal
+Statistical Society: Series B (Statistical Methodology),
+68(1):49–67, 2006.
+
+

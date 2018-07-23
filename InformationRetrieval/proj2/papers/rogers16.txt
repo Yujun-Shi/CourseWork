@@ -1,0 +1,1308 @@
+Differentially Private Chi-Squared Hypothesis Testing:
+
+Goodness of Fit and Independence Testing
+
+Marco Gaboardi
+University at Buffalo, SUNY
+Hyun Woo Lim
+University of California, Los Angeles
+Ryan Rogers
+University of Pennsylvania
+Salil P. Vadhan
+Harvard University
+
+GABOARDI@BUFFALO.EDU
+
+LIMHYUN@G.UCLA.EDU
+
+RYROGERS@SAS.UPENN.EDU
+
+SALIL@SEAS.HARVARD.EDU
+
+Abstract
+
+Hypothesis testing is a useful statistical tool in
+determining whether a given model should be re-
+jected based on a sample from the population.
+Sample data may contain sensitive information
+about individuals, such as medical information.
+Thus it is important to design statistical tests that
+guarantee the privacy of subjects in the data. In
+this work, we study hypothesis testing subject to
+differential privacy, speciﬁcally chi-squared tests
+for goodness of ﬁt for multinomial data and in-
+dependence between two categorical variables.
+
+1. Introduction
+Hypothesis testing provides a systematic way to test given
+models based on a sample, so that with high conﬁdence a
+data analyst may conclude that the model is incorrect or
+not. However, these data samples may contain highly sen-
+sitive information about the subjects and so the privacy of
+individuals can be compromised when the results of a data
+analysis are released. For example, in the area of genome-
+wide associaton studies (GWAS) Homer et al. (2008) have
+shown that it is possible to identify subjects in a data set
+based on publicly available aggregate statistics.
+A way to address this concern is by developing new tech-
+niques to support privacy-preserving data analysis. An
+approach that is gaining more and more attention by the
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+statistics and data analysis community is differential pri-
+vacy (Dwork et al., 2006b), which originated in theoretical
+computer science. In this work, we seek to develop hypoth-
+esis tests that are differentially private and that give conclu-
+sions similar to standard, non-private hypothesis tests.
+We focus here on two classical tests for data drawn from
+a multinomial distribution: goodness of ﬁt test, which de-
+termines whether the data was in fact drawn from a multi-
+nomial distribution with probability vector p0; and inde-
+pendence test, which tests whether two categorical random
+variables are independent of each other. Both tests depend
+on the chi-squared statistic, which is used to determine
+whether the data is likely or not under the given model.
+To guarantee differential privacy, we consider adding
+Laplace and Gaussian noise to the counts of categorical
+data. Using the noisy data we can form a private chi-
+squared statistic. It turns out that the classical hypothesis
+tests perform poorly when used with this modiﬁed statistic
+because they ignore the fact that noise was added. To im-
+prove this situation, we develop four new tests that account
+for the additional noise due to privacy. In particular, we
+give two tests based on a Monte Carlo approach to testing
+the null hypothesis and two tests based on an asymptotic
+distribution of the private chi-squared distribution factor-
+ing in the noise distribution.
+Our four differentially private tests achieve a target level
+1−α signiﬁcance, i.e. they reject with probability at most α
+when the null hypothesis holds (in some cases, we provide
+a rigorous proof of this fact and in others, it is experimen-
+tally veriﬁed). This guarantees limited Type I errors. How-
+ever, all of our tests do lose power; that is when the null
+hypothesis is false, they correctly reject with lower proba-
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+bility than the classical hypothesis tests. This corresponds
+to an increase of Type II errors. We empirically show that
+we can recover a level of power similar to the one achieved
+by the classical versions by adding more samples.
+
+2. Related Work
+There has been a myriad of work dealing with the applica-
+tion of differential privacy in statistical inference. One of
+the ﬁrst works that put differential privacy in the language
+of statistics is Wasserman and Zhou (2010), which stud-
+ies rates of convergence of distributions based on differen-
+tially private data released from the exponential mechanism
+(McSherry and Talwar, 2007). In a result of great general-
+ity, Smith (2011) shows that for a wide class of statistics
+T , there is a differentially private statistic that converges
+in distribution to the same asymptotic distribution as T .
+However, having the correct asymptotic distribution does
+not ensure that only statistically signiﬁcant conclusions are
+drawn at ﬁnite sample sizes, and indeed we observe that
+this fails dramatically for the most natural differentially pri-
+vate algorithms. Thus, we study how to ensure signiﬁcance
+and optimize power at small sample sizes by focusing on
+two basic statistical tests.
+A tempting ﬁrst approach to developing a hypothesis test
+for categorical data that is also differentially private is to ei-
+ther add noise directly to the chi-squared statistic that will
+ensure differential privacy or to add noise to each cell count
+(as we do in this work) and use a classical test with the pri-
+vate counts. For the former method, the amount of noise
+that must be added to ensure privacy can be unbounded
+in the worst case. However, motivated by applications
+to genome-wide association studies (GWAS), Uhler et al.
+(2013) and Yu et al. (2014) place restrictions on the form of
+the data or what is known to the data analyst to reduce the
+scale of the noise that needs to be added. The work of John-
+son and Shmatikov (2013) adds noise to each cell of a con-
+tingency table, but then uses classical statistical tests on the
+private version of the data, which we show can have very
+poor signiﬁcance (see Figures 1 and 2). Additionally, Uhler
+et al. (2013) look at 3×2 contingency tables that are evenly
+split between the two columns, and study releasing differ-
+entially private χ2-statistics of the most relevant SNPs for
+certain diseases by perturbing the table of counts, the χ2-
+statistic itself, and the p-values for the underlying test. The
+only one of these works that explicitly examine signiﬁcance
+and power in hypothesis testing (as we do here) is (Uhler
+et al., 2013), which shows that perturbing the p-values in
+independence testing does not perform much better than a
+random test, independent of a selected threshold, e.g. α.
+In fact, (Uhler et al., 2013) goes as far as to say that bas-
+ing inference on perturbed p-values “seems impossible.”
+An interesting direction for future work would be to apply
+
+the distance-score mechanism introduced by (Johnson and
+Shmatikov, 2013) and later improved by (Yu et al., 2014;
+Yu and Ji, 2014; Simmons and Berger, 2016), to achieve
+a target level of signiﬁcance and high power in hypothesis
+testing for GWAS data.
+If we assume that there is some prior estimates for the con-
+tingency table cell probabilities, Vu and Slavkovic (2009)
+determine the sample size adjustment for the Pearson chi-
+squared independence test that uses the private counts to
+achieve the same power as the test with the original counts.
+Several other works have shown negative experimental re-
+sults for using classical inference on statistics that have
+been altered for differential privacy (Fienberg et al., 2010;
+Karwa and Slavkovi´c, 2012; Karwa and Slavkovi´c, 2016).
+Another problem that arises when noise is added to the cells
+in a contingency table is that the entries may neither be
+positive nor sum to a known value n. Several works have
+focused on this problem, where they seek to release a con-
+tingency table in a differentially private way that also sat-
+isﬁes some known consistency properties of the underlying
+data (Barak et al., 2007; Li et al., 2010; Hardt et al., 2012;
+Li and Miklau, 2012; Gaboardi et al., 2014). For indepen-
+dence testing, we use techniques from Lee et al. (2015) to
+ﬁnd the most likely contingency table given the noisy ver-
+sion of it so that we can then estimate the cell probabilities
+that generated the table. This two step procedure to es-
+timate parameters given a differentially private statistic is
+inspired by the work of Karwa and Slavkovi´c (2016) for
+estimating parameters in the β-model for random graphs.
+Independent of our work, Wang et al. (2015) also look
+at hypothesis testing with categorical data subject to dif-
+ferential privacy. They mainly consider adding Laplace
+noise to the data but point out that their method also gen-
+eralizes to arbitrary noise distributions. However, in or-
+der to compute critical values, they resort to Monte Carlo
+methods to sample from the asymptotic distribution. Our
+Monte Carlo approach samples from the exact distribution
+from the underlying null hypothesis, which, unlike sam-
+pling from the asymptotic distribution, guarantees signiﬁ-
+cance at least 1 − α in goodness of ﬁt tests at ﬁnite sample
+sizes. We only focus on Gaussian noise in our asymptotic
+analysis due to there being existing methods for ﬁnding
+tail probabilities (and hence critical values) for the result-
+ing distributions, but our approaches can be generalized for
+arbitrary noise distributions. Further, we also consider the
+power of each of our differentially private tests.
+
+3. Differential Privacy Preliminaries
+We start with a brief overview of differential privacy. In or-
+der to deﬁne differential privacy, we ﬁrst deﬁne neighbor-
+ing databases d, d(cid:48) from some class of databases Dn where
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+i,··· , dn) where di (cid:54)= d(cid:48)
+
+they differ in an individual’s data but are equal among
+the rest of the data, e.g. d = (d1,··· , di,··· dn) and
+d(cid:48) = (d1,··· , d(cid:48)
+i. We will con-
+sider n to be known and public.
+Deﬁnition 3.1 (Differential Privacy (Dwork et al., 2006b)).
+Let M : Dn → O be some randomized mechanism For
+, δ > 0 we say that M is (, δ)-differentially private if for
+any neighboring databases d, d(cid:48) ∈ Dn and any subset of
+outcomes S ⊆ O we have
+
+Pr [M (d) ∈ S] ≤ e Pr [M (d(cid:48)) ∈ S] + δ.
+
+If δ = 0, then we simply say M is -differentially private.
+As is common in the privacy literature, we will think of
+ as a small constant, e.g. 0.1, and δ (cid:28) 1/n as crypto-
+graphically small, where we sometimes write δn to explic-
+itly show its dependence on n.
+
+A typical differentially private mechanism is to add care-
+fully calibrated noise to some quantity that a data analyst
+is interested in. We can release a differentially private an-
+swer to a function φ : Dn → Rd by adding independent
+noise to each component of φ. The scale of the noise we
+add depends on the impact any individual can have on the
+outcome. We use the global sensitivity of φ to quantify this
+impact, which we deﬁne for i = 1, 2 as:
+
+GSi(φ) =
+
+max
+
+d,d(cid:48)neighboring in Dn
+
+{||φ(d) − φ(d(cid:48))||i} .
+
+Lemma 3.2 (Dwork et al. (2006a;b)). Let φ : Dn → Rd
+have global sensitivity GSi(φ) for i = 1, 2. Then the
+mechanism MD : Dn → Rd where MD(d) = φ(d) +
+(Z1,··· , Zd)T
+{Zi} i.i.d.∼ D is -differentially private
+if D = Laplace
+or (, δ)-differentially private if
+D = N (0, σ2) with σ =
+
+(cid:16) GS1(φ)
+
+(cid:17)
+
+2 ln(2/δ)
+
+GS2(φ)
+
+√
+
+.
+
+
+
+
+
+There are many useful properties of differentially private
+mechanisms. The one we will use in this paper is re-
+ferred to as post-processing, which ensures privacy no mat-
+ter what we do with the outcome of M.
+Lemma 3.3. (Dwork et al., 2006b)Let M : Dn → O be
+(, δ)-differentially private and ψ : O → O(cid:48) be some ar-
+bitrary mapping from O to O(cid:48). Then ψ ◦ M : Dn → O(cid:48)
+remains (, δ)-differentially private.
+
+The tests that we present will be differentially private,
+assuming n is known and public, because we will add
+Laplace or Gaussian noise as in Lemma 3.2 to the vector
+of counts in goodness of ﬁt testing
+
+given as a null hypothesis H0. We will denote our test as
+an algorithm A that takes a dataset X, signiﬁcance level
+1 − α and null hypothesis H0 and returns a decision of
+whether to reject H0 or not. We would like to design
+our test so that we achieve Type I error at most α, that is
+Pr [A(X; α, H0) = Reject|H0] ≤ α while also achieving
+a small Type II error β = Pr [A(X; α, H0) = Reject|H1]
+when the model is actually some alternate H1 (cid:54)= H0. Note
+that the probability is taken over the randomness from the
+data generation and the possible randomness from the al-
+gorithm A itself.
+It is common to refer to 1 − α as the
+signiﬁcance of test A and 1 − β as the power of A. We
+think of bounding Type I error as a hard constraint in our
+tests and then hope to minimize Type II error.
+
+where p = (p1,··· , pd) and(cid:80)d
+squared statistic Q2 where Q2 = (cid:80)d
+
+5. Goodness of Fit Test
+We consider X = (X1,··· , Xd)T ∼ Multinomial(n, p)
+i=1 pi = 1. For a good-
+ness of ﬁt test, we want to test the null hypothesis H0 :
+p = p0. A common way to test this is based on the chi-
+. We
+present the classical chi-squared goodness of ﬁt test in Al-
+gorithm 1, which compares the chi-squared statistic Q2 to
+a threshold χ2
+d−1,1−α that depends on a desired level of
+signiﬁcance 1 − α as well as the dimension of the data.
+d−1,1−α satisﬁes the following relation-
+The threshold χ2
+ship: Pr
+d−1 is a chi-
+squared random variable with d − 1 degrees of freedom.
+
+d−1 ≥ χ2
+χ2
+
+(Xi−np0
+np0
+i
+
+= α. where χ2
+
+d−1,1−α
+
+(cid:104)
+
+(cid:105)
+
+i )2
+
+i=1
+
+Algorithm 1 Goodness of Fit Test for Multinomial Data
+procedure GOF(x, α, H0 : p = p0)
+
+d−1,1−α then Decision ← Reject
+
+Compute Q2.
+if Q2 > χ2
+else Decision ← Fail to Reject
+return Decision.
+
+The reason why we compare Q2 with the chi-squared dis-
+tribution is because of the following classical result.
+Theorem 5.1. (Bishop et al., 1975) Assuming H0 : p = p0
+holds, the statistic Q2 converges in distribution to a chi-
+squared with d − 1 degrees of freedom, i.e. Q2 D→ χ2
+d−1.
+
+(cid:104)
+
+(cid:105) ≤ α for ﬁnite samples, never-
+
+Note
+Pr
+theless the test works well and is widely used in practice.
+
+that
+Q2 > χ2
+
+this
+d−1,1−α
+
+guarantee
+
+does
+
+that
+
+not
+
+4. Hypothesis Testing Preliminaries
+Given sampled data from a population, we wish to test
+whether the data came from a speciﬁc model, which is
+
+5.1. Differentially Private Chi-Squared Statistic
+
+To ensure differential privacy, we add independent noise to
+each component of X, which we will either use Laplace
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+√
+
+or Gaussian noise. The function g that outputs the counts
+in the d cells has global sensitivity GS1(g) = 2 and
+2 because one individual may move from one
+GS2(g) =
+cell count (decreasing the count by 1) to another (increasing
+the cell count by 1). We then form the private chi-squared
+statistic Q2D based on the noisy counts,
+
+(cid:0)Xi + Zi − np0
+
+i
+
+(cid:1)2
+
+d(cid:88)
+
+i=1
+
+np0
+i
+
+Q2D =
+
+,
+
+{Zi} i.i.d.∼ D (1)
+
+
+
+2
+
+√
+
+ln(2/δn)
+
+where the distributions for the noise that we consider in-
+clude D = Laplace(2/) and D = N (0, σ2) where σ ≡
+. We will denote the -differentially
+σ(, δn) =
+private statistic as Q2
+Lap and the (, δ)-differentially pri-
+vate statistic as Q2
+Gauss based on whether we use Laplace
+or Gaussian noise, respectively. Recall that in the origi-
+nal goodness of ﬁt test without privacy in Algorithm 1 we
+compare the distribution of Q2 with that of a chi-squared
+random variable with d − 1 degrees of freedom. We show
+in the supplementary materials that Q2D still has the same
+asymptotic distribution, with certain conditions on δn.
+It then seems natural to use GOF on the private chi-squared
+statistic as if we had the actual chi-squared statistic that did
+not introduce noise to each count since both private and
+nonprivate statistics have the same asymptotic distribution.
+We will show in our results in Section 7 that if we were
+to simply compare the private statistic to the critical value
+d−1,1−α, we will typically not get a good signiﬁcance
+χ2
+level even for relatively large n. In the following lemma
+we show that for every realization of data, the statistic Q2D
+is expected to be larger than the actual chi-squared statistic
+Q2. See the supplementary materials for the proof.
+Lemma 5.2. For each realization X = x, we have
+
+ED(cid:2)Q2D|x(cid:3) ≥ Q2, where D has mean zero.
+
+This result suggests that the signiﬁcance threshold for the
+private version of the chi-squared statistic Q2D should be
+higher than the standard one. Otherwise, we would reject
+H0 too easily using the classical test, which we show in our
+experimental results. This motivates the need to develop
+new tests that account for the distribution of the noise.
+
+5.2. Monte Carlo Test: MCGOFD
+Given some null hypothesis p0 and statistic Q2D, we want
+to determine a threshold τ α such that Q2D > τ α at most an
+α fraction of the time when the null hypothesis is true. As
+a ﬁrst approach, we determine threshold τ α using a Monte
+Carlo (MC) approach by sampling from the distribution of
+Q2D, where X ∼ Multinomial(n, p0) and {Zi} i.i.d.∼ D for
+both Laplace and Gaussian noise. We give our MC based
+test MCGOF in Algorithm 2. We show in the supplementary
+materials that MCGOF achieves at least our target signiﬁ-
+cance 1 − α when we choose k > 1/α many samples.
+
+Algorithm 2 MC Goodness of Fit
+procedure MCGOFD(x, (, δ), α, H0 : p = p0)
+
+Compute q = Q2D (1).
+Select k > 1/α.
+Sample q1,··· , qk i.i.d. from the distribution of Q2D.
+Sort the samples q(1) ≤ ··· ≤ q(k).
+Compute threshold q(t) where t = (cid:100)(k + 1)(1 − α)(cid:101).
+if q > q(t) then Decision ← Reject
+else Decision ← Fail to Reject
+return Decision
+
+Theorem 5.3.
+has
+
+Pr(cid:2)MCGOFD(X, (, δ), α, p0) = Reject |H0
+
+MCGOFD(·, (, δ), α, p0)
+i.e.
+α.
+
+1 − α,
+≤
+
+signiﬁcance
+
+least
+
+The
+
+test
+
+(cid:3)
+
+at
+
+In Section 7, we present the empirical power results for
+MCGOFD (along with all our other tests) when we ﬁx an
+alternative hypothesis.
+
+5.3. Asymptotic Approach: PrivGOF
+
+In this section we attempt to determine a more analyt-
+Gauss. We
+ical approximation to the distribution of Q2
+focus on Gaussian noise because it
+is more compati-
+ble with the asymptotic analysis of GOF, as opposed
+to Laplace noise. Consider the random vector U =
+i√
+(U1,··· , Ud) where Ui = Xi−np0
+for any i ∈ [d].
+We then introduce the Gaussian noise random vector as
+V = (Z1/σ(, δn),··· , Zd/σ(, δn))T ∼ N (0, Id). Let
+
+W ∈ R2d be the concatenated vector deﬁned as W =(cid:0)U
+
+(cid:1).
+
+np0
+i
+
+V
+
+Note that W D→ N (0, Σ(cid:48)) where the covariance matrix is
+the 2d by 2d block matrix
+
+(cid:20)Σ 0
+
+(cid:21)
+
+0
+
+Id
+
+Σ(cid:48) =
+
+, where Σ = Id −(cid:112)
+
+p0(cid:112)
+
+T
+
+p0
+
+(2)
+
+Since Σ is idempotent, so is Σ(cid:48). We next deﬁne the 2d x 2d
+positive semi-deﬁnite matrix A (composed of four d by d
+block matrices) as
+
+(cid:33)
+
+(cid:32)
+
+σ(, δn)(cid:112)np0
+
+(cid:20)Id Λ
+
+(cid:21)
+
+Λ Λ2
+
+A =
+
+where Λ = Diag
+
+(3)
+
+We can then rewrite our private chi-squared statistic as a
+quadratic form Q2
+
+Remark 5.4. If we have σ(, δn)/(cid:112)np0 → constant then
+
+Gauss = WT AW.
+
+the asymptotic distribution of Q2
+form of multivariate normals.
+
+Gauss would be a quadratic
+
+Similar to the classical goodness of ﬁt test we consider the
+limiting case that the random vector U is actually a mul-
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+(cid:34) r(cid:88)
+
+(cid:35)
+
+where A is positive semi-deﬁnite is (cid:80)r
+
+tivariate normal, which will result in W being multivari-
+ate normal as well. We next want to be able to calculate
+the distribution of the quadratic form of normals WT AW.
+Note that we will write {χ2,i
+1 }r
+i=1 as a set of r independent
+chi-squared random variables with one degree of freedom.
+Theorem 5.5. Let W ∼ N (0, Σ(cid:48)) where Σ(cid:48) is idempotent
+and has rank r ≤ 2d. Then the distribution of WT AW
+1 where
+i=1 are the eigenvalues of BT AB where B ∈ R2d×r
+{λi}r
+such that BBT = Σ(cid:48) and BT B = Ir.
+Note that in the non-private case, the coefﬁcients {λi} in
+Theorem 5.5 become the eigenvalues for the rank d − 1
+idempotent matrix Σ, thus resulting in a χ2
+d−1 distribution.
+We use the result of Theorem 5.5 in order to ﬁnd a threshold
+that will achieve the desired signiﬁcance level 1 − α, as in
+the classical chi-squared goodness of ﬁt test. We then set
+the threshold τ α to satisfy the following:
+
+i=1 λiχ2,i
+
+Pr
+
+λiχ2,i
+
+1 ≥ τ α
+
+= α
+
+(4)
+
+i=1
+
+for {λi} found in Theorem 5.5. Note, the threshold τ α is a
+function of n, , δ, α and p0, but not the data.
+We present our modiﬁed goodness of ﬁt test when we are
+dealing with differentially private counts in Algorithm 3.
+
+Algorithm 3 Private Chi-Squared Goodness of Fit Test
+procedure PrivGOF(x, (, δ), α, H0 : p = p0)
+
+Set σ = 2(cid:112)log(2/δ)/.
+
+Gauss from (1) and τ α that satisﬁes (4).
+
+Gauss > τ α then Decision ← Reject
+
+Compute Q2
+if Q2
+else Decision ← Fail to Reject
+return Decision
+
+6. Independence Testing
+We now consider the problem of testing whether two ran-
+dom variables Y(1) ∼ Multinomial(1, π(1)) and Y(2) ∼
+Multinomial(1, π(2)) are independent of each other. We
+then form the null hypothesis H0 : Y(1)⊥Y(2), i.e. they
+are independent. One approach to testing H0 is to sample
+n joint outcomes of Y(1) and Y(2) and count the num-
+ber of observed outcomes, Xi,j which is the number of
+times Y (1)
+j = 1 in the n trials, so that we
+can summarize all joint outcomes as a contingency table
+X = (Xi,j) ∼ Multinomial(n, p), where pi,j is the prob-
+ability that Y (1)
+j = 1. We will write the full
+contingency table of counts X = (Xi,j) as a vector with
+the ordering convention that we start from the top row and
+move from left to right across the contingency table.
+We want to calculate the chi-squared statistic as in the
+goodness of ﬁt section (where now the summation is over
+
+i = 1 and Y (2)
+
+i = 1 and Y (2)
+
+i,j
+
+all joint outcomes i and j), but now we do not know the
+true proportion p = (pi,j) which depends on π(1) and
+π(2). However, we can use the maximum likelihood esti-
+
+mator (MLE)(cid:98)p for the probability vector p subject to H0
+to form the statistic (cid:98)Q2 =(cid:80)
+
+. Note that un-
+der the null hypothesis we can write p as a function of π(1)
+and π(2),
+p = f (π(1), π(2)) where fi,j(π(1), π(2)) = π(1)
+
+Further, we can write the MLE(cid:98)p as described below.
+
+(Xi,j−n(cid:98)pi,j )2
+
+n(cid:98)pi,j
+
+Lemma 6.1 ((Bishop et al., 1975)). Given X, which is n
+samples of joint outcomes of Y(1) ∼ Multinomial(1, π(1))
+and Y(2) ∼ Multinomial(1, π(2)), if Y(1)⊥Y(2), then the
+MLE for p = f (π(1), π(2)) for f given in (5) is the follow-
+
+. (5)
+
+·π(2)
+
+j
+
+i
+
+for i ∈ [r], j ∈ [c]
+
+(6)
+
+i=1 Xi,j.
+
+We then state another classical result that gives the asymp-
+
+j = X·,j/n
+
+j=1 Xi,j and X·,j =(cid:80)c
+
+ing:(cid:98)p = f ((cid:98)π(1),(cid:98)π(2)) where
+(cid:98)π(1)
+i = Xi,·/n, (cid:98)π(2)
+where Xi,· =(cid:80)r
+totic distribution of (cid:98)Q2 given H0.
+in Lemma 6.1, the statistic (cid:98)Q2 D→ χ2
+(cid:98)p ← MLE calculation in (6)
+Compute (cid:98)Q2 and set ν = (r − 1)(c − 1).
+if (cid:98)Q2 > χ2
+
+Decision ← Reject
+else Decision ← Fail to Reject
+return Decision.
+
+Theorem 6.2. (Bishop et al., 1975) Given the assumptions
+ν for ν = (r−1)(c−1).
+
+Algorithm 4 Pearson Chi-Squared Independence Test
+procedure Indep(x, α)
+
+ν,1−α and all entries of x are at least 5 then
+
+statistic (cid:98)Q2, with the value χ2
+
+The chi-squared independence test is then to compare the
+ν,1−α for a 1 − α signiﬁcance
+test. We formally give the Pearson Chi-Squared test in Al-
+gorithm 4. An often used “rule of thumb” (Triola, 2014)
+with this test is that it can only be used if all the cell counts
+are at least 5, otherwise the test Fails to Reject H0. We will
+follow this rule of thumb in our tests.
+Similar to our prior analysis for goodness of ﬁt, we aim to
+understand the asymptotic distribution from Theorem 6.2.
+
+(cid:98)Ui,j = (Xi,j − n(cid:98)pi,j)/(cid:112)n(cid:98)pi,j.
+
+First, we can deﬁne (cid:98)U in terms of the MLE(cid:98)p given in (6):
+bution of (cid:98)U under H0, which also proves Theorem 6.2.
+ses as Lemma 6.1, the random vector (cid:98)U D→ N (0, Σind)
+Lemma 6.3. (Bishop et al., 1975) With the same hypothe-
+where Σind = Irc − √
+
+The following classical result gives the asymptotic distri-
+
+p · √
+√
+given in (5), and Γ = Diag(
+
+pT − Γ(ΓT Γ)−1ΓT with f
+p)−1 · ∇f (π(1), π(2)).
+
+(7)
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+In order to do a test that is similar to Indep given in Algo-
+rithm 4, we need to determine an estimate for π(1) and π(2)
+where we are only given access to the noisy cell counts.
+
+6.1. Estimating Parameters with Private Counts
+
+We now assume that we do not have access to the counts
+Xi,j in a contingency table but instead we have Wi,j =
+Xi,j + Zi,j where Zi,j ∼ D for Laplace or Gaussian noise
+given in (1) and we want to perform a test for indepen-
+dence. We consider the full likelihood of the noisy r × c
+the best estimates for {π(i)} given the noisy counts.
+
+contingency table Pr(cid:2)X + Z = w|H0, π(1), π(2)(cid:3) to ﬁnd
+
+Algorithm 5 Two Step MLE Calculation
+procedure 2MLE(X + Z = w)
+if D = Gauss then set γ = 1
+if D = Lap then set 0 < γ (cid:28) 1 .
+
+(cid:101)x ← Solution to (8).
+if Any cell of(cid:101)x is less than 5 then (cid:101)π(1),(cid:101)π(2) ← NULL
+else(cid:101)π(1),(cid:101)π(2) ← MLE with(cid:101)x given in (6).
+return (cid:101)π(1) and(cid:101)π(2).
+
+We will follow a two step procedure similar to the work
+of (Karwa and Slavkovi´c, 2016). We will ﬁrst ﬁnd the
+most likely contingency table given the noisy data w and
+then ﬁnd the most likely probability vectors under the null
+hypothesis that could have generated that denoised contin-
+gency table (this is not equivalent to maximizing the full
+likelihood, but it seems to work well as our experiments
+later show). For the latter step, we use Equation (6) to get
+(cid:80)
+the MLE for π(1) and π(2) given a vector of counts x. For
+the ﬁrst step, we need to minimize ||w − x|| subject to
+i,j xi,j = n and xi,j ≥ 0 where the norm in the objec-
+tive is either (cid:96)1 for Laplace noise or (cid:96)2 for Gaussian noise.
+Note that for Laplace noise, the above optimization prob-
+lem does not give a unique solution and it is not clear which
+contingency table x to use. One solution to overcome this
+is to add a regularizer to the objective value. We will fol-
+low the work of (Lee et al., 2015) to overcome this problem
+by using an elastic net regularizer (Zou and Hastie, 2005):
+
+(1 − γ) · ||w − x||1 + γ · ||w − x||2
+
+2
+
+(8)
+
+argmin
+
+x
+
+s.t.
+
+(cid:88)
+
+xi,j = n,
+
+xi,j ≥ 0.
+
+i,j
+
+where if we use Gaussian noise, we set γ = 1 and if we
+use Laplace noise then we pick a small γ > 0 and then
+solve the resulting program. Our two step procedure for
+ﬁnding an approximate MLE for π(1) and π(2) based on our
+noisy vector of counts w is given in Algorithm 5, where we
+take into account the rule of thumb from Indep and return
+NULL if any computed table has counts less than 5.
+
+applied to the result of 2MLE(X + Z). We now write down
+the private chi-squared statistic when we use the estimate
+
+We will denote(cid:101)p to be the probability vector of f from (5)
+(cid:101)p in place of the actual (unknown) probability vector p:
+(cid:101)Q2D =
+
+(Xi,j + Zi,j − n(cid:101)pi,j)2
+
+{Zi,j} i.i.d.∼ D.
+
+(cid:88)
+
+(9)
+
+n(cid:101)pi,j
+
+i,j
+
+Algorithm 6 MC Independence Testing
+procedure MCIndepD(x, (, δ), α)
+
+return Fail to Reject
+
+w ← x + Z, where {Zi,j} i.i.d.∼ D and D given in (1).
+
+Set k > 1/α and q ← NULL.
+for t ∈ [k] do
+
+((cid:101)π(1),(cid:101)π(2)) ← 2MLE(w) and(cid:101)p ← f ((cid:101)π(1),(cid:101)π(2)).
+if ((cid:101)π(1),(cid:101)π(2)) == NULL then
+else(cid:101)q ← (cid:101)Q2D using w and(cid:101)p.
+Generate contingency table(cid:101)x using(cid:0)(cid:101)π(1),(cid:101)π(2)(cid:1).
+(cid:101)w ←(cid:101)x + Z, where {Zi,j} i.i.d.∼ D.
+((cid:101)(cid:101)π
+, π(2)) ← 2MLE((cid:101)w).
+if ((cid:101)(cid:101)π
+,(cid:101)(cid:101)π
+else Compute (cid:101)Q2D from (9), add it to array q.
+(cid:101)τ α ← the (cid:100)(k + 1)(1 − α)(cid:101) ranked statistic in q.
+if(cid:101)q >(cid:101)τ α then
+
+return Fail to Reject.
+
+return Reject H0.
+
+) == NULL then
+
+1
+
+2
+
+1
+
+else
+
+return Fail to Reject H0.
+
+6.2. Monte Carlo Test: MCIndepD
+We ﬁrst follow a similar procedure as in Section 5.2 but us-
+ing the parameter estimates from 2MLE instead of the ac-
+tual (unknown) probabilities. Our procedure MCIndepD
+(given in Algorithm 6 ) works as follows: given a dataset
+x, we will add the appropriately scaled Laplace or Gaus-
+sian noise to ensure differential privacy to get the noisy ta-
+ble w. Then we use 2MLE on the private data to get ap-
+
+proximates to the parameters π(i), which we denote as(cid:101)π(i)
+different values for (cid:101)Q2D and choose the (cid:100)(k + 1)(1 − α)(cid:101)
+ranked statistic as our threshold(cid:101)τ α. If at any stage 2MLE
+
+for i = 1, 2. Using these probability estimates, we sample
+k > 1/α many contingency tables and noise terms to get k
+
+returns NULL, then the test Fails to Reject H0. We for-
+mally give our test MCIndepD in Algorithm 6.
+
+6.3. Asymptotic Approach: PrivIndep
+
+We will now focus on the analytical form of our private
+statistic when Guassian noise is added. We can then write
+
+Gauss = (cid:102)WT (cid:101)A(cid:102)W in its quadratic form, which is similar
+(cid:101)Q2
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+Figure 1. Signiﬁcance of test PrivGOF in 10, 000 trials with (, δ) = (0.1, 10−6).
+
+Algorithm 7 Private Independence Test for r × c tables
+procedure PrivIndep(x, (, δ), 1 − α)
+w ← x + Z where Z ∼ N (0, σ2Ir·c).
+
+(cid:0)(cid:101)π(1),(cid:101)π(2)(cid:1) ← 2MLE(w).
+if(cid:0)(cid:101)π(1),(cid:101)π(2)(cid:1) == NULL then
+else(cid:101)p ← f(cid:0)(cid:101)π(1),(cid:101)π(2)(cid:1) for f given in (5).
+Set (cid:101)Q2
+Gauss from (9) with w and(cid:101)τ α from (11).
+if (cid:101)Q2
+Gauss >(cid:101)τ α then
+
+return Fail to Reject
+
+return Reject
+
+else
+
+return Fail to Reject
+
+to the form of Q2
+
+Gauss where (cid:102)W =(cid:0)(cid:101)U
+
+(cid:1) with (cid:101)U set in (7)
+except with(cid:101)p used instead of the given p0 in the goodness
+of ﬁt testing. Further, we denote (cid:101)A as A in (3) but with
+(cid:101)p instead of p0. We will use the 2rc by 2rc block matrix
+ind to estimate the covariance of(cid:102)W, where
+(cid:101)Σ(cid:48)
+
+V
+
+(cid:101)Σ(cid:48)
+
+ind =
+
+(cid:20)(cid:101)Σind
+
+0
+
+(cid:21)
+
+0
+Irc
+
+(10)
+
+actual (unknown) parameters.
+Thus, if we are given a differentially private version of a
+contingency table where each cell has added independent
+Gauss and
+
+and(cid:101)Σind is the matrix Σind in Lemma 6.3, except we use
+our estimates(cid:101)π(1),(cid:101)π(2), or(cid:101)p whenever we need to use the
+Gaussian noise with variance σ2, we calculate (cid:101)Q2
+compare it to the threshold(cid:101)τ α where
+(cid:35)
+(cid:101)λiχ2,i
+1 ≥(cid:101)τ α
+
+(cid:34) rc(cid:88)
+
+with {(cid:101)λi} being the eigenvalues of (cid:101)BT (cid:101)A(cid:101)B with rank ν =
+rc + (r − 1)(c − 1) matrix (cid:101)B ∈ R2rc,ν where (cid:101)B(cid:101)BT =
+(cid:101)Σ(cid:48)
+
+ind. Our new independence test PrivIndep is given in
+Algorithm 7, where 2MLE estimates π(i) for i = 1, 2 and
+PrivIndep Fails to Reject if 2MLE returns NULL.
+
+(11)
+
+= α
+
+Pr
+
+i=1
+
+7. Signiﬁcance Results
+We now show how each of our tests perform on simulated
+data when H0 holds in goodness of ﬁt and independence
+testing. We ﬁx our desired signiﬁcance 1 − α = 0.95 and
+privacy level (, δ) = (0.1, 10−6) in all of our tests.
+By Theorem 5.3, we know that MCGOFD will have signiﬁ-
+cance at least 1 − α. We then turn to our test PrivGOF
+to compute the proportion of trials that failed to reject
+H0 : p = p0 when it holds. In Figure 1 we give several dif-
+ferent null hypotheses p0 and sample sizes n to show that
+PrivGOF achieves near 0.95 signiﬁcance in all our tested
+cases. We also compare our results with how the original
+test GOF would perform if used on the private counts with
+either Laplace and Gaussian noise.
+We then turn to independence testing for 2× 2 contingency
+tables using both MCIndepD and PrivIndep. Note that
+our methods do apply to arbitrary k × (cid:96) tables and run in
+time poly(k, (cid:96), log(n)) plus the time for the iterative Imhof
+method to ﬁnd the critical values. In Figure 2 we compute
+the empirical signiﬁcance of both of our tests and compare
+it to how Indep performs on the nonprivate data. For
+MCIndepD and PrivIndep we sample 1,000 trials for
+various parameters π(1), π(2), and n that could have gener-
+ated the contingency tables. We set the number of samples
+k = 50 in MCIndepD regardless of the noise we added
+and when we use Laplace noise, we set γ = 0.01 as the
+parameter in 2MLE.
+We also plot the critical values of our various tests in Fig-
+ure 3. For both PrivGOF and PrivIndep we used the
+package in R “CompQuadForm” that has various methods
+for ﬁnding estimates to the tail probabilities for quadratic
+forms of normals, of which we used the “imhof” method
+(Imhof, 1961) to approximate the threshold for each test.
+Note that in MCIndepD and PrivIndep each trial has a
+different threshold, so we give the average over all trials.
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+Figure 2. Signiﬁcance of Indep when used on a contingency table with added Laplace or Gaussian noise compared to MCIndepD for
+both Laplace and Gaussian noise and PrivIndep in 1,000 trials with (, δ) = (0.1, 10−6) and α = 0.05.
+
+Figure 3. Comparison of the (average) critical values for all of our tests with α = 0.05 and (, δ) = (0.1, 10−6).
+
+8. Power Results
+We now want to show that our tests correctly reject H0
+when it is false, ﬁxing parameters α = 0.05 and (, δ) =
+(0.1, 10−6). For our two goodness of ﬁt tests, MCGOFD
+(with k = 100) and PrivGOF we test whether the multi-
+nomial data came from p0 = (1/4, 1/4, 1/4, 1/4) when it
+was actually sampled from p1 = p0 +0.01·(1,−1, 1,−1).
+We compare each of our tests with the classical Indep
+test that uses the unaltered data in Figure 4. We then ﬁnd
+the proportion of 1,000 trials that each of our tests rejected
+H0 : p = p0 for various n. Note that Indep has difﬁculty
+distinguishing p0 and p1 for reasonable sample sizes.
+
+Figure 4. Power Plots of MCGOFD and PrivGOF, as well as our
+independence tests MCIndepD and PrivIndep compared with
+the classical tests, with (, δ) = (0.1, 10−6).
+We then turn to independence testing for 2 × 2 ta-
+
+We ﬁx the alternate H1
+
+bles with our two differentially private tests MCIndepD
+and PrivIndep.
+:
+Cov(Y(1), Y(2)) = ∆ > 0 so that Y(1) ∼ Bern(π(1) =
+1/2) and Y(2) ∼ Bern(π(2) = 1/2) are not independent.
+We then sample contingency tables from a multinomial
+distribution with probability p1 = (1/4, 1/4, 1/4, 1/4) +
+∆(1,−1, 1,−1) and various sizes n. We compute the pro-
+portion of 1,000 trials that MCIndepD and PrivIndep
+rejected H0 : Y(1)⊥Y(2) and ∆ = 0.01 in Figure 4. For
+MCIndepD we set the number of samples k = 50 and
+when we use Laplace noise, we set γ = 0.01 in 2MLE.
+
+9. Conclusion
+We proposed new hypothesis tests based on a private ver-
+sion of the chi-squared statistic for goodness of ﬁt and in-
+dependence tests. For each test, we showed analytically or
+experimentally that we can achieve signiﬁcance close to the
+target 1 − α level similar to the nonprivate tests. We also
+showed that all the tests have a loss in power with respect to
+the non-private classical tests, with methods using Laplace
+noise outperforming those with Gaussian noise, due to the
+fact that the Gaussian noise has higher variance (to achieve
+the same level of privacy). Experimentally we show for
+2× 2 tables that with less than 3000 additional samples the
+tests with Laplace noise achieve the same power as the clas-
+sical tests. Typically, one would expect differential privacy
+to require the sample size to blow up by a multiplicative
+1/ factor. However, we see a better performance because
+the noise is dominated by the sampling error.
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+Acknowledgements
+This work is part of the “Privacy Tools for Sharing Re-
+search Data” project based at Harvard, supported by NSF
+grant CNS-1237235 as well as a grant from the Sloan
+Foundation. This work has also been partially supported
+by the “PrivInfer - Programming Languages for Differen-
+tial Privacy: Conditioning and Inference” EPSRC project
+EP/M022358/1 and by the University of Dundee, UK. Salil
+Vadhan’s work was also supported by a Simons Investi-
+gator grant and was done in part while visiting the De-
+partment of Applied Mathematics and the Shing-Tung Yau
+Center at National Chiao-Tung University in Taiwan. We
+would like to thank the following people for helpful discus-
+sions: Dan Kifer, Aaron Roth, Aleksandra B. Slavkovi´c, Or
+Sheffet, Adam Smith, and a number of others involved with
+the Privacy Tools for Sharing Research Data project. A spe-
+cial thanks to Vishesh Karwa for helping us with statistics
+background and the suggestion to use a two step MLE pro-
+cedure.
+
+References
+Boaz Barak, Kamalika Chaudhuri, Cynthia Dwork, Satyen
+Kale, Frank McSherry, and Kunal Talwar. Privacy, accu-
+racy, and consistency too: a holistic solution to contin-
+gency table release. In Proceedings of the Twenty-Sixth
+ACM SIGACT-SIGMOD-SIGART Symposium on Prin-
+ciples of Database Systems, June 11-13, 2007, Beijing,
+China, pages 273–282, 2007.
+
+Yvonne M. M. Bishop, Stephen E. Fienberg, and Paul W.
+Holland. Discrete multivariate analysis: Theory and
+practice, 1975.
+
+Cynthia Dwork, Krishnaram Kenthapadi, Frank McSherry,
+Ilya Mironov, and Moni Naor. Our data, ourselves: Pri-
+vacy via distributed noise generation. In Proceedings of
+the 24th Annual International Conference on The Theory
+and Applications of Cryptographic Techniques, EURO-
+CRYPT’06, 2006a.
+
+Cynthia Dwork, Frank McSherry, Kobbi Nissim, and
+Adam Smith. Calibrating noise to sensitivity in private
+data analysis. In TCC ’06, pages 265–284, 2006b.
+
+Stephen E. Fienberg, Alessandro Rinaldo, and Xiaolin
+Yang. Differential privacy and the risk-utility tradeoff
+In Proceed-
+for multi-dimensional contingency tables.
+ings of the 2010 International Conference on Privacy in
+Statistical Databases, PSD’10, pages 187–199, Berlin,
+Heidelberg, 2010. Springer-Verlag.
+
+Marco Gaboardi, Emilio Jes´us Gallego Arias, Justin Hsu,
+Aaron Roth, and Zhiwei Steven Wu. Dual query: Prac-
+tical private query release for high dimensional data. In
+International Conference on Machine Learning, 2014.
+
+Moritz Hardt, Katrina Ligett, and Frank McSherry. A sim-
+ple and practical algorithm for differentially private data
+release. In Conference on Neural Information Process-
+ing Systems (NIPS), pages 2348–2356, 2012.
+
+Nils Homer, Szabolcs Szelinger, Margot Redman, David
+Duggan, Waibhav Tembe, Jill Muehling, John V. Pear-
+son, Dietrich A. Stephan, Stanley F. Nelson, and
+David W. Craig. Resolving individuals contributing trace
+amounts of dna to highly complex mixtures using high-
+density snp genotyping microarrays. PLoS Genet, 4(8),
+08 2008.
+
+J. P. Imhof. Computing the distribution of quadratic forms
+in normal variables. Biometrika, 48(3-4):419–426, 1961.
+
+Aaron Johnson and Vitaly Shmatikov. Privacy-preserving
+data exploration in genome-wide association studies. In
+Proceedings of the 19th ACM SIGKDD International
+Conference on Knowledge Discovery and Data Mining,
+KDD ’13, pages 1079–1087, New York, NY, USA, 2013.
+ACM.
+
+Vishesh Karwa and Aleksandra Slavkovi´c. Inference using
+noisy degrees: Differentially private β-model and syn-
+thetic graphs. Ann. Statist., 44(P1):87–112, 02 2016.
+
+Vishesh Karwa and Aleksandra Slavkovi´c. Differentially
+private graphical degree sequences and synthetic graphs.
+In Josep Domingo-Ferrer and Ilenia Tinnirello, edi-
+tors, Privacy in Statistical Databases, volume 7556 of
+Lecture Notes in Computer Science, pages 273–285.
+Springer Berlin Heidelberg, 2012.
+
+Jaewoo Lee, Yue Wang, and Daniel Kifer. Maximum like-
+lihood postprocessing for differential privacy under con-
+In Proceedings of the 21th ACM
+sistency constraints.
+SIGKDD International Conference on Knowledge Dis-
+covery and Data Mining, KDD ’15, pages 635–644,
+New York, NY, USA, 2015. ACM.
+
+Chao Li and Gerome Miklau. An adaptive mechanism
+for accurate query answering under differential privacy.
+Proc. VLDB Endow., 5(6):514–525, February 2012.
+
+Chao Li, Michael Hay, Vibhor Rastogi, Gerome Mik-
+lau, and Andrew McGregor. Optimizing linear count-
+In ACM
+ing queries under differential privacy.
+SIGACT–SIGMOD–SIGART Symposium on Principles
+of Database Systems (PODS), pages 123–134, 2010.
+
+Frank McSherry and Kunal Talwar. Mechanism design via
+differential privacy. In Proceedings of the 48th Annual
+IEEE Symposium on Foundations of Computer Science,
+FOCS ’07, pages 94–103, Washington, DC, USA, 2007.
+IEEE Computer Society.
+
+Differentially Private Chi-Squared Hypothesis Testing
+
+preserving
+
+genome-wide
+
+Sean Simmons and Bonnie Berger.
+
+Realizing pri-
+stud-
+vacy
+2016.
+ies.
+doi:
+URL
+http://bioinformatics.oxfordjournals.
+org/content/32/9/1293.abstract.
+
+Bioinformatics,
+10.1093/bioinformatics/btw009.
+
+association
+32(9):1293–1300,
+
+Adam Smith. Privacy-preserving statistical estimation with
+optimal convergence rates. In Proceedings of the Forty-
+third Annual ACM Symposium on Theory of Computing,
+STOC ’11, pages 813–822, New York, NY, USA, 2011.
+ACM.
+
+M.F. Triola.
+
+Essentials of Statistics.
+
+ucation, 2014.
+https://books.google.com/books?id=
+QZN-AgAAQBAJ.
+
+ISBN 9780321924636.
+
+Pearson Ed-
+URL
+
+Caroline Uhler, Aleksandra Slavkovic, and Stephen E.
+Fienberg. Privacy-preserving data sharing for genome-
+wide association studies. Journal of Privacy and Conﬁ-
+dentiality, 5(1), 2013.
+
+Duy Vu and Aleksandra Slavkovic. Differential privacy for
+clinical trial data: Preliminary evaluations. In Proceed-
+ings of the 2009 IEEE International Conference on Data
+Mining Workshops, ICDMW ’09, pages 138–143, Wash-
+ington, DC, USA, 2009. IEEE Computer Society.
+
+Y. Wang, J. Lee, and D. Kifer. Differentially Private Hy-
+pothesis Testing, Revisited. ArXiv e-prints, November
+2015.
+
+Larry Wasserman and Shuheng Zhou. A statistical frame-
+work for differential privacy. Journal of the American
+Statistical Association, 105(489):375–389, 2010.
+
+Fei Yu and Zhanglong Ji. Scalable privacy-preserving data
+sharing methodology for genome-wide association stud-
+ies: an application to idash healthcare privacy protection
+challenge. BMC Medical Informatics and Decision Mak-
+ing, 14(1):1–8, 2014. ISSN 1472-6947. doi: 10.1186/
+1472-6947-14-S1-S3. URL http://dx.doi.org/
+10.1186/1472-6947-14-S1-S3.
+
+Fei Yu, Stephen E. Fienberg, Aleksandra B. Slavkovic, and
+Caroline Uhler. Scalable privacy-preserving data shar-
+ing methodology for genome-wide association studies.
+Journal of Biomedical Informatics, 50:133–141, 2014.
+
+Hui Zou and Trevor Hastie. Regularization and variable se-
+lection via the elastic net. Journal of the Royal Statistical
+Society, Series B, 67:301–320, 2005.
+
+

@@ -1,0 +1,1125 @@
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+Nadav Cohen
+Amnon Shashua
+The Hebrew University of Jerusalem
+
+COHENNADAV@CS.HUJI.AC.IL
+SHASHUA@CS.HUJI.AC.IL
+
+Abstract
+
+Convolutional rectiﬁer networks, i.e. convolu-
+tional neural networks with rectiﬁed linear acti-
+vation and max or average pooling, are the cor-
+nerstone of modern deep learning. However, de-
+spite their wide use and success, our theoretical
+understanding of the expressive properties that
+drive these networks is partial at best. On the
+other hand, we have a much ﬁrmer grasp of these
+issues in the world of arithmetic circuits. Specif-
+ically, it is known that convolutional arithmetic
+circuits possess the property of ”complete depth
+efﬁciency”, meaning that besides a negligible set,
+all functions realizable by a deep network of
+polynomial size, require exponential size in or-
+der to be realized (or approximated) by a shallow
+network. In this paper we describe a construc-
+tion based on generalized tensor decompositions,
+that transforms convolutional arithmetic circuits
+into convolutional rectiﬁer networks. We then
+use mathematical tools available from the world
+of arithmetic circuits to prove new results. First,
+we show that convolutional rectiﬁer networks are
+universal with max pooling but not with aver-
+age pooling. Second, and more importantly, we
+show that depth efﬁciency is weaker with convo-
+lutional rectiﬁer networks than it is with convo-
+lutional arithmetic circuits. This leads us to be-
+lieve that developing effective methods for train-
+ing convolutional arithmetic circuits, thereby ful-
+ﬁlling their expressive potential, may give rise to
+a deep learning architecture that is provably su-
+perior to convolutional rectiﬁer networks but has
+so far been overlooked by practitioners.
+
+1. Introduction
+Deep neural networks are repeatedly proving themselves
+to be extremely effective machine learning models, provid-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+ing state of the art accuracies on a wide range of tasks.
+Arguably, the most successful deep learning architecture
+to date is that of convolutional neural networks (Con-
+vNets, (LeCun and Bengio, 1995)), which prevails in the
+ﬁeld of computer vision, and is recently being harnessed
+for many other application domains as well (e.g. (Shen
+et al., 2014; Wallach et al., 2015)). Modern ConvNets
+are formed by stacking layers one after the other, where
+each layer consists of a linear convolutional operator fol-
+lowed by Rectiﬁed Linear Unit (ReLU) activation (σ(z) =
+max{0, z}), which in turn is followed by max or average
+pooling (P{cj} = max{cj} or P{cj} = mean{cj} re-
+spectively). Such models, which we refer to as convolu-
+tional rectiﬁer networks, have driven the resurgence of deep
+learning (Krizhevsky et al., 2012), and represent the cutting
+edge of the ConvNet architecture.
+Despite their empirical success, and the vast attention they
+are receiving, our theoretical understanding of convolu-
+tional rectiﬁer networks is limited. It is believed that they
+enjoy depth efﬁciency, i.e. that when allowed to go deep,
+such networks can implement with polynomial size com-
+putations that would require super-polynomial size if the
+networks were shallow. However, formal arguments that
+support this are scarce. It is unclear to what extent con-
+volutional rectiﬁer networks leverage depth efﬁciency, or
+more formally, what is the proportion of weight settings
+that would lead a deep network to implement a computation
+that cannot be efﬁciently realized by a shallow network. We
+refer to the most optimistic situation, where this takes place
+for all weight settings but a negligible (zero measure) set,
+as complete depth efﬁciency.
+Compared to convolutional rectiﬁer networks, our theoret-
+ical understanding of depth efﬁciency for arithmetic cir-
+cuits, and in particular for convolutional arithmetic circuits,
+is much more developed. Arithmetic circuits (also known
+as Sum-Product Networks, (Poon and Domingos, 2011))
+are networks with two types of nodes: sum nodes, which
+compute a weighted sum of their inputs, and product nodes,
+computing the product of their inputs. The depth efﬁciency
+of arithmetic circuits has been studied by the theoretical
+computer science community for the last ﬁve decades, long
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+before the resurgence of deep learning. Although many
+problems in the area remain open, signiﬁcant progress has
+been made over the years, making use of various mathemat-
+ical tools. Convolutional arithmetic circuits form a speciﬁc
+sub-class of arithmetic circuits. Namely, these are Con-
+vNets with linear activation (σ(z) = z) and product pool-
+
+ing (P{cj} = (cid:81) cj). Recently, (Cohen et al., 2016b) an-
+
+alyzed convolutional arithmetic circuits through tensor de-
+compositions, essentially proving, for the type of networks
+considered, that depth efﬁciency holds completely. Al-
+though convolutional arithmetic circuits are known to be
+equivalent to SimNets (Cohen and Shashua, 2014), a new
+deep learning architecture that has recently demonstrated
+promising empirical performance (Cohen et al., 2016a),
+they are fundamentally different from convolutional recti-
+ﬁer networks. Accordingly, the result established in (Cohen
+et al., 2016b) does not apply to the models most commonly
+used in practice.
+In this paper we present a construction, based on the notion
+of generalized tensor decompositions, that transforms con-
+volutional arithmetic circuits of the type considered in (Co-
+hen et al., 2016b) into convolutional rectiﬁer networks. We
+then use the available mathematical tools from the world of
+arithmetic circuits to prove new results concerning the ex-
+pressive power and depth efﬁciency of convolutional recti-
+ﬁer networks. Namely, we show that with ReLU activation,
+average pooling leads to loss of universality, whereas max
+pooling is universal but enjoys depth efﬁciency to a lesser
+extent than product pooling with linear activation (convolu-
+tional arithmetic circuits). These results indicate that from
+the point of view of expressive power and depth efﬁciency,
+convolutional arithmetic circuits (SimNets) have an advan-
+tage over the prevalent convolutional rectiﬁer networks.
+This leads us to believe that developing effective methods
+for training convolutional arithmetic circuits, thereby ful-
+ﬁlling their expressive potential, may give rise to a deep
+learning architecture that is provably superior to convolu-
+tional rectiﬁer networks but has so far been overlooked by
+practitioners. 1
+
+2. Related Work
+The literature on the computational complexity of arith-
+metic circuits is far too wide to cover here, dating back
+over ﬁve decades. Although many of the fundamental ques-
+tions in the ﬁeld remain open, signiﬁcant progress has been
+made over the years, developing and employing a vast share
+of mathematical tools from branches of geometry, algebra,
+analysis, combinatorics, and more. We refer the interested
+reader to (Shpilka and Yehudayoff, 2010) for a survey writ-
+
+1 Due to lack of space, a signiﬁcant portion of the paper is
+deferred to the appendices. We refer the reader to (Cohen and
+Shashua, 2016) for a self-contained version of this manuscript.
+
+ten in 2010, and mention here the more recent works (De-
+lalleau and Bengio, 2011) and (Martens and Medabalimi,
+2014) studying depth efﬁciency of arithmetic circuits in the
+context of deep learning (Sum-Product Networks). Com-
+pared to arithmetic circuits, the literature on depth efﬁ-
+ciency of neural networks with ReLU activation is far less
+developed, primarily since these models were only intro-
+duced several years ago (Nair and Hinton, 2010). There
+have been some notable works on this line, but these em-
+ploy dedicated mathematical machinery, not making use of
+the plurality of tools available in the world of arithmetic cir-
+cuits. (Pascanu et al., 2013) and (Montufar et al., 2014) use
+combinatorial arguments to characterize the maximal num-
+ber of linear regions in functions generated by ReLU net-
+works, thereby establishing existence of depth efﬁciency.
+(Telgarsky, 2016) uses semi-algebraic geometry to analyze
+the number of oscillations in functions realized by neural
+networks with semi-algebraic activations, ReLU in partic-
+ular. The fundamental result proven in this work is the ex-
+istence, for every k ∈ N, of functions realizable by net-
+works with Θ(k3) layers and Θ(1) nodes per layer, which
+cannot be approximated by networks with O(k) layers un-
+less these are exponentially large (have Ω(2k) nodes). The
+work of (Eldan and Shamir, 2015) makes use of Fourier
+analysis to show existence of functions that are efﬁciently
+computable by depth-3 networks, yet require exponential
+size in order to be approximated by depth-2 networks. The
+result applies to various activations, including ReLU. (Pog-
+gio et al., 2015) also compares the computational abili-
+ties of deep vs. shallow networks under different activa-
+tions that include ReLU. However, the complexity measure
+considered in (Poggio et al., 2015) is the VC dimension,
+whereas our interest lies in network size.
+None of the analyses above account for convolutional net-
+works 2, thus they do not apply to the deep learning archi-
+tecture most commonly used in practice. Recently, (Cohen
+et al., 2016b) introduced convolutional arithmetic circuits,
+which may be viewed as ConvNets with linear activation
+and product pooling. These networks were shown to cor-
+respond to hierarchical tensor decompositions (see (Hack-
+busch, 2012)). Tools from linear algebra, functional anal-
+ysis and measure theory were then employed to prove that
+the networks are universal, and exhibit complete depth efﬁ-
+ciency. Although similar in structure, convolutional arith-
+metic circuits are inherently different from convolutional
+rectiﬁer networks (ConvNets with ReLU activation and
+max or average pooling). Accordingly, the analysis carried
+out in (Cohen et al., 2016b) does not apply to the networks
+at the forefront of deep learning.
+Closing the gap between the networks analyzed in (Cohen
+
+2 By this we mean that in all analyses, the deep networks
+shown to beneﬁt from depth (i.e. to realize functions that require
+super-polynomial size from shallow networks) are not ConvNets.
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+et al., 2016b) and convolutional rectiﬁer networks is the
+topic of this paper. We achieve this by generalizing tensor
+decompositions, thereby opening the door to mathematical
+machinery as used in (Cohen et al., 2016b), harnessing it to
+analyze, for the ﬁrst time, the depth efﬁciency of convolu-
+tional rectiﬁer networks.
+
+3. Generalized Tensor Decompositions
+We begin by establishing basic tensor-related terminology
+and notations 3. For our purposes, a tensor is simply a
+multi-dimensional array. The order of a tensor is deﬁned
+to be the number of indexing entries in the array, which are
+referred to as modes. The dimension of a tensor in a par-
+ticular mode is deﬁned as the number of values that may
+be taken by the index in that mode. For example, a 4-by-3
+matrix is a tensor of order 2, i.e. it has two modes, with
+dimension 4 in mode 1 and dimension 3 in mode 2. If A
+is a tensor of order N and dimension Mi in each mode
+i ∈ [N ] := {1, . . . , N}, the space of all conﬁgurations it
+can take is denoted, quite naturally, by RM1×···×MN .
+The fundamental operator in tensor analysis is the tensor
+product, denoted by ⊗. It is an operator that intakes two
+tensors A ∈ RM1×···×MP and B ∈ RMP +1×···×MP +Q (or-
+ders P and Q respectively), and returns a tensor A ⊗ B ∈
+RM1×···×MP +Q (order P + Q) deﬁned by:
+
+(A ⊗ B)d1,...,dP +Q
+
+= Ad1,...,dP · BdP +1,...,dP +Q
+
+(1)
+
+Tensor decompositions (see (Kolda and Bader, 2009) for a
+survey) may be viewed as schemes for expressing tensors
+using tensor products and weighted sums. For example,
+suppose we have a tensor A ∈ RM1×···×MN given by:
+cj1...jN · aj1,1 ⊗ ··· ⊗ ajN ,N
+
+(cid:88)J
+
+A =
+
+j1...jN =1
+
+This expression is known as a Tucker decomposition, pa-
+rameterized by the coefﬁcients {cj1...jN ∈ R}j1...jN∈[J]
+and vectors {aj,i ∈ RMi}i∈[N ],j∈[J]. It is different from
+the CP and Hierarchical Tucker decompositions our anal-
+ysis will rely upon (see sec. 4), yet all decompositions are
+closely related, speciﬁcally in the fact that they are based
+on iterating between tensor products and weighted sums.
+Our construction and analysis are facilitated by general-
+izing the tensor product, which in turn generalizes ten-
+sor decompositions. For an associative and commuta-
+tive binary operator g, i.e. a function g : R × R →
+R such that ∀a, b, c ∈ R : g(g(a, b), c) = g(a, g(b, c))
+and ∀a, b ∈ R : g(a, b) = g(b, a),
+the generalized
+
+3 The deﬁnitions we give are actually concrete special cases of
+more abstract algebraic deﬁnitions as given in (Hackbusch, 2012).
+We limit the discussion to these special cases since they sufﬁce for
+our needs and are easier to grasp.
+
+tensor product ⊗g, an operator intaking tensors A ∈
+RM1×···×MP ,B ∈ RMP +1×···×MP +Q and returning tensor
+A ⊗g B ∈ RM1×···×MP +Q, is deﬁned as follows:
+(A ⊗g B)d1,...,dP +Q
+Generalized tensor decompositions are simply obtained by
+plugging in the generalized tensor product ⊗g in place of
+the standard tensor product ⊗.
+
+= g(Ad1,...,dP ,BdP +1,...,dP +Q)
+
+(2)
+
+4. From Networks to Tensors
+The ConvNet architecture analyzed in this paper is pre-
+sented in ﬁg. 1. The input to a network, denoted X, is
+composed of N patches x1 . . . xN ∈ Rs. For example,
+X could represent a 32-by-32 RGB image through 5×5 re-
+gions crossing the three color bands, in which case, assum-
+ing a patch is taken for every pixel (boundaries padded),
+we have N = 1024 and s = 75. The ﬁrst layer in a net-
+work is referred to as representation, and may be thought
+of as a generalized convolution. Namely, it consists of ap-
+plying M representation functions fθ1. . .fθM : Rs → R
+to all patches of the input, thereby creating M feature
+maps. In the case where representation functions are stan-
+dard neurons, i.e. fθd (x) = σ(w(cid:62)
+d x + bd) for parameters
+θd = (wd, bd) ∈ Rs × R and some chosen activation σ(·),
+we obtain a conventional convolutional layer.
+Following the representation, a network includes L hidden
+layers indexed by l = 0. . .L−1. Each hidden layer l begins
+with a 1 × 1 conv operator, which is simply a 3D convolu-
+tion with rl channels and receptive ﬁeld 1 × 1 followed
+by point-wise activation σ(·). We allow the convolution
+to operate without weight sharing, in which case the ﬁlters
+that generate feature maps by sliding across the previous
+layer may have different coefﬁcients at different spatial lo-
+cations. This is often referred to in the deep learning com-
+munity as a locally-connected layer (see (Taigman et al.,
+2014)). We refer to it as the unshared case, in contrast to
+the shared case that gives rise to a standard 1 × 1 convolu-
+tion. The second (last) operator in a hidden layer is spatial
+pooling. Feature maps generated by 1 × 1 conv are dec-
+imated, by applying the pooling operator P (·) (e.g. max
+or average) to non-overlapping 2D windows that cover the
+spatial extent. The last of the L hidden layers (l = L − 1)
+reduces feature maps to singletons (global pooling), creat-
+ing a vector of dimension rL−1. This vector is mapped into
+Y network outputs through a ﬁnal dense linear layer.
+Altogether, the architectural parameters of a ConvNet are
+the type of representation functions (fθd), the pooling win-
+dow sizes (which in turn determine the number of hidden
+layers L), the setting of conv weights as shared or unshared,
+the number of channels in each layer (M for representation,
+r0. . .rL−1 for hidden layers, Y for output), and the choice
+of activation and pooling operators (σ(·) and P (·) respec-
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+Figure 1. ConvNet architecture analyzed in this paper (see description in sec. 4). Best viewed in color.
+
+tively). Given these architectural parameters, the learn-
+able parameters of a network are the representation weights
+(θd), the conv weights (al,j,γ for hidden layer l, location j
+and channel γ in unshared case; al,γ for hidden layer l and
+channel γ in shared case), and the output weights (aL,1,y).
+The choice of activation and pooling operators determines
+the type of network we arrive at. For linear activation
+
+(σ(z) = z) and product pooling (P{cj} = (cid:81) cj) we get
+
+a convolutional arithmetic circuit as analyzed in (Cohen
+et al., 2016b). For ReLU activation (σ(z) = max{0, z})
+and max or average pooling (P{cj} = max{cj} or
+P{cj} = mean{cj}) we get the commonly used convo-
+lutional rectiﬁer networks, on which we focus in this paper.
+In terms of pooling window sizes and network depth, we
+direct our attention to two special cases representing the
+extremes. The ﬁrst is a shallow network that includes
+global pooling in its single hidden layer – see illustration
+in ﬁg. 2. The second is the deepest possible network, in
+which all pooling windows cover only two entries, result-
+ing in L = log2 N hidden layers. These ConvNets, which
+we refer to as shallow and deep respectively, will be shown
+to correspond to canonical tensor decompositions.
+It is
+for this reason, and for simplicity of presentation, that we
+focus on these special cases. One may just as well con-
+sider networks of intermediate depths with different pool-
+ing window sizes, and that would correspond to other, non-
+standard, tensor decompositions. The analysis carried out
+in sec. 5 can easily be adapted to such networks.
+In a classiﬁcation setting, the Y outputs of a network cor-
+respond to different categories, and prediction follows the
+output with highest activation. Speciﬁcally, if we denote by
+hy(·) the mapping from network input to output y, the pre-
+dicted label for the instance X = (x1, . . . , xN ) ∈ (Rs)N
+is determined by the following classiﬁcation rule:
+
+ˆy = argmaxy∈[Y ] hy(X)
+
+We refer to hy as the score function of category y. Score
+functions are studied in this paper through the notion of
+
+grid tensors. Given ﬁxed vectors x(1) . . . x(M ) ∈ Rs, re-
+ferred to as templates, the grid tensor of hy, denoted A(hy),
+is deﬁned to be the tensor of order N and dimension M in
+each mode given by:
+
+A(hy)d1...dN = hy(x(d1), . . . , x(dN ))
+
+(3)
+
+That is to say, the grid tensor of a score function un-
+der M templates x(1) . . . x(M ), is a tensor of order N
+and dimension M in each mode, holding score values
+on the exponentially large grid of instances {Xd1...dN :=
+(x(d1), . . . , x(dN )) : d1. . .dN ∈ [M ]}. Before heading on
+to our analysis of grid tensors generated by ConvNets, to
+simplify notation, we deﬁne F ∈ RM×M to be the ma-
+trix holding the values taken by the representation func-
+tions fθ1 . . .fθM : Rs → R on the selected templates
+x(1) . . . x(M ) ∈ Rs:
+
+(4)
+
+ fθ1 (x(1))
+
+...
+
+fθ1 (x(M ))
+
+F :=
+
+
+
+···
+...
+···
+
+fθM (x(1))
+
+...
+
+fθM (x(M ))
+
+To express the grid tensor of a ConvNet’s score function us-
+ing generalized tensor decompositions (see sec. 3), we set
+the underlying function g : R×R → R to be the activation-
+pooling operator deﬁned by:
+
+g(a, b) = P (σ(a), σ(b))
+
+(5)
+where σ(·) and P (·) are the network’s activation and pool-
+ing functions, respectively. Notice that the activation-
+pooling operator meets the associativity and commutativity
+requirements under product pooling with linear activation
+(g(a, b) = a·b), and under max pooling with ReLU activa-
+tion (g(a, b) = max{a, b, 0}). To account for the case of
+average pooling with ReLU activation, which a-priori leads
+to a non-associative activation-pooling operator, we sim-
+ply replace average by sum, i.e. we analyze sum pooling
+with ReLU activation (g(a, b) = max{a, 0} + max{b, 0}),
+
+,direpidfxinputrepresentation1x1 convpooling1x1 convpoolingdense (output)hidden layer 0hidden layer L-1ixM0r0r1Lr1LrY0,,0,,,:jconvjrepja00',',jwindowjpooljPconvj11'coversspace',LLjpoolPconvj,1,1,:LyLoutypoolaXConvolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+which from the point of view of expressiveness is com-
+pletely equivalent to average pooling with ReLU activation
+(linear weights that follow pooling absorb scaling factors).
+With the activation-pooling operator g in place,
+is
+y – a score
+straightforward to see that the grid tensor of hS
+function generated by the shallow ConvNet (ﬁg. 2), is given
+by the following generalized tensor decomposition:
+
+it
+
+z · (F az,1) ⊗g ··· ⊗g (F az,N )
+ay
+
+(6)
+
+A(cid:0)hS
+
+y
+
+(cid:1) =
+
+Z(cid:88)
+
+z=1
+
+Z here is the number of channels in the network’s hidden
+layer, {az,i ∈ RM}z∈[Z],i∈[N ] are the weights in the hid-
+den conv, and ay ∈ RZ are the weights of output y. The
+factorization in eq. 6 generalizes the classic CP decompo-
+sition (see (Kolda and Bader, 2009)), and we accordingly
+refer to it as the generalized CP decomposition.
+Turning to the deep ConvNet (ﬁg. 1 with size-2 pooling
+windows and L = log2 N hidden layers), the grid tensor of
+y is given by the hierarchical general-
+its score function hD
+ized tensor decomposition below:
+
+φ1,j,γ =
+···
+
+φl,j,γ =
+
+···
+φL−1,j,γ =
+
+A(cid:0)hD
+
+y
+
+(cid:1) =
+
+α=1
+
+r0(cid:88)
+rl−1(cid:88)
+rL−2(cid:88)
+rL−1(cid:88)
+
+α=1
+
+α=1
+
+α=1
+
+a1,j,γ
+α
+
+(F a0,2j−1,α) ⊗g (F a0,2j,α)
+
+(cid:124)
+
+al,j,γ
+α
+
+φl−1,2j−1,α
+order 2l−1
+
+⊗g φl−1,2j,α
+order 2l−1
+
+(cid:123)(cid:122)
+(cid:124)
+
+(cid:125)
+(cid:123)(cid:122)
+
+(cid:123)(cid:122)
+(cid:124)
+(cid:123)(cid:122)
+
+(cid:125)
+(cid:123)(cid:122)
+(cid:125)
+
+(cid:124)
+(cid:125)
+(cid:124)
+
+aL−1,j,γ
+
+α
+
+φL−2,2j−1,α
+
+⊗g φL−2,2j,α
+
+aL,1,y
+α
+
+order N
+4
+
+order N
+4
+
+(cid:124)
+
+φL−1,1,α
+order N
+2
+
+⊗g φL−1,2,α
+
+(cid:123)(cid:122)
+
+(cid:125)
+
+order N
+2
+
+(cid:125)
+
+(7)
+
+r0. . .rL−1 ∈ N here are the number of channels in
+the network’s hidden layers, {a0,j,γ ∈ RM}j∈[N ],γ∈[r0]
+are the weights in the ﬁrst hidden conv, {al,j,γ ∈
+Rrl−1}l∈[L−1],j∈[N/2l],γ∈[rl] are the weights in the follow-
+ing hidden convs, and aL,1,y ∈ RrL−1 are the weights of
+output y. The factorization in eq. 7 generalizes the Hier-
+archical Tucker decomposition introduced in (Hackbusch
+and K¨uhn, 2009), and is accordingly referred to as the gen-
+eralized HT decomposition.
+To conclude this section, we presented a ConvNet architec-
+ture (ﬁg. 1) whose activation and pooling operators may be
+chosen to realize convolutional arithmetic circuits (linear
+activation, product pooling) or convolutional rectiﬁer net-
+works (ReLU activation, max/average pooling). We then
+deﬁned the grid tensor of a network’s score function as a
+tensor holding function values on an exponentially large
+
+Figure 2. Shallow ConvNet with global pooling in its single hid-
+den layer. Best viewed in color.
+
+grid whose points are sequences with elements chosen from
+a ﬁnite set of templates. Then, we saw that the grid tensor
+of a shallow ConvNet (ﬁg. 2) is given by the generalized CP
+decomposition (eq. 6), and a grid tensor of a deep ConvNet
+(ﬁg. 1 with L = log2 N) is given by the generalized HT
+decomposition (eq. 7). In the next section we utilize the
+connection between ConvNets and generalized tensor de-
+compositions for an analysis of the expressive power and
+depth efﬁciency of convolutional rectiﬁer networks.
+
+5. Capacity Analysis
+In this section we study score functions expressible by
+the shallow and deep ConvNets (ﬁg. 2, and ﬁg. 1 with
+L = log2 N, respectively) under ReLU activation with max
+or average pooling (convolutional rectiﬁer networks), com-
+paring these settings against linear activation with product
+pooling (convolutional arithmetic circuits). Due to lack of
+space, the proofs of our claims are all given in app. E. In
+these proofs, score functions are analyzed through grid ten-
+sors (eq. 3), represented by the generalized tensor decom-
+positions established in the previous section: the general-
+ized CP decomposition (eq. 6) corresponding to the shal-
+low network, and the generalized HT decomposition (eq. 7)
+corresponding to the deep network.
+
+5.1. Templates and Representation Functions
+
+The expressiveness of our ConvNets obviously depends on
+the possible forms that may be taken by the representation
+functions fθ1. . .fθM : Rs → R. For example, if represen-
+tation functions are limited to be constant, the ConvNets
+can only realize constant score functions. We denote by
+F := {fθ : Rs → R : θ ∈ Θ} the parametric family from
+which representation functions are chosen, and make two
+mild assumptions on this family:
+
+• Continuity: fθ(x) is continuous w.r.t. both θ and x.
+• Non-degeneracy: For any x(1) . . . x(M ) ∈ Rs such
+that xi (cid:54)= xj ∀i(cid:54)=j, there exist fθ1 . . .fθM ∈ F for
+which the matrix F deﬁned in eq. 4 is non-singular.
+
+,direpidfxinputrepresentation1x1 convglobal poolingdense (output)hidden layerixMZZY,,,,:ziconvizrepiacoversspace,ipoolzPconviz,:youtypoolaXConvolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+Both of the assumptions above are met for most reasonable
+choices of F.
+In particular, non-degeneracy holds when
+representation functions are standard neurons:
+Claim 1. The parametric family:
+
+F =(cid:8)fθ(x) = σ(w(cid:62)x + b) : θ = (w, b) ∈ Rs × R(cid:9)
+
+where σ(·) is any sigmoidal activation 4 or the ReLU ac-
+tivation, meets the non-degeneracy condition (i.e. for any
+distinct x(1) . . . x(M ) ∈ Rs there exist fθ1. . .fθM ∈ F such
+that the matrix F deﬁned in eq. 4 is non-singular).
+
+Non-degeneracy means that given distinct templates, one
+may choose representation functions for which F is non-
+singular. We may as well consider the opposite situation,
+where we are given representation functions, and would
+like to choose templates leading to a non-singular F . Ap-
+parently, so long as the representation functions are linearly
+independent, this is always possible:
+Claim 2. Let fθ1 . . .fθM : Rs → R be any lin-
+early independent continuous functions. Then, there exist
+x(1) . . . x(M ) ∈ Rs such that F (eq. 4) is non-singular.
+
+As stated previously, in this paper we study score functions
+expressible by ConvNets through the notion of grid ten-
+sors. The translation of score functions into grid tensors
+is facilitated by the choice of templates x(1) . . . x(M ) ∈
+Rs (eq. 3). For general templates, the correspondence
+between score functions and grid tensors is not injec-
+tive – a score function corresponds to a single grid ten-
+sor, but a grid tensor may correspond to more than one
+score function. We use the term covering to refer to
+templates leading to an injective correspondence, i.e. to
+a situation where two score functions associated with
+the same grid tensor are effectively identical.
+In other
+words,
+the templates x(1) . . . x(M ) are covering if the
+value of score functions outside the exponentially large
+
+grid(cid:8)Xd1...dN := (x(d1), . . . , x(dN )) : d1. . .dN ∈ [M ](cid:9) is
+
+irrelevant for classiﬁcation. Some of the claims in our
+analysis will assume existence of covering templates (it
+will be stated explicitly when so). We argue in app. A
+that for structured compositional data (e.g.natural images),
+M ∈ Ω(100) sufﬁces in order for this assumption to hold.
+
+5.2. Universality
+
+To the best of our knowledge universality has never been
+studied in the context of convolutional rectiﬁer networks.
+This is the purpose of the current subsection. Speciﬁcally,
+we analyze the universality of our shallow and deep Con-
+vNets (ﬁg. 2, and ﬁg. 1 with L = log2 N, respectively)
+under ReLU activation and max or average pooling.
+We begin by stating a result similar to that given in (Cohen
+et al., 2016b), according to which convolutional arithmetic
+circuits are universal:
+Claim 3. Assuming covering templates exist, with linear
+activation and product pooling the shallow ConvNet is uni-
+versal (hence so is the deep).
+
+Heading on to convolutional rectiﬁer networks, the follow-
+ing claim tells us that max pooling leads to universality:
+Claim 4. Assuming covering templates exist, with ReLU
+activation and max pooling the shallow ConvNet is univer-
+sal (hence so is the deep).
+
+At this point we encounter the ﬁrst somewhat surprising
+result, according to which convolutional rectiﬁer networks
+are not universal with average pooling:
+Claim 5. With ReLU activation and average pooling, both
+the shallow and deep ConvNets are not universal.
+
+One may wonder if perhaps the non-universality of ReLU
+activation and average pooling is merely an artifact of the
+conv operator in our networks having 1 × 1 receptive ﬁeld.
+Apparently, as the following claim shows, expanding the
+receptive ﬁeld does not remedy the situation, and indeed
+non-universality is an inherent property of convolutional
+rectiﬁer networks with average pooling:
+Claim 6. Consider the network obtained by expanding the
+conv receptive ﬁeld in the shallow ConvNet from 1 × 1 to
+w×h, where w·h < N/2+1−logM N (conv windows cover
+less than half the feature maps that precede them). Such a
+network, when equipped with ReLU activation and average
+pooling, is not universal.
+
+the non-
+We conclude this subsection by noting that
+universality result
+the
+known universality of shallow (single hidden layer) fully-
+connected neural networks – see app. B for a discussion on
+the matter.
+
+in claim 6 does not contradict
+
+Universality refers to the ability of a network to realize (or
+approximate) any function of choice when its size is unlim-
+ited. It is well-known that fully-connected neural networks
+are universal under all types of non-linear activations typi-
+cally used in practice, even if the number of hidden layers
+is restricted to one (Cybenko, 1989; Hornik et al., 1989).
+4 σ(·) is sigmoidal if it is monotonic with limz→−∞ σ(z) = c
+
+and limz→+∞ σ(z) = C for some c(cid:54)=C in R.
+
+5.3. Depth Efﬁciency
+
+The driving force behind deep learning is the expressive
+power that comes with depth. It is generally believed that
+deep networks with non-linear layers efﬁciently express
+functions that cannot be efﬁciently expressed by shallow
+networks, i.e. that would require the latter to have super-
+polynomial size. We refer to such scenario as depth efﬁ-
+ciency. Being concerned with the minimal size required
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+by a shallow network in order to realize (or approximate) a
+given function, the question of depth efﬁciency implicitly
+assumes universality, i.e. that there exists some (possibly
+exponential) size with which the shallow network is capa-
+ble of expressing the target function 5.
+To the best of our knowledge, at the time of this writing
+the only work to formally analyze depth efﬁciency in the
+context of ConvNets is (Cohen et al., 2016b). This work
+focused on convolutional arithmetic circuits, showing that
+with such networks depth efﬁciency is complete, i.e. be-
+sides a negligible set, all functions realizable by a deep net-
+work are depth efﬁcient. Framing this result in our setup:
+Claim 7 (adaptation of theorem 1 in (Cohen et al., 2016b)).
+Let fθ1. . .fθM be any set of linearly independent repre-
+sentation functions for a deep ConvNet (ﬁg. 1 with L =
+log2 N) with linear activation and product pooling. Sup-
+pose we randomize the linear weights (al,j,γ) of the net-
+work by some continuous distribution. Then, with proba-
+bility 1, we obtain score functions that cannot be realized
+by a shallow ConvNet (ﬁg. 2) with linear activation and
+product pooling if the number of hidden channels in the
+latter (Z) is less than min{r0, M}N/2.
+We now turn to convolutional rectiﬁer networks, for which
+depth efﬁciency has yet to be analyzed. In sec. 5.2 we saw
+that convolutional rectiﬁer networks are universal with max
+pooling, and non-universal with average pooling. Since
+depth efﬁciency is only applicable to universal architec-
+tures, we focus on the former setting. The following claim
+establishes existence of depth efﬁciency for ConvNets with
+ReLU activation and max pooling:
+Claim 8. There exist weight settings for a deep Con-
+vNet with ReLU activation and max pooling, giving rise
+to score functions that cannot be realized by a shallow
+ConvNet with ReLU activation and max pooling if the
+number of hidden channels in the latter (Z) is less than
+min{r0, M}N/2 ·
+Nearly all results in the literature that relate to depth efﬁ-
+ciency merely show its existence, and claim 8 is no differ-
+ent in that respect. From a practical perspective, the impli-
+cations of such results are slight, as a-priori, it may be that
+only a small fraction of the functions realizable by a deep
+network enjoy depth efﬁciency, and for all the rest shallow
+networks sufﬁce. In app. F we extend claim 8, arguing that
+with ReLU activation and max pooling, depth efﬁciency
+becomes more and more prevalent as the number of hidden
+channels in the deep ConvNet grows. However, no matter
+
+M·N .
+
+2
+
+5 While technically it is possible to consider depth efﬁciency
+with a non-universal shallow network, in the majority of the cases,
+particularly in our framework, the shallow network would simply
+not be able to express a function generated by a deep network, no
+matter how large we allow it to be. Arguably, this provides little
+insight into the complexity of functions brought forth by depth.
+
+how large the deep ConvNet is, with ReLU activation and
+max pooling depth efﬁciency is never complete – there is
+always positive measure to the set of weight conﬁgurations
+that lead the deep ConvNet to generate score functions ef-
+ﬁciently realizable by the shallow ConvNet:
+Claim 9. Suppose we randomize the weights of a deep
+ConvNet with ReLU activation and max pooling by some
+continuous distribution with non-vanishing continuous
+probability density function. Then, assuming covering tem-
+plates exist, with positive probability, we obtain score func-
+tions that can be realized by a shallow ConvNet with ReLU
+activation and max pooling having only a single hidden
+channel (Z = 1).
+
+Comparing claims 7 and 9, we see that depth efﬁciency
+is complete under linear activation with product pooling,
+and incomplete under ReLU activation with max pooling.
+We interpret this as indicating that convolutional arith-
+metic circuits beneﬁt from the expressive power of depth
+more than convolutional rectiﬁer networks do. This result
+is rather surprising, particularly since convolutional recti-
+ﬁer networks are much more commonly used in practice.
+We attribute the discrepancy primarily to historical reasons,
+and conjecture that developing effective methods for train-
+ing convolutional arithmetic circuits, thereby fulﬁlling their
+expressive potential, may give rise to a deep learning archi-
+tecture that is provably superior to convolutional rectiﬁer
+networks but has so far been overlooked by practitioners.
+Loosely speaking, we have shown that the gap in expressive
+power between the shallow and deep ConvNets is greater
+with linear activation and product pooling than it is with
+ReLU activation and max pooling. One may wonder at
+this point if it is plausible to deduce from this which ar-
+chitectural setting is more expressive, as a-priori, altering
+the shallow vs. deep ConvNet comparisons such that one
+network has linear activation with product pooling and the
+other has ReLU activation with max pooling, may change
+the expressive gaps in favor of the latter. Claims 10 and 11
+below show that this is not the case. Speciﬁcally, they show
+that the depth efﬁciency of the deep ConvNet with linear
+activation and product pooling remains complete when the
+shallow ConvNet has ReLU activation and max pooling
+(claim 10), and on the other hand, the depth efﬁciency of
+the deep ConvNet with ReLU activation and max pooling
+remains incomplete when the shallow ConvNet has linear
+activation and product pooling (claim 11). This afﬁrms our
+stand regarding the expressive advantage of convolutional
+arithmetic circuits over convolutional rectiﬁer networks.
+Claim 10. Let fθ1. . .fθM be any set of linearly indepen-
+dent representation functions for a deep ConvNet with lin-
+ear activation and product pooling. Suppose we randomize
+the weights of the network by some continuous distribu-
+tion. Then, with probability 1, we obtain score functions
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+2
+
+M·N .
+
+that cannot be realized by a shallow ConvNet with ReLU
+activation and max pooling if the number of hidden chan-
+nels in the latter (Z) is less than min{r0, M}N/2 ·
+Claim 11. Suppose we randomize the weights of a deep
+ConvNet with ReLU activation and max pooling by some
+continuous distribution with non-vanishing continuous
+probability density function. Then, assuming covering tem-
+plates exist, with positive probability, we obtain score func-
+tions that can be realized by a shallow ConvNet with linear
+activation and product pooling having only a single hidden
+channel (Z = 1).
+
+5.3.1. APPROXIMATION
+
+In their current form, the results in our analysis establishing
+depth efﬁciency (claims 7, 8, 10 and the analogous ones in
+app. D) relate to exact realization. Speciﬁcally, they pro-
+vide a lower bound on the size of a shallow ConvNet re-
+quired in order for it to realize exactly a grid tensor gen-
+erated by a deep ConvNet. From a practical perspective,
+a more interesting question would be the size required by
+a shallow ConvNet in order to approximate the computa-
+tion of a deep ConvNet. A-priori, it may be that although
+the size required for exact realization is exponential, the
+one required for approximation is only polynomial. As we
+show in app. C, this is not the case, and in fact all of the
+lower bounds we have provided apply not only to exact re-
+alization, but also to arbitrarily-well approximation.
+
+5.4. Shared Coefﬁcients for Convolution
+
+To this end, our analysis has focused on the unshared set-
+ting, where the coefﬁcients of the 1 × 1 conv ﬁlters may
+vary across spatial locations. In practice, ConvNets typi-
+cally enforce coefﬁcient sharing, which in our framework
+implies that in channel γ of hidden layer l, instead of hav-
+ing a coefﬁcient set al,j,γ for every location j, we have a
+single set al,γ for all locations. Due to lack of space, we
+defer our analysis of the shared setting to app. D, providing
+here a summary of its results.
+In terms of universality, introducing sharing is detrimental.
+Under all possible choices of activation and pooling, shared
+coefﬁcients limit the shallow ConvNet to symmetric grid
+tensors only. The deep ConvNet can go beyond symmetric
+grid tensors, but is still not universal. Evaluation of depth
+efﬁciency requires the shallow network to be universal, and
+we accordingly compare deep ConvNets with shared coef-
+ﬁcients against shallow ConvNets that are not constrained
+by coefﬁcient sharing. In a nutshell, we ﬁnd all results es-
+tablished above for the unshared setting still applicable – a
+deep ConvNet with shared coefﬁcients is completely depth
+efﬁcient under linear activation with product pooling, and
+incompletely depth efﬁcient under ReLU activation with
+max pooling.
+
+6. Discussion
+The contribution of this paper is twofold. First, we in-
+troduce a construction in the form of generalized ten-
+sor decompositions,
+that enables transforming convolu-
+tional arithmetic circuits into convolutional rectiﬁer net-
+works (ConvNets with ReLU activation and max or aver-
+age pooling). This opens the door to various mathematical
+tools from the world of arithmetic circuits, now available
+for analyzing convolutional rectiﬁer networks. As a second
+contribution, we make use of such tools to prove new re-
+sults on the expressive properties that drive this important
+class of networks.
+Our analysis shows that convolutional rectiﬁer networks
+are universal with max pooling, but not with average pool-
+ing. This implies that if non-linearity originates solely from
+ReLU activation, increasing network size alone is not suf-
+ﬁcient for expressing arbitrary functions. More interest-
+ingly, we analyze the behavior of convolutional rectiﬁer
+networks in terms of depth efﬁciency, i.e. of cases where
+a function generated by a deep network of polynomial size
+requires shallow networks to have super-polynomial size.
+It is known that convolutional arithmetic circuits exhibit
+complete depth efﬁciency, meaning that besides a negligi-
+ble (zero measure) set, all functions generated by deep net-
+works of this type are depth efﬁcient. We show that this
+is not the case with convolutional rectiﬁer networks, for
+which depth efﬁciency exists, but is weaker in the sense
+that it is not complete (there is positive measure to the set
+of functions generated by a deep network that may be efﬁ-
+ciently realized by shallow networks).
+Depth efﬁciency is believed to be the key factor behind
+the success of deep learning. Our analysis indicates that
+from this perspective, the widely used convolutional rec-
+tiﬁer networks are inferior to convolutional arithmetic cir-
+cuits. This leads us to believe that convolutional arithmetic
+circuits bear the potential to improve the performance of
+deep learning beyond what is witnessed today. Of course,
+a practical machine learning model is measured not only
+by its expressive power, but also by our ability to train it.
+Over the years, massive amounts of research have been de-
+voted to training convolutional rectiﬁer networks. Convo-
+lutional arithmetic circuits on the other hand received far
+less attention, although they have been successfully trained
+in recent works on the SimNet architecture (Cohen and
+Shashua, 2014; Cohen et al., 2016a), demonstrating how
+the enhanced expressive power can lead to state of the art
+performance in computationally limited settings.
+We believe that developing effective methods for training
+convolutional arithmetic circuits, thereby fulﬁlling their ex-
+pressive potential, may give rise to a deep learning archi-
+tecture that is provably superior to convolutional rectiﬁer
+networks but has so far been overlooked by practitioners.
+
+Convolutional Rectiﬁer Networks as Generalized Tensor Decompositions
+
+James Martens and Venkatesh Medabalimi. On the expres-
+arXiv preprint
+
+sive efﬁciency of sum product networks.
+arXiv:1411.7717, 2014.
+
+Guido F Montufar, Razvan Pascanu, Kyunghyun Cho, and Yoshua
+Bengio. On the number of linear regions of deep neural net-
+works. In Advances in Neural Information Processing Systems,
+pages 2924–2932, 2014.
+
+Vinod Nair and Geoffrey E Hinton. Rectiﬁed linear units im-
+In Proceedings of the
+prove restricted boltzmann machines.
+27th International Conference on Machine Learning (ICML-
+10), pages 807–814, 2010.
+
+Razvan Pascanu, Guido Montufar, and Yoshua Bengio. On the
+number of inference regions of deep feed forward networks
+with piece-wise linear activations. arXiv preprint arXiv, 1312,
+2013.
+
+Tomaso Poggio, Fabio Anselmi, and Lorenzo Rosasco. I-theory
+on depth vs width: hierarchical function composition. Techni-
+cal report, Center for Brains, Minds and Machines (CBMM),
+2015.
+
+Hoifung Poon and Pedro Domingos. Sum-product networks: A
+new deep architecture. In Computer Vision Workshops (ICCV
+Workshops), 2011 IEEE International Conference on, pages
+689–690. IEEE, 2011.
+
+Yelong Shen, Xiaodong He, Jianfeng Gao, Li Deng, and Gr´egoire
+Mesnil. Learning semantic representations using convolu-
+tional neural networks for web search. In Proceedings of the
+companion publication of the 23rd international conference
+on World wide web companion, pages 373–374. International
+World Wide Web Conferences Steering Committee, 2014.
+
+Amir Shpilka and Amir Yehudayoff. Arithmetic circuits: A
+survey of recent results and open questions. Foundations
+and Trends in Theoretical Computer Science, 5(3–4):207–388,
+2010.
+
+Yaniv Taigman, Ming Yang, Marc’Aurelio Ranzato, and Lior
+Wolf. DeepFace: Closing the Gap to Human-Level Perfor-
+mance in Face Veriﬁcation. In CVPR ’14: Proceedings of the
+2014 IEEE Conference on Computer Vision and Pattern Recog-
+nition. IEEE Computer Society, June 2014.
+
+Matus Telgarsky. Beneﬁts of depth in neural networks. arXiv
+
+preprint arXiv:1602.04485, 2016.
+
+Izhar Wallach, Michael Dzamba, and Abraham Heifets. Atom-
+net: A deep convolutional neural network for bioactivity pre-
+arXiv preprint
+diction in structure-based drug discovery.
+arXiv:1510.02855, 2015.
+
+Daniel Zoran and Yair Weiss. ”Natural Images, Gaussian Mix-
+tures and Dead Leaves”. Advances in Neural Information Pro-
+cessing Systems, pages 1745–1753, 2012.
+
+Acknowledgments
+This work is partly funded by Intel grant ICRI-CI no. 9-
+2012-6133 and by ISF Center grant 1790/12. Nadav Cohen
+is supported by a Google Fellowship in Machine Learning.
+
+References
+Richard Caron and Tim Traynor. The zero set of a polynomial.
+
+WSMR Report 05-02, 2005.
+
+Nadav Cohen and Amnon Shashua. Simnets: A generalization
+of convolutional networks. Advances in Neural Information
+Processing Systems (NIPS), Deep Learning Workshop, 2014.
+
+Nadav Cohen and Amnon Shashua. Convolutional rectiﬁer net-
+works as generalized tensor decompositions. arXiv preprint
+arXiv:1603.00162, 2016.
+
+Nadav Cohen, Or Sharir, and Amnon Shashua. Deep simnets.
+IEEE Conference on Computer Vision and Pattern Recognition
+(CVPR), 2016a.
+
+Nadav Cohen, Or Sharir, and Amnon Shashua. On the expressive
+power of deep learning: A tensor analysis. Conference On
+Learning Theory (COLT), 2016b.
+
+G Cybenko. Approximation by superpositions of a sigmoidal
+function. Mathematics of Control, Signals and Systems, 2(4):
+303–314, 1989.
+
+Olivier Delalleau and Yoshua Bengio. Shallow vs. deep sum-
+product networks. In Advances in Neural Information Process-
+ing Systems, pages 666–674, 2011.
+
+Ronen Eldan and Ohad Shamir. The power of depth for feedfor-
+ward neural networks. arXiv preprint arXiv:1512.03965, 2015.
+
+W Hackbusch and S K¨uhn. A New Scheme for the Tensor Rep-
+resentation. Journal of Fourier Analysis and Applications, 15
+(5):706–722, 2009.
+
+Wolfgang Hackbusch. Tensor Spaces and Numerical Tensor Cal-
+culus, volume 42 of Springer Series in Computational Math-
+ematics. Springer Science & Business Media, Berlin, Heidel-
+berg, February 2012.
+
+Kurt Hornik, Maxwell B Stinchcombe, and Halbert White. Multi-
+layer feedforward networks are universal approximators. Neu-
+ral networks, 2(5):359–366, 1989.
+
+Frank Jones. Lebesgue integration on Euclidean space. Jones &
+
+Bartlett Learning, 2001.
+
+Tamara G Kolda and Brett W Bader. Tensor Decompositions and
+
+Applications. SIAM Review (), 51(3):455–500, 2009.
+
+Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hinton.
+
+Im-
+ageNet Classiﬁcation with Deep Convolutional Neural Net-
+works. Advances in Neural Information Processing Systems,
+pages 1106–1114, 2012.
+
+Yann LeCun and Yoshua Bengio. Convolutional networks for im-
+ages, speech, and time series. The handbook of brain theory
+and neural networks, 3361(10), 1995.
+
+

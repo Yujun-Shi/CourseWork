@@ -1,0 +1,1074 @@
+Learning Privately from Multiparty Data
+
+Jihun Hamm
+Dept. Computer Science and Engineering, Ohio State University, Columbus, OH 43210, USA
+Paul Cao
+Dept. Computer Science and Engineering, UC-San Diego, La Jolla, CA 92093, USA
+Mikhail Belkin
+Dept. Computer Science and Engineering, Ohio State University, Columbus, OH 43210, USA
+
+MBELKIN@CSE.OHIO-STATE.EDU
+
+HAMMJ@CSE.OHIO-STATE.EDU
+
+YIC242@ENG.UCSD.EDU
+
+Abstract
+
+Learning a classiﬁer from private data collected
+by multiple parties is an important problem that
+has many potential applications. How can we
+build an accurate and differentially private global
+classiﬁer by combining locally-trained classiﬁers
+from different parties, without access to any
+party’s private data? We propose to transfer the
+‘knowledge’ of the local classiﬁer ensemble by
+ﬁrst creating labeled data from auxiliary unla-
+beled data, and then train a global -differentially
+private classiﬁer. We show that majority voting
+is too sensitive and therefore propose a new risk
+weighted by class probabilities estimated from
+the ensemble. Relative to a non-private solution,
+our private solution has a generalization error
+bounded by O(−2M−2) where M is the num-
+ber of parties. This allows strong privacy with-
+out performance loss when M is large, such as in
+crowdsensing applications. We demonstrate the
+performance of our method with realistic tasks of
+activity recognition, network intrusion detection,
+and malicious URL detection.
+
+1. Introduction
+Consider the problem of performing machine learning with
+data collected by multiple parties.
+In many settings, the
+parties may not wish to disclose the private information.
+For example, the parties can be medical institutions who
+aim to perform collaborative research using sensitive pa-
+tient information they hold. For another example, the par-
+ties can be computer users who aim to collectively build
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+a malware detector without sharing their usage data. A
+conventional approach to learning from multiparty data is
+to ﬁrst collect data from all parties and then process them
+centrally. When privacy is a major concern, this approach
+is not always an appropriate solution since it is vulnera-
+ble to attacks during transmission, storage, and processing
+of data. Instead, we will consider a setting in which each
+party trains a local classiﬁer from its private data without
+sending the data. The goal is to build a global classiﬁer
+by combining local classiﬁers efﬁciently and privately. We
+expect the global classiﬁer to be more accurate than indi-
+vidual local classiﬁers, as it has access to more information
+than individual classiﬁers.
+This problem of aggregating classiﬁers was considered in
+(Pathak et al., 2010), where the authors proposed averaging
+of the parameters of local classiﬁers to get a global classi-
+ﬁer. To prevent the leak of private information from the av-
+eraged parameters, the authors used a differentially private
+mechanism. Differential privacy measures maximal change
+in the probability of any outcome of a procedure when any
+item is added to or removed from a database. It provides
+a strict upper bound on the privacy loss against any adver-
+sary (Dwork & Nissim, 2004; Dwork et al., 2006; Dwork,
+2006). Parameter averaging is a simple and practical proce-
+dure that can be implemented by Secure Multiparty Com-
+putation (Yao, 1982). However, averaging is not applicable
+to classiﬁers with non-numerical parameters such as deci-
+sion trees, nor to a collection of different classiﬁer types.
+This raises the question if there are more ﬂexible and per-
+haps better ways of aggregating local classiﬁers privately.
+In this paper, we propose a method of building a global
+differentially private classiﬁer from an ensemble of lo-
+cal classiﬁer in two steps (see Fig. 1.)
+In the ﬁrst step,
+locally-trained classiﬁers are collected by a trusted entity.
+A naive approach to use the collected classiﬁers is to re-
+lease (the parameters of) the classiﬁers after sanitization
+by differentially private mechanisms, which is impractical
+
+Learning Privately from Multiparty Data
+
+Figure 1. Workﬂow of the proposed algorithm. Assume that the parties are smart devices. Each party holds a small amount of private
+data and uses the data to train a local classiﬁer. The ensemble of local classiﬁers collected then generates labels for auxiliary data, which
+in turn are used for training a global classiﬁer. The ﬁnal classiﬁer is released after sanitization for privacy.
+
+(Sec. 3.2.) Instead, we use the classiﬁer ensemble to gener-
+ates (pseudo)labels for auxiliary unlabeled data, thus trans-
+ferring the knowledge of the ensemble to the auxiliary data.
+In the second step, we use the labeled auxiliary data to ﬁnd
+an empirical risk minimizer, and release a differentially pri-
+vate classiﬁer using output perturbation (Chaudhuri et al.,
+2011).
+When generating labels for auxiliary data using an ensem-
+ble of classiﬁers, majority voting is the simplest choice.
+However, we show quantitatively that a global classiﬁer
+trained from majority-voted labels is highly sensitive to
+individual votes of local classiﬁers. Consequently, the ﬁ-
+nal classiﬁer after differentially-private sanitization suffer
+a heavy loss in its performance. To address this, we pro-
+pose a new risk insensitive to individual votes, where each
+sample is weighted by the conﬁdence of the ensemble.
+We provide an interpretation of the weighted risk in terms
+of random hypothesis of an ensemble (Breiman, 1996a)
+in contrast to deterministic labeling rule of majority vot-
+ing. One of our main results is in Theorem 4: we can
+achieve -differential privacy with a generalization error of
+O(−2M−2) and O(N−1) terms, relative to the expected
+risk of a non-private solution, where M is the number of
+parties and N is the number of samples in auxiliary data.
+This result is especially useful in a scenario where there are
+a large number of parties with weak local classiﬁers such
+as a group of connected smart devices with limited com-
+puting capability. We demonstrate the performance of our
+approach with several realistic tasks: activity recognition,
+network intrusion detection, and malicious URL detection.
+The results show that it is feasible to achieve both accuracy
+and privacy with a large number of parties.
+
+To summarize, we propose a method of building a global
+differentially private classiﬁer from locally-trained classi-
+ﬁers of multiple parties without access to their private data.
+The proposed method has the following advantages: 1) it
+can use local classiﬁers of any (mixed) types and there-
+fore is ﬂexible; 2) its generalization error converges to that
+of a non-private solution with a fast rate of O(−2M−2)
+and O(N−1); 3) it also provides -differential privacy to
+all samples of a party and not just a single sample.
+In Sec. 2, we formally describe privacy deﬁnitions.
+In
+Sec. 3, we discuss the ﬁrst step of leveraging unlabeled
+data, and in Sec. 4, we present the second step of ﬁnd-
+ing a global private classiﬁer via empirical risk minimiza-
+tion in two different forms. In Sec. 5, we discuss related
+works. We evaluate the methods with real tasks in Sec. 6
+and conclude the paper in Sec. 7. The supplementary ma-
+terial contains omitted proofs and several extensions of the
+algorithms.
+
+2. Preliminary
+2.1. Differential privacy
+A randomized algorithm that takes data D as input and out-
+puts a function f is called -differentially private if
+
+P (f (D) ∈ S)
+P (f (D(cid:48)) ∈ S)
+
+≤ e
+
+(1)
+for all measurable S ⊂ T of the output range and for all
+datasets D and D(cid:48) differing in a single item, denoted by
+D ∼ D(cid:48). That is, even if an adversary knows the whole
+dataset D except for a single item, she cannot infer much
+about the unknown item from the output f of the algorithm.
+
+Learning Privately from Multiparty Data
+
+When an algorithm outputs a real-valued vector f ∈ RD,
+its global L2 sensitivity (Dwork et al., 2006) can be deﬁned
+as
+
+S(f ) = maxD∼D(cid:48) (cid:107)f (D) − f (D(cid:48))(cid:107)
+
+(2)
+where (cid:107)·(cid:107) is the L2 norm. An important result from (Dwork
+et al., 2006) is that a vector-valued output f with sensitivity
+S(f ) can be made -differentially private by perturbing f
+with an additive noise vector η whose density is
+
+P (η) ∝ e
+
+− 
+
+S(f )(cid:107)η(cid:107)
+
+.
+
+(3)
+
+2.2. Output perturbation
+
+When a classiﬁer which minimizes empirical risk is re-
+leased in public, it leaks information about the training
+data. Such a classiﬁer can be sanitized by perturbation with
+additive noise calibrated to the sensitivity of the classiﬁer,
+known as output perturbation method (Chaudhuri et al.,
+2011). Speciﬁcally, the authors show the following. If ws
+is the minimizer of the regularized empirical risk
+
+Rλ
+
+S(w) =
+
+1
+N
+
+l(h(x; w), y) +
+
+(cid:107)w(cid:107)2,
+
+λ
+2
+
+(4)
+
+(cid:88)
+
+(x,y)∈S
+
+Then the perturbed output wp = ws +η, p(η) ∝ e− N λ
+2 (cid:107)η(cid:107)
+is -differentially private for a single sample. Output per-
+turbation was used to sanitize the averaged parameters in
+(Pathak et al., 2010). We also use output perturbation to
+sanitize global classiﬁers. One important difference of our
+setting to previous work is that we consider -differential
+privacy of all samples of a party, which is much stronger
+than -differential privacy of a single sample.
+There are conditions on the loss function for this guarantee
+to hold. We will assume the following conditions for our
+global classiﬁer1 similar to (Chaudhuri et al., 2011).
+
+• The loss-hypothesis has a form l(h(x; w), v)) =
+l(vwT φ(x)), where φ : X → Rd is a ﬁxed map.
+We will consider only linear classiﬁers l(vwT x),
+where any nonlinear map φ is absorbed into the d-
+dimensional features.
+
+• The surrogate loss l(·) is convex and continuously dif-
+
+ferentiable.
+
+• The derivative l(cid:48)(·) is bounded: |l(cid:48)(t)| ≤ 1, ∀t ∈ R,
+and c-Lipschitz: |l(cid:48)(s) − l(cid:48)(t)| ≤ c|s − t|, ∀s, t ∈ R.
+
+• The features are bounded: supx∈X (cid:107)x(cid:107) ≤ 1.
+
+These conditions are satisﬁed by, e.g., logistic regression
+loss (c = 1/4) and approximate hinge loss.
+
+1Local classiﬁers are allowed to be of any type.
+
+3. Transferring knowledge of ensemble
+3.1. Local classiﬁers
+
+, y(i)
+Ni
+
+1 , y(i)
+
+1 ), ... , (x(i)
+Ni
+
+S(i) = {(x(i)
+j , y(i)
+
+In this paper, we treat local classiﬁers as M black boxes
+h1(x), ..., hM (x). We assume that a local classiﬁer hi(x)
+is trained using its private i.i.d. training set S(i)
+)},
+
+(5)
+j ) ∈ X × {−1, 1} is a sample from a dis-
+where (x(i)
+tribution P (x, y) common to all parties. We consider bi-
+nary labels y ∈ {−1, 1} in the main paper, and present a
+multiclass extension in Appendix B of the supplementary
+material.
+This splitting of training data across parties is similar to
+the Bagging procedure (Breiman, 1996a) with some differ-
+ences. In Bagging, the training set S(i) for party i is sam-
+pled with replacement from the whole dataset D, whereas
+in our setting, the training set is sampled without replace-
+ment from D, more similar to the Subagging (Politis et al.,
+1999) procedure.
+
+3.2. Privacy issues of direct release
+
+In the ﬁrst step of our method, local classiﬁers from mul-
+tiple parties are ﬁrst collected by a trusted entity. A naive
+approach to use the ensemble is to directly release the local
+classiﬁer parameters to the parties after appropriate sani-
+tization. However, this is problematic in efﬁciency and
+privacy. Releasing all M classiﬁer parameters is an op-
+eration with a constant sensitivity, as opposed to releasing
+insensitive statistics such as an average whose sensitivity is
+O(M−1). Releasing the classiﬁers requires much stronger
+perturbation than necessary, incurring steep loss of perfor-
+mance of sanitized classiﬁers. Besides, efﬁcient differen-
+tially private mechanisms are known only for certain types
+of classiﬁers so far (see (Ji et al., 2014) for a review.) An-
+other approach is to use the ensemble as a service to make
+predictions for test data followed by appropriate sanitiza-
+tion. Suppose we use majority voting to provide a pre-
+diction for a test sample. A differentially private mecha-
+nism such as Report Noisy Max (Dwork & Roth, 2013) can
+be used to sanitize the votes for a single query. However,
+answering several queries requires perturbing all answers
+with noise linearly proportional to the number of queries,
+which is impractical in most realistic settings.
+
+3.3. Leveraging auxiliary data
+
+To address the problems above, we propose to transfer the
+knowledge of the ensemble to a global classiﬁer using aux-
+iliary unlabeled data. More precisely, we use the ensemble
+to generate (pseudo)labels for the auxiliary data, which in
+turn are used to train a global classiﬁer. Compared to di-
+rectly releasing local classiﬁers, releasing a global classiﬁer
+
+Learning Privately from Multiparty Data
+
+trained on auxiliary data is a much less sensitive operation
+with O(M−1) (Sec. 4.4) analogous to releasing an average
+statistic. The number of auxiliary samples does not affect
+privacy, and in fact the larger the data the closer the global
+classiﬁer is to the original ensemble with O(N−1) bound
+(Sec. 4.4). Also, compared to using the ensemble to an-
+swer prediction queries, the sanitized global classiﬁer can
+be used as many times as needed without its privacy being
+affected.
+We argue that the availability of auxiliary unlabeled data
+is not an issue, since in many settings they are practically
+much easier to collect than labeled data. Furthermore, if
+the auxiliary data are obtained from public repositories, pri-
+vacy of such data is not an immediate concern. We mainly
+focus on the privacy of local data, and discuss extensions
+for preserving the privacy of auxiliary data in Sec. 4.5.
+
+4. Finding a global private classiﬁer
+We present details of training a global private classiﬁer. As
+the ﬁrst attempt, we use majority voting of an ensemble to
+assign labels to auxiliary data, and ﬁnd a global classiﬁer
+from the usual ERM procedure. In the second attempt, we
+present a better approach where we use the ensemble to
+estimate the posterior P (y|x) of the auxiliary samples and
+solve a ‘soft-labeled’ weighted empirical minimization.
+
+4.1. First attempt: ERM with majority voting
+
+As the ﬁrst attempt, we use majority voting of M local clas-
+siﬁers to generate labels of auxiliary data, and analyze its
+implications. Majority voting for binary classiﬁcation is
+the following rule
+
+(cid:26) 1,
+
+−1,
+
+if (cid:80)M
+
+v(x) =
+
+i=1 I[hi(x) = 1] ≥ M
+
+2
+
+otherwise
+
+.
+
+(6)
+
+Ties can be ignored by assuming an odd number M of par-
+ties. Regardless of local classiﬁer types or how they are
+trained, we can consider the majority vote of the ensem-
+ble {h1, ..., hM} as a deterministic target concept to train a
+global classiﬁer.
+The majority-voted auxiliary data are
+
+S = {(x1, v(x1)), ..., (xN , v(xN ))},
+
+(7)
+where xi ∈ X is an i.i.d. sample from the same distribution
+P (x) as the private data. We train a global classiﬁer by
+minimizing the (regularized) empirical risk associated with
+a loss and a hypothesis class:
+
+Rλ
+
+S(w) =
+
+1
+N
+
+l(h(x; w), v) +
+
+(cid:107)w(cid:107)2.
+
+λ
+2
+
+(8)
+
+(cid:88)
+
+(x,v)∈S
+
+We use Rλ(w) and R(w) without the subscript S to de-
+
+Algorithm 1 DP Ensemble by Majority-voted ERM
+Input: h1, ..., hM (local classiﬁers), X (auxiliary unlabeled
+samples), , λ
+Output: wp
+Begin
+
+for i = 1, ... , N do
+
+Generate majority voted labels v(xi) by (6)
+
+end for
+Find the minimizer ws of (8) with S = {(xi, v(xi))}
+Sample a random vector η from p(η) ∝ e−0.5λ(cid:107)η(cid:107)
+Output wp = ws + η
+
+note expected risks with and without regularization. Algo-
+rithm 1 summarizes the procedure.
+Applying output perturbation to our multiparty setting
+gives us the following result.
+Theorem 1. The perturbed output wp = ws + η from Al-
+gorithm 1 with p(η) ∝ e− λ
+2 (cid:107)η(cid:107) is -differentially private.
+
+The proof of the theorem and others are in the Appendix A
+of the supplementary material.
+
+4.2. Performance issues of majority voting
+
+We brieﬂy discuss the generalization error of majority-
+voted ERM. In (Chaudhuri et al., 2011), it is shown that
+the expected risk of an output-perturbed ERM solution wp
+with respect to the risk of any reference hypothesis w0 is
+bounded by two terms – one due to noise and another due to
+the gap between expected and empirical regularized risks.
+This result is applicable to the majority-voted ERM with
+minor modiﬁcations. The sensitivity of majority-voted
+ERM from Theorem 1 is 2
+N λ of a standard
+λ compared to 2
+ERM, and corresponding the error bound is
+
+R(wp) ≤ R(w0) + O(−2) + O(N−1),
+
+(9)
+
+with high probability, ignoring other variables. Unfortu-
+nately, the bound does not guarantee a successful learning
+due to the constant gap O(−2), which can be large for a
+small .
+What causes this is the worst-case scenario of multiparty
+voting. Suppose the votes of M − 1 local classiﬁers are
+exactly ties for all auxiliary samples {x1, ..., xN}. If we
+replace a local classiﬁer hi(x) with the ‘opposite’ clas-
+i(x) = −hi(x), then the majority-voted labels
+siﬁer h(cid:48)
+{v1, ..., vN} become {−v1, ...,−vN}, and the resultant
+global classiﬁer is entirely different. However unlikely this
+scenario may be in reality, differential privacy requires that
+we calibrate our noise to the worst case sensitivity.
+
+Learning Privately from Multiparty Data
+
+4.3. Better yet: weighted ERM with soft labels
+
+The main problem with majority voting was its sensitivity
+to the decision of a single party. Let α(x) be the fraction of
+positive votes from M classiﬁers given a sample x:
+
+M(cid:88)
+
+j=1
+
+α(x) =
+
+1
+M
+
+I[hj(x) = 1].
+
+(10)
+
+In terms of α, the original loss l(wT xv(x)) for majority
+voting can be written as
+
+l(ywT x) = I[α(x) ≥ 0.5] l(wT x)
+
++ I[α(x) < 0.5] l(−wT x),
+
+(11)
+
+which changes abruptly when the fraction α(x) crosses the
+boundary α = 0.5. We remedy the situation by introducing
+the new weighted loss:
+
+lα(·) = α(x)l(wT x) + (1 − α(x))l(−wT x).
+
+(12)
+
+The new loss has the following properties. When the
+M votes given a sample x are unanimously positive (or
+negative), then the weighted loss is lα(·) = l(wT x) (or
+l(−wT x)), same as the original loss. If the votes are al-
+most evenly split between positive and negative, then the
+weighted loss is lα(·) (cid:39) 0.5 l(wT x) + 0.5 l(−wT x) which
+is insensitive to the change of label by a single vote, un-
+like the original loss. Speciﬁcally, a single vote can change
+lα(·) only by a factor of 1/M (see Proof of Theorem 3.)
+interpretation of α(x) and the
+We provide a natural
+weighted loss in the following. For the purpose of anal-
+ysis, assume that the local classiﬁers h1(x), ..., hM (x) are
+from the same hypothesis class.2 Since the local training
+data are i.i.d. samples from P (x, y), the local classiﬁers
+{h1(x), ..., hM (x)} can be considered random hypotheses,
+as in (Breiman, 1996a). Let Q(j|x) be the probability of
+such a random hypothesis h(x) predicting label j given x:
+
+Q(j|x) = P (h(x) = j|x),
+
+(13)
+
+Then the fraction α(x) = 1
+j=1 I[hj(x) = 1] is an
+unbiased estimate of Q(1|x). Furthermore, the weighted
+M
+loss is directly related to the unweighted loss:
+Lemma 2. For any w, the expectation of the weighted loss
+(12) is asymptotically the expectation of the unweighted
+loss:
+
+M→∞ Ex[lα(w)] = Ex,v[l(wT xv)].
+lim
+
+(14)
+
+Proof. The expected risk Ex,v[l(vwT x)] is
+
+(cid:80)M
+
+Algorithm 2 DP Ensemble by Weighted ERM
+Input: h1, ..., hM (local classiﬁers), X (auxiliary unlabeled
+samples), , λ
+Output: wp
+Begin
+
+for i = 1, ... , N do
+
+Compute α(xi) by (10)
+
+end for
+Find the minimizer of ws of (17) with {(xi, α(xi))}
+Sample a random vector η from p(η) ∝ e−0.5M λ(cid:107)η(cid:107)
+Output wp = ws + η
+
+= Ex[Q(1|x)l(wT x) + Q(−1|x)l(−wT x)]
+= Ex[ lim
+
+M→∞ α(x)l(wT x) + (1 − lim
+
+M→∞ α(x))l(−wT x)]
+
+= lim
+
+(the law of large numbers)
+
+M→∞ Ex[α(x)l(wT x) + (1 − α(x))l(−wT x)]
+(bounded α and l for ∀x ∈ X )
+M→∞ Ex[lα(w)].
+
+= lim
+
+(15)
+
+This shows that minimizing the expected weighted loss is
+asymptotically the same as minimizing the standard ex-
+pected loss, when the target v is a probabilistic concept
+from P (h(x) = v) of the random hypothesis, as opposed
+to a deterministic concept v(x) from majority voting.
+The auxiliary dataset with ‘soft’ labels is now
+
+S = {(x1, α(x1)), ... , (xN , α(xN ))}.
+
+(16)
+where xi ∈ X is an i.i.d. sample from the same distribution
+P (x) as the private data, and 0 ≤ α ≤ 1. Note that we are
+not trying to learn a regression function X → [0, 1] but to
+learn a classiﬁer X → {−1, 1} using α as a real-valued
+oracle on P (y = 1|x). Consequently, we ﬁnd a global
+classiﬁer by minimizing the regularized weighted empirical
+risk
+
+Rλ
+
+S(w) =
+
+1
+N
+
+lα(h(xi; w), αi) +
+
+(cid:107)w(cid:107)2,
+
+λ
+2
+
+(17)
+
+N(cid:88)
+
+i=1
+
+where αi = α(xi). We use Rλ(w) and R(w) without
+the subscript S to denote expected weighted risks with and
+without regularization.
+We again use output perturbation to make the classiﬁer dif-
+ferentially private as summarized in Algorithm 2.
+
+= ExEv|x[l(vwT x)]
+
+4.4. Privacy and performance
+
+2Our differential privacy guarantee holds whether they are
+
+from the same hypothesis class or not.
+
+Compared to Theorem 1 for majority-voted ERM with a
+noise of P (η) ∝ e− λ
+
+2 (cid:107)η(cid:107), we have the following result:
+
+Learning Privately from Multiparty Data
+
+Theorem 3. The perturbed output wp = ws + η from Al-
+gorithm 2 with p(η) ∝ e− M λ
+2 (cid:107)η(cid:107) is -differentially private.
+
+That is, we now require 1/M times smaller noise to achieve
+the same -differential privacy. This directly impacts the
+performance of the corresponding global classiﬁer as fol-
+lows.
+Theorem 4. Let w0 be any reference hypothesis. Then with
+probability of at least 1 − δp − δs over the privacy mecha-
+nism (δp) and over the choice of samples (δs),
+
+R(wp) ≤ R(w0) +
+
+4d2(c + λ) log2(d/δp)
+
+λ2M 22
+
++
+
+16(32 + log(1/δs))
+
+λN
+
+(cid:107)w0(cid:107)2. (18)
+
++
+
+λ
+2
+
+The generalization error bound above has the O(M−2−2)
+term compared to the O(−2) term for majority-voted ERM
+(9). This implies that by choosing a large M, Algorithm 2
+can ﬁnd a solution whose expected risk is close to the min-
+imum of a non-private solution for any ﬁxed  > 0.
+We remind the user that the results should be interpreted
+with a caution. The bounds in (9) and (18) indicate the
+goodness of private ERM solutions relative to the best non-
+private solutions with deterministic and probability con-
+cepts which are not the same task. Also, they do not in-
+dicate the goodness of the ensemble approach itself rela-
+tive to a centrally-trained classiﬁer using all private data
+without privacy consideration. We leave this comparison
+to empirical evaluation in the experiment section.
+
+4.5. Extensions
+
+We discuss extensions of Algorithms 1 and 2 to provide ad-
+ditional privacy for auxiliary data. More precisely, those al-
+gorithms can be made -differentially private for all private
+data of a single party and a single sample in the auxiliary
+data, by increasing the amount of perturbation as necessary.
+We outline the proof as follows. In the previous sections, a
+global classiﬁer was trained on auxiliary data whose labels
+were generated either by majority voting or soft labeling. A
+change in the local classiﬁer affects only the labels {vi} of
+the auxiliary data but not the features {xi}. Now assume in
+addition that the feature of one sample from the auxiliary
+data can also change arbitrarily, i.e., xj (cid:54)= x(cid:48)
+j for some j
+i for all i ∈ {1, ..., N} \ {j}. The sensitivity
+and xi = x(cid:48)
+of the resultant risk minimizer can be computed similarly
+to the proofs of Theorems 1 and 3 in Appendix A of the
+supplementary material. Brieﬂy, the sensitivity is upper-
+bounded by the absolute sum of the difference of gradients
+
+(cid:107)∇g(w)(cid:107) ≤ 1
+N
+
+(cid:107)∇l(yiwT xi) − ∇l(y(cid:48)
+
+iwT x(cid:48)
+
+i)(cid:107). (19)
+
+N(cid:88)
+
+i=1
+
+j)wT x(cid:48)
+
+For majority voting, one term in the sum (19) is
+jl(cid:48)(v(cid:48)(x(cid:48)
+
+(cid:107)v(xj)xjl(cid:48)(v(xj)wT xj) − v(cid:48)(x(cid:48)
+j)(cid:107)
+j)x(cid:48)
+(20)
+j ∈ X , and therefore the
+which is at most 2 for any xj, x(cid:48)
+sensitivity is the same whether xj = x(cid:48)
+j or not. As a re-
+sult, Algorithm 1 is already -differentially private for both
+labeled and auxiliary data without modiﬁcation. Further-
+more, the privacy guarantee remains the same if we allow
+xj (cid:54)= x(cid:48)
+j for any number of samples. For soft labeling, one
+term in the sum (19) is
+
+jx(cid:48)
+
+jl(cid:48)(wT x(cid:48)
+
+(cid:107)αjxjl(cid:48)(wT xj) − (1 − αj)xjl(cid:48)(−wT xj)
+j)(cid:107) (21)
+j) + (1 − α(cid:48)
+−α(cid:48)
+jl(cid:48)(−wT x(cid:48)
+j)x(cid:48)
+j ∈ X and 2
+which is also at most 2 for any xj, x(cid:48)
+M when
+xj = x(cid:48)
+j. When only a single auxiliary sample changes,
+i.e., xj (cid:54)= x(cid:48)
+j for one j, the overall sensitivity increases by
+a factor of N +M−1
+. By increasing the noise by this fac-
+tor, Algorithm 2 is -differentially private for both labeled
+and auxiliary data. Note that this factor N +M−1
+can be
+bounded close to 1 if we increase the number of auxiliary
+samples N relative to the number of parties M.
+
+N
+
+N
+
+5. Related work
+To preserve privacy in data publishing, several approaches
+such as k-anonymity (Sweeney, 2002) and secure multi-
+party computation (Yao, 1982) have been proposed (see
+(Fung et al., 2010) for a review.) Recently, differential pri-
+vacy (Dwork & Nissim, 2004; Dwork et al., 2006; Dwork,
+2006) has addressed several weaknesses of k-anonymity
+(Ganta et al., 2008), and gained popularity as a quantiﬁable
+measure of privacy risk. The measure provides a bound
+on the privacy loss regardless of any additional informa-
+tion an adversary might have. Differential privacy has been
+used for a privacy-preserving data analysis platform (Mc-
+Sherry, 2009), and for sanitization of learned model param-
+eters from a standard ERM (Chaudhuri et al., 2011). This
+paper adopts output perturbation techniques from the lat-
+ter to sanitize non-standard ERM solutions from multiparty
+settings.
+Private learning from multiparty data has been studied
+In particular, several differentially-private
+previously.
+algorithms were proposed,
+including parameter averag-
+ing through secure multiparty computation (Pathak et al.,
+2010), and private exchange of gradient information to
+minimize empirical risks incrementally (Rajkumar & Agar-
+wal, 2012; Hamm et al., 2015). Our paper is motivated by
+(Pathak et al., 2010) but uses a very different approach to
+aggregate local classiﬁers. In particular, we use an ensem-
+ble approach and average the classiﬁer decisions (Breiman,
+1996a) instead of parameters, which makes our approach
+applicable to arbitrary and mixed classiﬁer types. Advan-
+
+Learning Privately from Multiparty Data
+
+tages of ensemble approaches in general have been ana-
+lyzed previously, in terms of bias-variance decomposition
+(Breiman, 1996b), and in terms of the margin of training
+samples (Schapire et al., 1998).
+Furthermore, we are using unlabeled data to augment la-
+beled data during training, which can be considered a semi-
+supervised learning method (Chapelle et al., 2006). There
+are several related papers in this direction. Augmenting
+private data with non-private labeled data to lower the sen-
+sitivity of the output is straightforward, and was demon-
+strated in medical applications (Ji et al., 2014). Using non-
+private unlabeled data, which is more general than using
+labeled data, was demonstrated speciﬁcally to assist learn-
+ing of random forests (Jagannathan et al., 2013). Our use
+of auxiliary data is not speciﬁc to classiﬁer types. Further-
+more, we present an extension to preserve the privacy of
+auxiliary data as well.
+
+6. Experiments
+We use three real-world datasets to compare the perfor-
+mance of the following algorithms:
+
+• batch: classiﬁer trained using all data ignoring privacy
+• soft: private ensemble using soft-labels (Algorithm 2)
+• avg: parameter averaging (Pathak et al., 2010)
+• vote: private ensemble using majority voting (Algo-
+• indiv: individually trained classiﬁer using local data
+
+rithm 1)
+
+We can expect batch to perform better than any private al-
+gorithm since it uses all private data for training ignoring
+privacy. In contrast, indiv uses only the local data for train-
+ing and will perform signiﬁcantly worse than batch, but it
+achieves a perfect privacy as long as the trained classiﬁers
+are kept local to the parties. We are interested in the range
+of  where private algorithms (soft, avg, and vote) perform
+better than the baseline indiv.
+To compare all algorithms fairly, we use only a single type
+of classier – binary or multiclass logistic regression. For
+Algorithms 1 and 2, both local and global classiﬁers are of
+this type as well. The only hyperparameter of the model is
+the regularization coefﬁcient λ which we ﬁxed to 10−4 af-
+ter performing some preliminary experiments. About 10%
+of the original training data are used as auxiliary unlabeled
+data, and the rest 90% are randomly distributed to M par-
+ties as private data. We report the mean and s.d. over 10
+trials for non-private algorithms and 100-trials for private
+algorithms.
+
+6.1. Activity recognition using accelerometer
+
+Consider a scenario where wearable device users want to
+train a motion-based activity classiﬁer without revealing
+
+Figure 2. Test accuracy of private and non-private algorithms for
+activity recognition with K = 6 activity types.
+
+her data to others. To test the algorithms, we use the
+UCI Human Activity Recognition Dataset (Anguita et al.,
+2012), which is a collection of motion sensor data on a
+smart device by multiple subjects performing 6 activities
+(walking, walking upstairs, walking downstairs, sitting,
+standing, laying). Various time and frequency domain vari-
+ables are extracted from the signal, and we apply PCA to
+get d = 50 dimensional features. The training and testing
+samples are 7K and 3K, respectively.
+We simulate a case with M = 1K users (i.e., parties).
+Each user can use only 6 samples to train a local classi-
+ﬁer. The remaining 1K samples are used as auxiliary un-
+labeled data. Figure 2 shows the test accuracy of using
+different algorithms with varying privacy levels. For non-
+private algorithms, the top solid line (batch) shows the ac-
+curacy of a batch-trained classiﬁer at around 0.90, and the
+bottom dashed line (indiv) shows the averaged accuracy of
+local classiﬁers at around 0.47. At 1/ = 0, the private
+algorithms achieve test accuracy of 0.79 (vote), 0.76 (soft)
+and 0.67 (avg), and as the the privacy level 1/ increases,
+the performance drops for all private algorithms. As ex-
+pected from the bound (9), vote becomes useless even at
+1/ = 0.1, while soft and avg are better than indiv until
+1/ = 1. We ﬁxed M to 1000 in this experiment due to
+the limited number of samples, the tendency in the graph is
+similar to other experiments with larger M’s.
+
+6.2. Network intrusion detection
+
+Consider a scenario where multiple gateways or routers
+collect suspicious network activities independently, and
+aim to collaboratively build an accurate network intrusion
+detector without revealing local trafﬁc data. For this task
+we use the KDD-99 dataset, which consists of examples of
+‘bad’ connections, called intrusions or attacks, and ‘good’
+normal connections. Features of this dataset consists of
+continuous values and categorical attributes. To apply lo-
+gistic regression, we change categorical attributes to one-
+
+00.1110100Privacy (1/eps)0.40.50.60.70.80.91.0AccuracyM=1000batchsoftavgvoteindivLearning Privately from Multiparty Data
+
+Figure 3. Test accuracy of private and non-private algorithms for network intrusion detection.
+
+Figure 4. Test accuracy of private and non-private algorithms for malicious URL detection.
+
+hot vectors to get d = 123 dimensional features. The train-
+ing and testing samples are 493K and 311K, respectively.
+We simulate cases with M = 5K/10K/20K parties. Each
+party can only use 22 samples to train a local classiﬁer.
+The remaining 43K samples are used as auxiliary unla-
+beled data. Figure 3 shows the test accuracy of using dif-
+ferent algorithms with varying privacy levels. For each of
+M = 5K/10K/20K the tendency of algorithms is similar
+to Figure 2 – for a small 1/, private algorithms perform
+roughly in between batch and indiv, and as 1/ increases
+private algorithms start to perform worse than indiv. When
+M is large (e.g., M = 20K), private algorithms soft and
+avg hold their accuracy better than when M is small (e.g.,
+M = 5K.) In particular, soft performs nearly as well as the
+non-private batch until around 1/ = 10 compared to avg.
+
+6.3. Malicious URL prediction
+
+In addition to network intrusion detection, multiple parties
+such as computer users can collaborate on detecting mali-
+cious URLs without revealing the visited URLs. The Ma-
+licious URL Dataset (Ma et al., 2009) is a collection of ex-
+amples of malicious URLs from a large Web mail provider.
+The task is to predict whether a URL is malicious or not
+by various lexical and host-based features of the URL. We
+
+apply PCA to get d = 50 dimensional feature vectors. We
+choose days 0 to 9 for training, and days 10 to 19 for test-
+ing, which amount to 200K samples for training and 200K
+samples for testing.
+We simulate cases with M = 5K/10K/20K parties. Each
+party can use only 9 samples to train a local classiﬁer. The
+remaining 16K samples are used as auxiliary unlabeled
+data. Figure 4 shows the test accuracy of using different
+algorithms with varying privacy levels. The gap between
+batch and other algorithms is larger compared to the pre-
+vious experiment (Figure 3), most likely due to the smaller
+number (=9) of samples per party. However, the overall
+tendency is very similar to previous experiments.
+
+7. Conclusion
+In this paper, we propose a method of building global dif-
+ferentially private classiﬁers from local classiﬁers using
+two new ideas: 1) leveraging unlabeled auxiliary data to
+transfer the knowledge of the ensemble, and 2) solving a
+weighted ERM using class probability estimates from the
+ensemble. In general, privacy comes with a loss of classiﬁ-
+cation performance. We present a solution to minimize the
+performance gap between private and non-private ensem-
+bles demonstrated with real world tasks.
+
+00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=5000batchsoftavgvoteindiv00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=10000batchsoftavgvoteindiv00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=20000batchsoftavgvoteindiv00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=5000batchsoftavgvoteindiv00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=10000batchsoftavgvoteindiv00.1110100Privacy (1/eps)0.50.60.70.80.91.0AccuracyM=20000batchsoftavgvoteindivLearning Privately from Multiparty Data
+
+Ma, J., Saul, L.K., Savage, S., and Voelker, G.M.
+
+Identifying
+suspicious urls: an application of large-scale online learning.
+In Proceedings of the 26th Annual International Conference
+on Machine Learning, pp. 681–688. ACM, 2009.
+
+McSherry, F.D. Privacy integrated queries: an extensible plat-
+form for privacy-preserving data analysis. In Proceedings of
+the 2009 ACM SIGMOD International Conference on Manage-
+ment of data, pp. 19–30. ACM, 2009.
+
+Pathak, M., Rane, S., and Raj, B. Multiparty differential privacy
+In Advances in
+via aggregation of locally trained classiﬁers.
+Neural Information Processing Systems, pp. 1876–1884, 2010.
+
+Politis, D. N., Romano, J. P., and Wolf, M. Subsampling. Springer
+
+Verlag, 1999.
+
+Rajkumar, A. and Agarwal, S. A differentially private stochastic
+gradient descent algorithm for multiparty classiﬁcation. In In-
+ternational Conference on Artiﬁcial Intelligence and Statistics,
+pp. 933–941, 2012.
+
+Schapire, R.E., Freund, Y., Bartlett, P., and Lee, W.S. Boosting
+the margin: A new explanation for the effectiveness of voting
+methods. Annals of statistics, pp. 1651–1686, 1998.
+
+Sweeney, L. k-anonymity: A model for protecting privacy. In-
+ternational Journal of Uncertainty, Fuzziness and Knowledge-
+Based Systems, 10(05):557–570, 2002.
+
+Yao, A.C. Protocols for secure computations. In 2013 IEEE Symp.
+
+Found. Comp. Sci., pp. 160–164. IEEE, 1982.
+
+Acknowledgements
+This research was supported in part by funding from NSF
+IIS EAGER 1550757 and Google Faculty Research Award
+2015.
+
+References
+Anguita, D., Ghio, A., Oneto, L., Parra, X., and Reyes-Ortiz, J.L.
+Human activity recognition on smartphones using a multiclass
+hardware-friendly support vector machine. In Ambient assisted
+living and home care, pp. 216–223. Springer, 2012.
+
+Breiman, L. Bagging predictors. Machine learning, 24(2):123–
+
+140, 1996a.
+
+Breiman, L. Bias, variance, and arcing classiﬁers. Technical re-
+port, Statistics Department, University of California, Berkeley,
+CA, USA, 1996b.
+
+Chapelle, O., Sch¨olkopf, B., and Zien, A. (eds.). Semi-Supervised
+Learning. MIT Press, Cambridge, MA, 2006. URL http:
+//www.kyb.tuebingen.mpg.de/ssl-book.
+
+Chaudhuri, K., Monteleoni, C., and Sarwate, A.D. Differentially
+private empirical risk minimization. The Journal of Machine
+Learning Research, 12:1069–1109, 2011.
+
+Dwork, C. Differential privacy. In Automata, languages and pro-
+
+gramming, pp. 1–12. Springer, 2006.
+
+Dwork, C. and Nissim, K. Privacy-preserving datamining on
+vertically partitioned databases. In Advances in Cryptology–
+CRYPTO 2004, pp. 528–544. Springer, 2004.
+
+Dwork, C. and Roth, A. The algorithmic foundations of differ-
+ential privacy. Theoretical Computer Science, 9(3-4):211–407,
+2013.
+
+Dwork, C., McSherry, F., Nissim, K., and Smith, A. Calibrat-
+ing noise to sensitivity in private data analysis. In Theory of
+cryptography, pp. 265–284. Springer, 2006.
+
+Fung, B., Wang, K., Chen, R., and Yu, P.S. Privacy-preserving
+data publishing: A survey of recent developments. ACM Comp.
+Surveys (CSUR), 42(4):14, 2010.
+
+Ganta, S.R., Kasiviswanathan, S.P., and Smith, A. Composition
+attacks and auxiliary information in data privacy. In Proc. ACM
+SIGKDD, pp. 265–273. ACM, 2008.
+
+Hamm, J., Champion, A., Chen, G., Belkin, M., and Xuan, D.
+Crowd-ML: A privacy-preserving learning framework for a
+In Proceedings of the 35th IEEE
+crowd of smart devices.
+International Conference on Distributed Computing Systems
+(ICDCS). IEEE, 2015.
+
+Jagannathan, G., Monteleoni, C., and Pillaipakkamnatt, K. A
+semi-supervised learning approach to differential privacy.
+In
+Data Mining Workshops (ICDMW), 2013 IEEE 13th Interna-
+tional Conference on, pp. 841–848. IEEE, 2013.
+
+Ji, Z., Jiang, X., Wang, S., Xiong, L., and Ohno-Machado, L.
+Differentially private distributed logistic regression using pri-
+vate and public data. BMC medical genomics, 7(Suppl 1):S14,
+2014.
+
+

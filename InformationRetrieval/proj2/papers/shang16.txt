@@ -1,0 +1,1184 @@
+Understanding and Improving Convolutional Neural Networks via
+
+Concatenated Rectiﬁed Linear Units
+
+Wenling Shang1,4
+Kihyuk Sohn2
+Diogo Almeida3
+Honglak Lee1
+1University of Michigan, Ann Arbor; 2NEC Laboratories America; 3Enlitic; 4Oculus VR
+
+WENDY.SHANG@OCULUS.COM
+KSOHN@NEC-LABS.COM
+DIOGO@ENLITIC.COM
+HONGLAK@EECS.UMICH.EDU
+
+Abstract
+
+Recently, convolutional neural networks (CNNs)
+have been used as a powerful tool to solve many
+problems of machine learning and computer vi-
+sion.
+In this paper, we aim to provide insight
+on the property of convolutional neural networks,
+as well as a generic method to improve the per-
+formance of many CNN architectures. Speciﬁ-
+cally, we ﬁrst examine existing CNN models and
+observe an intriguing property that the ﬁlters in
+the lower layers form pairs (i.e., ﬁlters with op-
+posite phase).
+Inspired by our observation, we
+propose a novel, simple yet effective activation
+scheme called concatenated ReLU (CReLU) and
+theoretically analyze its reconstruction property
+in CNNs. We integrate CReLU into several
+state-of-the-art CNN architectures and demon-
+strate improvement in their recognition perfor-
+mance on CIFAR-10/100 and ImageNet datasets
+with fewer trainable parameters. Our results sug-
+gest that better understanding of the properties
+of CNNs can lead to signiﬁcant performance im-
+provement with a simple modiﬁcation.
+
+1. Introduction
+In recent years, convolutional neural networks (CNNs)
+have achieved great success in many problems of machine
+learning and computer vision (Krizhevsky et al., 2012; Si-
+monyan & Zisserman, 2014; Szegedy et al., 2015; Gir-
+shick et al., 2014). In addition, a wide range of techniques
+have been developed to enhance the performance or ease
+the training of CNNs (Lin et al., 2013; Zeiler & Fergus,
+2013; Maas et al., 2013; Ioffe & Szegedy, 2015). Despite
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+Figure 1. Visualization of conv1 ﬁlters from AlexNet. Each ﬁl-
+ter and its pairing ﬁlter (wi and ¯wi next to each other) appear
+surprisingly opposite (in phase) to each other. See text for details.
+
+the great empirical success, fundamental understanding of
+CNNs is still lagging behind. Towards addressing this is-
+sue, this paper aims to provide insight on the intrinsic prop-
+erty of convolutional neural networks.
+To better comprehend the internal operations of CNNs,
+we investigate the well-known AlexNet (Krizhevsky et al.,
+2012) and thereafter discover that the network learns highly
+negatively-correlated pairs of ﬁlters for the ﬁrst few con-
+volution layers. Following our preliminary ﬁndings, we
+hypothesize that the lower convolution layers of AlexNet
+learn redundant ﬁlters to extract both positive and negative
+phase information of an input signal (Section 2.1). Based
+on the premise of our conjecture, we propose a novel, sim-
+ple yet effective activation scheme called Concatenated
+Rectiﬁed Linear Unit (CReLU). The proposed activation
+scheme preserves both positive and negative phase infor-
+mation while enforcing non-saturated non-linearity. The
+unique nature of CReLU allows a mathematical charac-
+terization of convolution layers in terms of reconstruction
+property, which is an important indicator of how expres-
+sive and generalizable the corresponding CNN features are
+(Section 2.2).
+In experiments, we evaluate the CNN models with CReLU
+and make a comparison to models with ReLU and Abso-
+lute Value Rectiﬁcation Units (AVR) (Jarrett et al., 2009)
+on benchmark object recognition datasets, such as CIFAR-
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+(a) conv1
+
+(b) conv2
+
+(e) conv5
+Figure 2. Histograms of µr(red) and µw(blue) for AlexNet. Recall that for a set of unit length ﬁlters {φi}, we deﬁne µφ
+i = (cid:104)φi, ¯φi(cid:105)
+where ¯φi is the pairing ﬁlter of φi. For conv1 layer, the distribution of µw (from the AlexNet ﬁlters) is negatively centered, which
+signiﬁcantly differs from that of µr (from random ﬁlters), whose center is very close to zero. The center gradually shifts towards zero
+when going deeper into the network.
+
+(c) conv3
+
+(d) conv4
+
+10/100 and ImageNet (Section 3). We demonstrate that
+simply replacing ReLU with CReLU for the lower con-
+volution layers of an existing state-of-the-art CNN archi-
+tecture yields a substantial improvement in classiﬁcation
+performance. In addition, CReLU allows to attain notable
+parameter reduction without sacriﬁcing classiﬁcation per-
+formance when applied appropriately.
+We analyze our experimental results from several view-
+points, such as regularization (Section 4.1) and invariant
+representation learning (Section 4.2). Retrospectively, we
+provide empirical evaluations on the reconstruction prop-
+erty of CReLU models; we also conﬁrm that by integrating
+CReLU, the original “pair-grouping” phenomenon van-
+ishes as expected (Section 4.3). Overall, our results sug-
+gest that by better understanding the nature of CNNs, we
+are able to realize their higher potential with a simple mod-
+iﬁcation of the architecture.
+2. CRelu and Reconstruction Property
+2.1. Conjecture on Convolution Layers
+
+i = (cid:104)φi, ¯φi(cid:105).
+
+In our initial exploration of classic CNNs trained on natural
+images such as AlexNet (Krizhevsky et al., 2012), we noted
+a curious property of the ﬁrst convolution layer ﬁlters:
+these ﬁlters tend to form “pairs”. More precisely, assum-
+ing unit length vector for each ﬁlter φi, we deﬁne a pairing
+ﬁlter of φi in the following way: ¯φi = argminφj(cid:104)φi, φj(cid:105).
+We also deﬁne their cosine similarity µφ
+In Figure 1, we show each normalized ﬁlter of the ﬁrst con-
+volution layer from AlexNet with its pairing ﬁlter. Interest-
+ingly, they appear surprisingly opposite to each other, i.e.,
+for each ﬁlter, there does exist another ﬁlter that is almost
+on the opposite phase. Indeed, AlexNet employs the popu-
+lar non-saturated activation function, Rectiﬁed Linear Unit
+(ReLU) (Nair & Hinton, 2010), which zeros out negative
+values and produces sparse activation. As a consequence,
+if both the positive phase and negative phase along a spe-
+ciﬁc direction participate in representing the input space,
+the network then needs to learn two linearly dependent ﬁl-
+ters of both phases.
+
+To systematically study the pairing phenomenon in higher
+i ’s for conv1-conv5
+layers, we graph the histograms of ¯µw
+ﬁlters from AlexNet in Figure 2. For comparison, we gen-
+erate random Gaussian ﬁlters ri’s of unit norm1 and plot
+i ’s together. For conv1 layer, we ob-
+the histograms of ¯µr
+serve that the distribution of ¯µw
+is negatively centered; by
+i
+i is only slightly negative with a
+contrast, the mean of ¯µr
+small standard deviation. Then the center of ¯µw
+i shifts to-
+wards zero gradually when going deeper into the network.
+This implies that convolution ﬁlters of the lower layers tend
+to be paired up with one or a few others that represent their
+opposite phase, while the phenomenon gradually lessens as
+they go deeper.
+Following these observations, we hypothesize that despite
+ReLU erasing negative linear responses, the ﬁrst few con-
+volution layers of a deep CNN manage to capture both
+negative and positive phase information through learning
+pairs or groups of negatively correlated ﬁlters. This con-
+jecture implies that there exists a redundancy among the
+ﬁlters from the lower convolution layers.
+In fact, for a very special class of deep architecture, the in-
+variant scattering convolutional network (Bruna & Mallat,
+2013), it is well-known that its set of convolution ﬁlters,
+which are wavelets, is overcomplete in order to be able to
+fully recover the original input signals. On the one hand,
+similar to ReLU, each individual activation within the scat-
+tering network preserves partial information of the input.
+On the other hand, different from ReLU but more similar
+to AVR, scattering network activation preserves the energy
+information, i.e., keeping the modulus of the responses but
+erasing the phase information; ReLU from a generic CNN,
+as a matter of fact, retains the phase information but elim-
+inates the modulus information when the phase of a re-
+sponse is negative. In addition, while the wavelets for scat-
+tering networks are manually engineered, convolution ﬁl-
+ters from CNNs must be learned, which makes the rigorous
+theoretical analysis challenging.
+
+1We sample each entry from standard normal distribution in-
+
+dependently and normalize the vector to have unit l2 norm.
+
+-1-0.8-0.6-0.4-0.20-0.7-0.6-0.5-0.4-0.3-0.2-0.10-0.5-0.4-0.3-0.2-0.10-0.4-0.3-0.2-0.10-0.5-0.4-0.3-0.2-0.10Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+Now suppose we can leverage the pairing prior and design
+a method to explicitly allow both positive and negative ac-
+tivation, then we will be able to alleviate the redundancy
+among convolution ﬁlters caused by ReLU non-linearity
+and make more efﬁcient use of the trainable parameters. To
+this end, we propose a novel activation scheme, Concate-
+nated Rectiﬁed Linear Units, or CReLU. It simply makes
+an identical copy of the linear responses after convolution,
+negate them, concatenate both parts of activation, and then
+apply ReLU altogether. More precisely, we denote ReLU
+as [·]+ (cid:44) max(·, 0), and deﬁne CReLU as follows:
+Deﬁnition 2.1. CReLU activation, denoted by ρc : R →
+R2, is deﬁned as follows: ∀x ∈ R, ρc(x) (cid:44) ([x]+, [−x]+).
+The rationale of our activation scheme is to allow a ﬁlter to
+be activated in both positive and negative direction while
+maintaining the same degree of non-saturated non-linearity.
+An alternative way to allow negative activation is to em-
+ploy the broader class of non-saturated activation functions
+including Leaky ReLU and its variants (Maas et al., 2013;
+Xu et al., 2015). Leaky ReLU assigns a small slope to the
+negative part instead of completely dropping it. These ac-
+tivation functions share similar motivation with CReLU in
+the sense that they both tackle the two potential problems
+caused by the hard zero thresholding: (1) the weights of
+a ﬁlter will not be adjusted if it is never activated, and (2)
+truncating all negative information can potentially hamper
+the learning. However, CReLU is based on an activation
+scheme rather than a function, which fundamentally differ-
+entiates itself from Leaky ReLU or other variants. In our
+version, we apply ReLU after separating the negative and
+positive part to compose CReLU, but it is not the only fea-
+sible non-linearity. For example, CReLU can be combined
+with other activation functions, such as Leaky ReLU, to
+add more diversity to the architecture.
+Another natural analogy to draw is between CReLU and
+AVR, where the latter one only preserves the modulus in-
+formation but discard the phase information, similar to the
+scattering network. AVR has not been widely used recently
+for the CNN models due to its suboptimal empirical per-
+formance. We conﬁrm this common belief in the matter of
+large-scale image recognition task (Section 3) and conclude
+that modulus information alone does not sufﬁce to produce
+state-of-the-art deep CNN features.
+
+2.2. Reconstruction Property
+
+A notable property of CReLU is its information preserva-
+tion nature: CReLU conserves both negative and positive
+linear responses after convolution. A direct consequence of
+information preserving is the reconstruction power of the
+convolution layers equipped with CReLU.
+Reconstruction property of a CNN implies that its fea-
+
+tures are representative of the input data. This aspect of
+CNNs has gained interest recently: Mahendran & Vedaldi
+(2015) invert CNN features back to the input under sim-
+ple natural image priors; Zhao et al. (2015) stack autoen-
+coders with reconstruction objective to build better classi-
+ﬁers. Bruna et al. (2013) theoretically investigate general
+conditions under which the max-pooling layer followed by
+ReLU is injective and measure stability of the inverting
+process by computing the Lipschitz lower bound. How-
+ever, their bounds are non-trivial only when the number of
+ﬁlters signiﬁcantly outnumbers the input dimension, which
+is not realistic.
+In our case, it becomes more straightforward to analyze the
+reconstruction property since CReLU preserves all the in-
+formation after convolution. The rest of this section mathe-
+matically characterizes the reconstruction property of a sin-
+gle convolution layer followed by CReLU with or without
+max-pooling layer.
+We ﬁrst analyze the reconstruction property of convolution
+followed by CReLU without max-pooling. This case is
+directly pertinent as deep networks replacing max-pooling
+with stride has become more prominent in recent stud-
+ies (Springenberg et al., 2014). The following proposition
+states that the part of an input signal spanned by the shifts
+of the ﬁlters is well preserved.
+Proposition 2.1. Let x ∈ RD be an input vector2 and W be
+the D-by-K matrix whose columns vectors are composed
+of wi ∈ Rl, i = 1, . . . , K convolution ﬁlters. Furthermore,
+let x = x(cid:48) + (x − x(cid:48)), where x(cid:48) ∈ range(W ) and x − x(cid:48) ∈
+ker(W ). Then we can reconstruct x(cid:48) with fcnn(x), where
+
+fcnn(x) (cid:44) CReLU(cid:0)W T x(cid:1).
+
+See Section A.1 in the supplementary materials for proof.
+Next, we add max-pooling into the picture. To reach a non-
+trivial bound, we need additional constraints on the input
+space. Due to space limit, we carefully explain the con-
+straints and the theoretical consequence in Section A.2 of
+the supplementary materials. We will revisit this subject
+after the experiment section (Section 4.3).
+3. Benchmark Results
+We evaluate the effectiveness of the CReLU activation
+scheme on three benchmark datasets: CIFAR-10, CIFAR-
+100 (Krizhevsky, 2009) and ImageNet (Deng et al., 2009).
+To directly assess the impact of CReLU, we employ exist-
+ing CNN architectures with ReLU that have already shown
+a good recognition baseline and demonstrate improved per-
+formance on top by replacing ReLU into CReLU. Note
+that the models with CReLU activation don’t need sig-
+
+2For clarity, we assume the input signals are vectors (1D)
+rather than images (2D); however, similar analysis can be done
+for 2D case.
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+Table 1. Test set recognition error rates on CIFAR-10/100. We compare the performance of ReLU models (baseline) and CReLU
+models with different model capacities: “double” refers to the models that double the number of ﬁlters and “half” refers to the models
+that halve the number of ﬁlters. The error rates are provided in multiple ways, such as “Single”, “Average” (with standard error), or
+“Vote”, based on cross-validation methods. We also report the corresponding train error rates for the Single model. The number of
+model parameters are given in million. Please see the main text for more details about model evaluation.
+
+CIFAR-10
+
+CIFAR-100
+
+Model
+
+Baseline
++ (double)
+
+AVR
+
+CReLU
++ (half)
+
+Single
+
+train
+1.09
+0.47
+4.10
+4.23
+4.73
+
+test
+9.17
+8.65
+8.32
+8.43
+8.37
+
+Average
+10.20±0.09
+9.87±0.09
+10.26±0.10
+9.39±0.11
+9.44±0.09
+
+Vote
+7.55
+7.28
+7.76
+7.09
+7.09
+
+Single
+
+train
+13.68
+6.03
+19.35
+14.25
+21.01
+
+test
+36.30
+34.77
+35.00
+31.48
+33.68
+
+Average
+38.52±0.12
+36.73±0.15
+37.24±0.20
+33.76±0.12
+36.20±0.18
+
+Vote
+31.26
+28.34
+29.77
+27.60
+29.93
+
+params.
+
+1.4M
+5.6M
+1.4M
+2.8M
+0.7M
+
+niﬁcant hyperparameter tuning from the baseline ReLU
+model, and in most of our experiments, we only tune
+dropout rate while other hyperparameters (e.g., learning
+rate, mini-batch size) remain the same. We also replace
+ReLU with AVR for comparison with CReLU. The details
+of network architecture are in Section F of the supplemen-
+tary materials.
+
+3.1. CIFAR-10 and CIFAR-100
+
+The CIFAR-10 and 100 datasets (Krizhevsky, 2009) each
+consist of 50, 000 training and 10, 000 testing examples of
+32 × 32 images evenly drawn from 10 and 100 classes, re-
+spectively. We subtract the mean and divide by the standard
+deviation for preprocessing and use random horizontal ﬂip
+for data augmentation.
+We use the ConvPool-CNN-C model (Springenberg et al.,
+2014) as our baseline model, which is composed of con-
+volution and pooling followed by ReLU without fully-
+connected layers. This baseline model serves our purpose
+well since it has clearly outlined network architecture only
+with convolution, pooling, and ReLU. It has also shown
+competitive recognition performance using a fairly small
+number of model parameters.
+First, we integrate CReLU into the baseline model by sim-
+ply replacing ReLU while keeping the number of convolu-
+tion ﬁlters the same. This doubles the number of output
+channels at each convolution layer and the total number
+of model parameters is doubled. To see whether the per-
+formance gain comes from the increased model capacity,
+we conduct additional experiments with the baseline model
+while doubling the number of ﬁlters and the CReLU model
+while halving the number of ﬁlters. We also evaluate the
+performance of the AVR model while keeping the number
+of convolution ﬁlters the same as the baseline model.
+Since the datasets don’t provide pre-deﬁned validation set,
+we conduct two different cross-validation schemes:
+
+1. “Single”: we hold out a subset of training set for initial
+training and retrain the network from scratch using the
+
+whole training set until we reach at the same loss on a
+hold out set (Goodfellow et al., 2013). For this case,
+we also report the corresponding train error rates.
+
+2. 10-folds: we divide training set into 10 folds and do
+validation on each of 10 folds while training the net-
+works on the rest of 9 folds. The mean error rate
+of single network (“Average”) and the error rate with
+model averaging of 10 networks (“Vote”) are reported.
+
+The recognition results are summarized in Table 1. On
+CIFAR-10, we observe signiﬁcant improvement with the
+CReLU activation over ReLU. Especially, CReLU mod-
+els consistently improve over ReLU models with the same
+number of neurons (or activations) while reducing the num-
+ber of model parameters by half (e.g., CReLU + half model
+and the baseline model have the same number of neurons
+while the number of model parameters are 0.7M and 1.4M,
+respectively). On CIFAR-100, the models with larger ca-
+pacity generally improve the performance for both activa-
+tion schemes. Nevertheless, we still ﬁnd a clear beneﬁt
+of using CReLU activation that shows signiﬁcant perfor-
+mance gain when it is compared to the model with the
+same number of neurons, i.e., half the number of model pa-
+rameters. One possible explanation for the beneﬁt of using
+CReLU is its regularization effect, as can be conﬁrmed in
+Table 1 that the CReLU models showed signiﬁcantly lower
+gap between train and test set error rates than those of the
+baseline ReLU models.
+To our slight surprise, AVR outperforms the baseline
+ReLU model on CIFAR-100 with respect to all evalua-
+tion metrics and on CIFAR-10 with respect to single-model
+evaluation. It also reaches promising single-model recog-
+nition accuracy compared to CReLU on CIFAR-10; how-
+ever, when averaging or voting across 10-folds validation
+models, AVR becomes clearly inferior to CReLU.
+
+Experiments on Deeper Networks. We conduct experi-
+ments with very deep CNN that has a similar network ar-
+chitecture to the VGG network (Simonyan & Zisserman,
+2014). Speciﬁcally, we follow the model architecture and
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+Table 2. Test set recognition error rates on CIFAR-10/100 us-
+ing deeper networks. We gradually apply CReLU to replace
+ReLU after conv1, conv3, and conv5 layers of the baseline VGG
+network while halving the number of convolution ﬁlters.
+
+Model
+VGG
+(conv1)
+(conv1,3)
+(conv1,3,5)
+
+Model
+VGG
+(conv1)
+(conv1,3)
+(conv1,3,5)
+
+CIFAR-10
+
+Average
+6.90±0.03
+6.45±0.05
+6.45±0.02
+6.45±0.07
+
+Single
+6.35
+6.18
+5.94
+6.06
+CIFAR-100
+
+Single
+28.99
+27.29
+26.52
+26.16
+
+Average
+30.27±0.09
+28.43±0.11
+27.79±0.08
+27.67±0.07
+
+Vote
+5.43
+5.22
+5.09
+5.16
+
+Vote
+26.85
+24.67
+23.93
+23.66
+
+training procedure in Zagoruyko (2015). Besides the con-
+volution and pooling layers, this network contains batch
+normalization (Ioffe & Szegedy, 2015) and fully connected
+layers. Due to the sophistication of the network compo-
+sition which may introduce complicated interaction with
+CReLU, we only integrate CReLU into the ﬁrst few lay-
+ers. Similarly, we subtract the mean and divide by the stan-
+dard deviation for preprocessing and use horizontal ﬂip and
+random shifts for data augmentation.
+In this experiment3, we gradually replace ReLU after the
+ﬁrst, third, and the ﬁfth convolution layers4 with CReLU
+while halving the number of ﬁlters, resulting in a reduced
+number of model parameters. We report the test set error
+rates using the same cross-validation schemes as in the pre-
+vious experiments. As shown in Table 2, there is substan-
+tial performance gain in both datasets by replacing ReLU
+with CReLU. Overall, the proposed CReLU activation
+improves the performance of the state-of-the-art VGG net-
+work signiﬁcantly, achieving highly competitive error rates
+to other state-of-the-art methods, as summarized in Table 3.
+
+3.2. ImageNet
+
+To assess the impact of CReLU on large scale dataset,
+we perform experiments on ImageNet dataset (Deng et al.,
+2009)5, which contains about 1.3M images for training and
+50, 000 for validation from 1, 000 object categories. For
+preprocessing, we subtract the mean and divide by the stan-
+dard deviation for each input channel, and follow the data
+augmentation as described in (Krizhevsky et al., 2012).
+We take the All-CNN-B model (Springenberg et al., 2014)
+
+3We attempted to replace ReLU with AVR on various lay-
+ers but we observed signiﬁcant performance drop with AVR non-
+linearity when used for deeper networks.
+
+4Integrating CReLU into the second or fourth layer before
+
+max-pooling layers did not improve the performance.
+
+5We used a version of ImageNet dataset for ILSVRC 2012.
+
+Table 3. Comparison to other methods on CIFAR-10/100.
+
+Model
+
+(Rippel et al., 2015)
+(Snoek et al., 2015)
+(Liang & Hu, 2015)
+(Lee et al., 2016)
+
+(Srivastava et al., 2015)
+
+VGG
+
+VGG + CReLU
+
+CIFAR-10
+
+8.60
+6.37
+7.09
+6.05
+7.60
+5.43
+5.09
+
+CIFAR-100
+
+31.60
+27.40
+31.75
+32.37
+32.24
+26.85
+23.66
+
+as our baseline model. The network architecture of All-
+CNN-B is similar to that of AlexNet (Krizhevsky et al.,
+2012), where the max-pooling layer is replaced by convo-
+lution with the same kernel size and stride, the fully con-
+nected layer is replaced by 1 × 1 convolution layers fol-
+lowed by average pooling, and the local response normal-
+ization layers are discarded. In sum, the layers other than
+convolution layers are replaced or discarded and ﬁnally the
+network consists of convolution layers only. We choose
+this model since it reduces the potential complication in-
+troduced by CReLU interacting with other types of layers,
+such as batch normalization or fully connected layers.
+We gradually integrate more convolution layers with
+CReLU (e.g., conv1–4, conv1–7, conv1–9), while keep-
+ing the same number of ﬁlters. These models contain
+more parameters than the baseline model. We also eval-
+uate two models where one replaces all ReLU layers into
+CReLU and the other conv1,conv4 and conv7 only, where
+both models reduce the number of convolution layers be-
+fore CReLU by half. Hence, these models contain fewer
+parameters than the baseline model. For comparison, AVR
+models are also constructed by gradually replacing ReLU
+in the same manner as the CReLU experiments (conv1–
+4, conv1–7, conv1–9). The network architectures and the
+training details are in Section F and Section E of the sup-
+plementary materials.
+The results are provided in Table 4. We report the top-1
+and top-5 error rates with center crop only and by averag-
+ing scores over 10 patches from the center crop and four
+corners and with horizontal ﬂip (Krizhevsky et al., 2012).
+Interestingly, integrating CReLU to conv1-4 achieves the
+best results, whereas going deeper with higher model ca-
+pacity does not further beneﬁt the classiﬁcation perfor-
+mance. In fact, this parallels with our initial observation on
+AlexNet (Figure 2 in Section 2.1)—there exists less “pair-
+ing” in the deeper convolution layers and thus there is not
+much gain by decomposing the phase in the deeper layers.
+AVR networks exhibit the same trend but do not notice-
+ably improve upon the baseline performance, which im-
+plies that AVR is not the most suitable candidate for large-
+scale deep representation learning. Another interesting ob-
+servation, which we will discuss further in Section 4.2, is
+that the model integrating CReLU into conv1, conv4 and
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+(a) conv1
+
+(b) conv2
+
+(c) conv3
+
+(d) conv4
+
+Figure 3. Histograms of µr(red) and µw(blue) for CReLU model on ImageNet. The two distributions align with each other for all
+conv1-conv4 layers–as we expected, the pairing phenomenon is not present any more after applying the CReLU activation scheme.
+
+Model
+Baseline
+
+Table 4. Validation error rates on ImageNet. We compare the
+performance of baseline model with the proposed CReLU mod-
+els at different levels of activation scheme replacement. Error
+rates with † are obtained by averaging scores from 10 patches.
+top-5†
+17.17
+16.49
+17.42
+18.39
+15.32
+15.72
+16.01
+16.14
+16.72
+
+CReLU (conv1,4,7)
+CReLU (conv1–4)
+CReLU (conv1–7)
+CReLU (conv1–9)
+
+top-1†
+38.03
+37.32
+38.21
+39.70
+35.70
+36.20
+36.53
+36.50
+37.28
+
+top-1
+41.81
+41.12
+42.36
+43.33
+40.45
+39.82
+39.97
+40.15
+40.93
+
+top-5
+19.74
+19.25
+20.05
+21.05
+18.58
+18.28
+18.33
+18.58
+19.39
+
+AVR (conv1–4)
+AVR (conv1–7)
+AVR (conv1–9)
+
+CReLU (all)
+
+conv7 layers also achieve highly competitive recognition
+results with even fewer parameters than the baseline model.
+In sum, we believe that such a signiﬁcant improvement
+over the baseline model by simply modifying the activation
+scheme is a pleasantly surprising result.6
+We also compare our best models with AlexNet and other
+variants in Table 5. Even though reducing the number
+of parameters is not our primary goal, it is worth not-
+ing that our model with only 4.6M parameters (CReLU +
+all) outperforms FastFood-32-AD (FriedNet) (Yang et al.,
+2015) and Pruned AlexNet (PrunedNet) (Han et al., 2015),
+whose designs directly aim at parameter reduction. There-
+fore, besides the performance boost, another signiﬁcance of
+CReLU activation scheme is in designing more parameter-
+efﬁcient deep neural networks.
+4. Discussion
+In this section, we discuss qualitative properties of CReLU
+activation scheme in several viewpoints, such as regulariza-
+tion of the network and learning invariant representation.
+
+4.1. A View from Regularization
+
+In general, a model with more trainable parameters is
+more prone to overﬁtting. However, somewhat counter-
+
+6We note that Springenberg et al. (2014) reported slightly bet-
+ter result (41.2% top-1 error rate with center crop only) than our
+replication result, but still the improvement is signiﬁcant.
+
+Table 5. Comparison to other methods on ImageNet. We com-
+pare with AlexNet and other variants, such as FastFood-32-AD
+(FriedNet) (Yang et al., 2015) and pruned AlexNet (Pruned-
+Net) (Han et al., 2015), which are modiﬁcations of AlexNet aim-
+ing at reducing the number of parameters, as well as All-CNN-B,
+the baseline model (Springenberg et al., 2014). Error rates with †
+are obtained by averaging scores from 10 patches.
+
+Model
+AlexNet
+FriedNet
+PrunedNet
+AllConvB
+
+CReLU (all)
+(conv1,4,7)
+(conv1–4)
+
+top-1
+42.6
+41.93
+42.77
+41.81
+40.93
+40.45
+39.82
+
+top-5
+19.6
+
+–
+
+19.67
+19.74
+19.39
+18.58
+18.28
+
+top-1†
+40.7
+
+–
+–
+
+38.03
+37.28
+35.70
+36.20
+
+top-5†
+18.2
+
+–
+–
+
+17.17
+16.72
+15.32
+15.72
+
+params.
+
+61M
+32.8M
+6.7M
+9.4M
+4.7M
+8.6 M
+10.1M
+
+intuitively, for the all-conv CIFAR experiments, the models
+with CReLU display much less overﬁtting issue compared
+to the baseline models with ReLU, even though it has twice
+as many parameters (Table 1). We contemplate that keep-
+ing both positive and negative phase information makes the
+training more challenging, and such effect has been lever-
+aged to better regularize deep networks, especially when
+working on small datasets.
+Besides the empirical evidence, we can also describe the
+regularization effect by deriving a Rademacher complexity
+bound for the CReLU layer followed by linear transforma-
+tion as follows:
+Theorem 4.1. Let G be the class of real functions Rdin →
+R with input dimension F, that is, G = [F]din
+j=1. Let
+H be a linear transformation function from R2din to R,
+parametrized by W , where (cid:107)W(cid:107)2 ≤ B. Then, we have
+
+ˆRL(H ◦ ρc ◦ G) ≤(cid:112)
+
+dinB ˆRL(F).
+
+The proof is in Section B of the supplementary materials.
+Theorem 4.1 says that the complexity bound of CReLU +
+linear transformation is the same as that of ReLU + linear
+transformation, which is proved by Wan et al. (2013). In
+other words, although the number of model parameters are
+doubled by CReLU, the model complexity does not neces-
+sarily increase.
+
+-0.3-0.25-0.2-0.15-0.1-0.05-0.4-0.35-0.3-0.25-0.2-0.15-0.1-0.05-0.14-0.12-0.1-0.08-0.06-0.04-0.02-0.09-0.08-0.07-0.06-0.05-0.04-0.03-0.02Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+(a) CIFAR-10
+
+(b) CIFAR-100
+
+(c) ImageNet
+
+Figure 4. Invariance Scores for ReLU Models vs CReLU Models. The invariance scores for CReLU models are consistently higher
+than ReLU models. The invariance scores jump after max-pooling layers. Moreover, even though the invariance scores tend to increase
+along with the depth of the networks, the progression is not monotonic.
+
+Table 6. Correlation Comparison. The averaged correlation
+between the normalized positive-negative-pair (pair) outgoing
+weights and the normalized unmatched-pair (non-pair) outgoing
+weights are both well below 1 for all layers, indicating that the
+pair outgoing weights are capable of imposing diverse non-linear
+manipulation separately on the positive and negative components.
+
+ImageNet Conv1–7 CReLU Model
+layer
+non-pair
+conv1
+conv2
+conv3
+conv4
+conv5
+conv6
+conv7
+
+0.372 ±0.372
+0.180 ±0.149
+0.462 ±0.249
+0.175 ±0.146
+0.206 ±0.136
+0.256 ±0.124
+0.131 ±0.122
+
+pair
+
+0.165 ±0.154
+0.157 ±0.137
+0.120 ±0.120
+0.119 ±0.100
+0.105 ±0.093
+0.086 ±0.080
+0.080 ±0.070
+
+4.2. Towards Learning Invariant Features
+
+We measure the invariance scores using the evaluation met-
+rics from (Goodfellow et al., 2009) and draw another com-
+parison between the CReLU models and the ReLU mod-
+els. For a fair evaluation, we compare all 7 conv layers from
+all-conv ReLU model with those from all-conv CReLU
+model trained on CIFAR-10/100. In the case of ImageNet
+experiments, we choose the model where CReLU replaces
+ReLU for the ﬁrst 7 conv layers and compare the invariance
+scores with the ﬁrst 7 conv layers from the baseline ReLU
+model. Section D in the supplementary materials details
+how the invariance scores are measured.
+Figure 4 plots the invariance scores for networks trained on
+CIFAR-10, CIFAR-100, and ImageNet respectively. The
+invariance scores of CReLU models are consistently higher
+than those of ReLU models. For CIFAR-10 and CIFAR-
+100, there is a big increase between conv2 and conv3
+then again between conv4 and conv6, which are due to
+max-pooling layer extracting shift invariance features. We
+also observe that although as a general trend, the invari-
+ance scores increase while going deeper into the networks–
+
+consistent with the observations from (Goodfellow et al.,
+2009), the progression is not monotonic. This interesting
+observation suggests the potentially diverse functionality
+of different layers in the CNN, which would be worthwhile
+for future investigation.
+In particular, the scores of ImageNet ReLU model attain lo-
+cal maximum at conv1, conv4 and conv7 layers. It inspires
+us to design the architecture where CReLU are placed after
+conv1, 4, and 7 layers to encourage invariance represen-
+tations while halving the number of ﬁlters to limit model
+capacity. Interestingly, this architecture achieves the best
+top1 and top5 recognition results when averaging scores
+from 10 patches.
+
+4.3. Revisiting the Reconstruction Property
+
+In Section 2.1, we observe that lower layer convolution ﬁl-
+ters from ReLU models form negatively-correlated pairs.
+Does the pairing phenomenon still exist for CReLU mod-
+els? We take our best CReLU model trained on ImageNet
+(where the ﬁrst 4 conv layers are integrated with CReLU)
+and repeat the histogram experiments to generate Figure 3.
+In clear contrast to Figure 2, the distributions of ¯µw
+from
+i
+CReLU model well align with the distributions of ¯µr
+i from
+random Gaussian ﬁlters. In other words, each lower layer
+convolution ﬁlter now uniquely spans its own direction
+without a negatively correlated pairing ﬁlter, while CReLU
+implicitly plays the role of “pair-grouping”.
+The empirical gap between CReLU and AVR justiﬁes
+that both modulus and phase information are essential
+in learning deep CNN features.
+In addition, to ensure
+that the outgoing weights for the positive and negative
+phase are not merely negations of each other, we measure
+their correlations for the conv1-7 CReLU model trained
+on ImageNet. Table 6 compares the averaged correla-
+tion between the (normalized) positive-negative-pair (pair)
+outgoing weights and the (normalized) unmatched-pair
+(non-pair) outgoing weights. The pair correlations are
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+(a) Original image
+
+(b) conv1
+
+(c) conv2
+
+(d) conv3
+
+(e) conv4
+
+Figure 5. CReLU Model Reconstructions. We use a simple linear reconstruction algorithm (see Algorithm 1 in the supplementary
+materials) to reconstruct the original image from conv1-conv4 features (left to right). The image is best viewed in color/screen.
+
+marginally higher than the non-pair ones but both are on
+average far below 1 for all layers. This suggests that, in
+contrast to AVR, the CReLU network does not simply fo-
+cus on the modulus information but imposes different ma-
+nipulation over the opposite phases.
+In Section 2.2, we mathematically characterize the re-
+construction property of convolution layers with CReLU.
+Proposition 2.1 claims that the part of an input spanned
+by the shifts of the ﬁlters can be fully recovered.
+Ima-
+geNet contains a large number of training images from a
+wide variety of categories; the convolution ﬁlters learned
+from ImageNet are thus expected to be diverse enough to
+describe the domain of natural images. Hence, to qualita-
+tively verify the result from Proposition 2.1, we can directly
+invert features from our best CReLU model trained on Im-
+ageNet via the simple reconstruction algorithm described
+in the proof of Proposition 2.1 (Algorithm 1 in the sup-
+plementary materials). Figure 5 shows an image from the
+validation set along with its reconstructions using conv1-
+conv4 features (see Section G in the supplementary mate-
+rials for more reconstruction examples). Unlike other re-
+construction methods (Dosovitskiy & Brox, 2015; Mahen-
+dran & Vedaldi, 2015), our algorithm does not involve any
+additional learning. Nevertheless, it still produces reason-
+able reconstructions, which supports our theoretical claim
+in Proposition 2.1.
+For the convolution layers involving max-pooling opera-
+tion, it is less straightforward to perform direct reconstruc-
+tion. Yet we evaluate the conv+CReLU+max-pooling re-
+construction power via measuring properties of the convo-
+lution ﬁlters and the details are elaborated in Section C of
+the supplementary materials.
+5. Conclusion
+We propose a new activation scheme, CReLU, which
+conserves both positive and negative linear responses af-
+ter convolution so that each ﬁlter can efﬁciently repre-
+sent its unique direction. Our work demonstrates that
+CReLU improves deep networks with classiﬁcation ob-
+
+jective. Since CReLU preserves the available informa-
+tion from input while maintaining the non-saturated non-
+linearity, it can potentially beneﬁt more complicated ma-
+chine learning tasks such as structured output prediction
+and image generation. Another direction for future re-
+search involves engaging CReLU to the abundant set of
+existing deep neural network techniques and frameworks.
+We hope to investigate along these directions in the near
+future.
+
+ACKNOWLEDGMENTS
+
+We are grateful to Erik Brinkman, Harry Altman and Mark
+Rudelson for their helpful comments and support. We ac-
+knowledge Yuting Zhang and Anna Gilbert for discussions
+during the preliminary stage of this work. This work was
+supported in part by ONR N00014-13-1-0762 and NSF
+CAREER IIS-1453651. We thank Technicolor Research
+for providing resources and NVIDIA for the donation of
+GPUs.
+
+References
+Bruna, J. and Mallat, S.
+networks. PAMI, 2013.
+
+Invariant scattering convolution
+
+Bruna, J., Szlam, A., and LeCun, Y. Signal recovery from
+
+pooling representations. In ICML, 2013.
+
+Christensen, O. An introduction to frames and Riesz bases.
+
+Birkhuser Basel, 2003.
+
+Deng, J., Dong, W., Socher, R., Li, L.-j., Li, K., and
+Fei-Fei, L. Imagenet: A large-scale hierarchical image
+database. In CVPR, 2009.
+
+Dosovitskiy, A. and Brox, T. Inverting convolutional net-
+
+works with convolutional networks. In CVPR, 2015.
+
+Girshick, R., Donahue, J., Darrell, T., and Malik, J. Rich
+feature hierarchies for accurate object detection and se-
+mantic segmentation. In CVPR, 2014.
+
+Understanding and Improving Convolutional Neural Networks via Concatenated Rectiﬁed Linear Units
+
+Goodfellow, I., Lee, H., Le, Q. V., Saxe, A., and Ng, A.
+Measuring invariances in deep networks. In NIPS, 2009.
+
+Srivastava, R., Greff, K., and Schmidhuber, J. Training
+
+very deep networks. In NIPS, 2015.
+
+Szegedy, C., Liu, W., Jia, Y., Sermanet, P., Reed, S.,
+Anguelov, D., Erhan, D., Vanhoucke, V., and Rabi-
+novich, A. Going deeper with convolutions. In CVPR,
+2015.
+
+Wan, L., Zeiler, M., Zhang, S., LeCun, Y., and Fergus, R.
+Regularization of neural networks using dropconnect. In
+ICML, 2013.
+
+Xu, B., Wang, N., Chen, T., and Li, M. Empirical evalua-
+tion of rectiﬁed activations in convolutional network. In
+ICML Workshop, 2015.
+
+Yang, Z., Moczulski, M., Denil, M., de Freitas, N., Smola,
+In
+
+A., Song, L., and Wang, Z. Deep fried convnets.
+ICCV, 2015.
+
+Zagoruyko, S. Torch blog. http://torch.ch/blog/
+
+2015/07/30/cifar.html, 2015.
+
+Zeiler, M. D. and Fergus, R. Stochastic pooling for regular-
+ization of deep convolutional neural networks. In ICLR,
+2013.
+
+Zhao, J., Mathieu, M., Goroshin, R., and Lecun, Y. Stacked
+
+what-where auto-encoders. In ICLR, 2015.
+
+Goodfellow, I., Warde-Farley, D., Mirza, M., Courville, A.,
+
+and Bengio, Y. Maxout networks. In ICML, 2013.
+
+Han, S., Pool, J., Tran, J., and Dally, W. J. Learning both
+weights and connections for efﬁcient neural network. In
+NIPS, 2015.
+
+Ioffe, S. and Szegedy, C. Batch normalization: Accelerat-
+ing deep network training by reducing internal covariate
+shift. In ICML, 2015.
+
+Jarrett, K., Kavukcuoglu, K., Ranzato, M., and LeCun,
+Y. What is the best multi-stage architecture for object
+recognition? In CVPR, 2009.
+
+Krizhevsky, A. Learning multiple layers of features from
+
+tiny images, 2009.
+
+Krizhevsky, A., Sutskever, l., and Hinton, G.
+
+Imagenet
+classiﬁcation with deep convolutional neural networks.
+In NIPS, 2012.
+
+Lee, C.-y., Gallagher, P. W., and Tu, Z. Generalizing pool-
+ing functions in convolutional neural networks: Mixed,
+gated, and tree. In AISTATS, 2016.
+
+Liang, M. and Hu, X. Recurrent convolutional neural net-
+
+work for object recognition. In CVPR, 2015.
+
+Lin, M., Chen, Q., and Yan, S. Network in network. In
+
+ICLR, 2013.
+
+Maas, A., Hannun, A. Y., and Ng, A. Rectiﬁer nonlineari-
+ties improve neural network acoustic models. In ICML,
+2013.
+
+Mahendran, A. and Vedaldi, A. Understanding deep image
+
+representations by inverting them. In CVPR, 2015.
+
+Nair, V. and Hinton, G. Rectiﬁed linear units improve re-
+
+stricted boltzmann machines. In ICML, 2010.
+
+Rippel, O., Snoek, J., and Adams, R. Spectral representa-
+tions for convolutional neural networks. In NIPS, 2015.
+
+Simonyan, K. and Zisserman, A. Very deep convolutional
+In ICLR,
+
+networks for large-scale image recognition.
+2014.
+
+Snoek, J., Rippel, O., Swersky, K., Kiros, R., Satish, N.,
+Sundaram, N., Patwary, M. M. A., and Adams, R. Scal-
+able bayesian optimization using deep neural networks.
+In ICML, 2015.
+
+Springenberg, J., Dosovitskiy, A., Brox, T., and Riedmiller,
+M. Striving for simplicity: The all convolutional net. In
+ICLR Workshop, 2014.
+
+

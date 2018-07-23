@@ -1,0 +1,1616 @@
+Strongly-Typed Recurrent Neural Networks
+
+David Balduzzi1
+Muhammad Ghifary1,2
+1Victoria University of Wellington, New Zealand
+2Weta Digital, New Zealand
+
+DBALDUZZI@GMAIL.COM
+MGHIFARY@GMAIL.COM
+
+Abstract
+
+Recurrent neural networks are increasing pop-
+ular models for sequential learning. Unfortu-
+nately, although the most effective RNN archi-
+tectures are perhaps excessively complicated, ex-
+tensive searches have not found simpler alterna-
+tives. This paper imports ideas from physics and
+functional programming into RNN design to pro-
+vide guiding principles. From physics, we in-
+troduce type constraints, analogous to the con-
+straints that forbids adding meters to seconds.
+From functional programming, we require that
+strongly-typed architectures factorize into state-
+less learnware and state-dependent ﬁrmware, re-
+ducing the impact of side-effects.
+The fea-
+tures learned by strongly-typed nets have a sim-
+ple semantic interpretation via dynamic average-
+pooling on one-dimensional convolutions. We
+also show that strongly-typed gradients are better
+behaved than in classical architectures, and char-
+acterize the representational power of strongly-
+typed nets. Finally, experiments show that, de-
+spite being more constrained, strongly-typed ar-
+chitectures achieve lower training and compara-
+ble generalization error to classical architectures.
+
+1. Introduction
+Recurrent neural networks (RNNs) are models that learn
+nonlinear relationships between sequences of inputs and
+outputs. Applications include speech recognition (Graves
+et al., 2013), image generation (Gregor et al., 2015), ma-
+chine translation (Sutskever et al., 2014) and image cap-
+tioning (Vinyals et al., 2015; Karpathy & Fei-Fei, 2015).
+Training RNNs is difﬁcult due to exploding and vanish-
+ing gradients (Hochreiter, 1991; Bengio et al., 1994; Pas-
+canu et al., 2013). Researchers have therefore developed
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+gradient-stabilizing architectures such as Long Short-Term
+Memories or LSTMs (Hochreiter & Schmidhuber, 1997)
+and Gated Recurrent Units or GRUs (Cho et al., 2014).
+Unfortunately, LSTMs and GRUs are complicated and con-
+tain many components whose roles are not well understood.
+Extensive searches (Bayer et al., 2009; Jozefowicz et al.,
+2015; Greff et al., 2015) have not yielded signiﬁcant im-
+provements. This paper takes a fresh approach inspired by
+dimensional analysis and functional programming.
+
+Intuition from dimensional analysis. Nodes in neural
+networks are devices that, by computing dot products,
+measure the similarity of their inputs to representations
+encoded in weight matrices.
+Ideally, the representation
+learned by a net should “carve nature at its joints”. An ex-
+emplar is the system of measurement that has been carved
+out of nature by physicists. It prescribes units for express-
+ing the readouts of standardized measuring devices (e.g.
+kelvin for thermometers and seconds for clocks) and rules
+for combining them.
+A fundamental rule is the principle of dimensional homo-
+geneity: it is only meaningful to add quantities expressed in
+the same units (Bridgman, 1922; Hart, 1995). For example
+adding seconds to volts is inadmissible. In this paper, we
+propose to take the measurements performed by neural net-
+works as seriously as physicists take their measurements,
+and apply the principle of dimensional homogeneity to the
+representations learned by neural nets, see section 2.
+
+Intuition from functional programming. Whereas
+feedforward nets learn to approximate functions, recurrent
+nets learn to approximate programs – suggesting lessons
+from language design are relevant to RNN design. Lan-
+guage researchers stress the beneﬁts of constraints: elim-
+inating GOTO (Dijkstra, 1968); introducing type-systems
+that prescribe the interfaces between parts of computer pro-
+grams and guarantee their consistency (Pierce, 2002); and
+working with stateless (pure) functions.
+For our purposes, types correspond to units as above. Let
+us therefore discuss the role of states. The reason for recur-
+
+Strongly-Typed Recurrent Neural Networks
+
+rent connections is precisely to introduce state-dependence.
+Unfortunately, state-dependent functions have side-effects
+– unintended knock-on effects such as exploding gradients.
+State-dependence without side-effects is not possible.
+The architectures proposed below encapsulate states in
+ﬁrmware (which has no learned parameters) so that the
+learnware (which encapsulates the parameters) is state-
+less. It follows that the learned features and gradients in
+strongly-typed architectures are better behaved and more
+interpretable than their classical counterparts, see section 3.
+Strictly speaking, the ideas from physics (to do with units)
+and functional programming (to do with states) are inde-
+pendent. However, we found that they complemented each
+other. We refer to architectures as strongly-typed when
+they both (i) preserve the type structure of their features and
+(ii) separate learned parameters from state-dependence.
+
+Overview. The core of the paper is section 2, which in-
+troduces strongly-typed linear algebra. As partial motiva-
+tion, we show how types are implicit in principal compo-
+nent analysis and feedforward networks. A careful analysis
+of the update equations in vanilla RNNs identiﬁes a ﬂaw
+in classical RNN designs that leads to incoherent features.
+Fixing the problem requires new update equations that pre-
+serve the type-structure of the features.
+Section 3 presents strongly-typed analogs of standard RNN
+architectures. It turns out that small tweaks to the standard
+update rules yield simpler features and gradients, theorem 1
+and corollary 2. Finally, theorem 3 shows that, despite their
+more constrained architecture, strongly-typed RNNs have
+similar representational power to classical RNNs. Exper-
+iments in section 4 show that strongly-typed RNNs have
+comparable generalization performance and, surprisingly,
+lower training error than classical architectures (suggesting
+greater representational power). The ﬂipside is that regu-
+larization appears to be more important for strongly-typed
+architectures, see experiments.
+
+Related work. The analogy between neural networks
+and functional programming was proposed in (Olah, 2015),
+which also argued that representations should be inter-
+preted as types. This paper extends Olah’s proposal. Prior
+work on typed-linear algebra (Macedo & Oliveira, 2013) is
+neither intended for nor suited to applications in machine
+learning. Many familiar RNN architectures already incor-
+porate forms of weak-typing, see section 3.1.
+
+2. Strongly-Typed Features
+A variety of type systems have been developed for mathe-
+matical logic and language design (Reynolds, 1974; Girard,
+1989; Pierce, 2002). We introduce a type-system based on
+
+linear algebra that is suited to deep learning. Informally,
+a type is a vector space with an orthogonal basis. A more
+precise deﬁnition along with rules for manipulating types is
+provided below. Section 2.2 provides examples; section 2.3
+uses types to identify a design ﬂaw in classical RNNs.
+
+2.1. Strongly-Typed Quasi-Linear Algebra
+
+Quasi-linear algebra is linear algebra supplemented with
+nonlinear functions that act coordinatewise.
+Deﬁnition 1. Dot-products are denoted by (cid:104)w, x(cid:105) or w
+
+A type T =(cid:0)V,(cid:104)•,•(cid:105),{ti}d
+
+(cid:1) is a d-dimensional vector
+
+space equipped with an inner product and an orthogonal
+basis such that (cid:104)ti, tj(cid:105) = 1[i=j].
+Given type T , we can represent vectors in v ∈ V as real-
+valued d-tuples via
+
+x.
+
+i=1
+
+(cid:124)
+
+vT ↔ (v1, . . . , vd) ∈ Rd where vi := (cid:104)v, ti(cid:105).
+Deﬁnition 2. The following operations are admissible:
+T1. Unary operations on a type: T → T
+
+Given a function f : R → R (e.g. scalar multiplica-
+tion, sigmoid σ, tanh τ or relu ρ), deﬁne
+
+f (v) :=(cid:0)f (v1), . . . , f (vd)(cid:1) ∈ T .
+
+T2. Binary operations on a type: T × T → T
+Given v, w ∈ T and an elementary binary operation
+bin ∈ {+,−, max, min, π1, π2}1, deﬁne
+
+bin(v, w) :=(cid:0)bin(v1, w1), . . . , bin(vd, wd)(cid:1).
+
+Binary operations on two different types (e.g. adding
+vectors expressed in different orthogonal bases) are
+not admissible.
+
+T3. Transformations between types: T1 → T2
+
+A type-transform is a linear map P : V1 → V2 such
+for i = {1, . . . , min(d1, d2)}.
+that P(t(1)
+Type-transformations are orthogonal matrices.
+
+) = t(2)
+
+i
+
+i
+
+T4. Diagonalization: T1 → (T2 → T2)
+
+Suppose that v ∈ T1 and w ∈ T2 have the same di-
+mension. Deﬁne
+
+vT1 (cid:12) wT2 := (v1 · w1, . . . , vd · wd) ∈ T2,
+
+where vi := (cid:104)v, t(1)
+(cid:105). Diagonal-
+ization converts type T1 into a new type, T2 → T2, that
+acts on T2 by coordinatewise scalar multiplication.
+
+(cid:105) and wi := (cid:104)w, t(2)
+
+i
+
+i
+
+Deﬁnition 1 is inspired by how physicists have carved the
+world into an orthogonal basis of meters, amps, volts etc.
+The analogy is not perfect: e.g. f (x) = x2 maps meters to
+square-meters, whereas types are invariant to coordinate-
+wise operations. Types are looser than physical units.
+
+1Note: πi is projection onto the ith coordinate.
+
+2.2. Motivating examples
+
+Eq. (1) over time obtains
+
+Strongly-Typed Recurrent Neural Networks
+
+
+
+v1
+
+...
+vd
+
+ ...
+
+c1
+...
+
+···
+
+...
+cd
+...
+
+ z =
+
+
+
+(cid:68)
+(cid:68)
+
+(cid:1)d
+(cid:1)d
+...
+
+(cid:124)
+1 ci
+
+(cid:124)
+d ci
+
+(v
+
+(v
+
+i=1, z
+
+i=1, z
+
+(cid:69)
+ ,
+(cid:69)
+
+V2z =
+
+We build intuition by recasting PCA and feedforward neu-
+ral nets from a type perspective.
+Principal component analysis (PCA). Let X ∈ Rn×d
+denote n datapoints {x(1), . . . , x(n)} ⊂ Rd. PCA factor-
+DP where P is a (d × d)-orthogonal ma-
+(cid:124)
+izes X
+trix and D = diag(d) contains the eigenvalues of X
+X. A
+common application of PCA is dimensionality reduction.
+From a type perspective, this consists in:
+T{pk} P
+
+T{pk} Proj−−−→
+
+T{ek} P−→
+
+T{ek},
+
+(cid:124)−−→
+
+X = P
+
+(cid:124)
+
+(cid:124)
+
+(i)
+
+(ii)
+
+(iii)
+
+(i) transforming the standard orthogonal basis {ek}d
+k=1 of
+Rd into the latent type given by the rows of P; (ii) project-
+ing onto a subtype (subset of coordinates in the latent type);
+and (iii) applying the inverse to recover the original type.
+
+Feedforward nets. The basic feedforward architecture is
+stacked layers computing h = f (W · x) where f (•) is a
+nonlinearity applied coordinatewise. We present two de-
+scriptions of the computation.
+The standard description is in terms of dot-products. Rows
+of W correspond to features, and matrix multiplication is
+a collection of dot-products that measure the similarity be-
+tween the input x and the row-features:
+
+··· w1
+
+...
+··· wd
+
+ x =
+
+(cid:104)w1, x(cid:105)
+
+(cid:104)wd, x(cid:105)
+
+...
+
+ .
+
+···
+
+···
+
+Wx =
+
+Factorize
+Types provide a ﬁner-grained description.
+(cid:124) by singular value decomposition into D =
+W = PDQ
+diag(d) and orthogonal matrices P and Q. The layer-
+computation can be rewritten as h = f (PDQ
+x). From a
+type-perspective, the layer thus:
+
+(cid:124)
+
+Tx
+
+(cid:124)−−→
+
+Q
+
+(i)
+
+Tlatent
+
+diag(d)(cid:12)•
+−−−−−−→
+
+(ii)
+
+Tlatent
+
+P−−→
+
+(iii)
+
+Th
+
+f (•)−−−→
+
+(iv)
+
+Th,
+
+(i) transforms x to a latent type; (ii) applies coordinatewise
+scalar multiplication to the latent type; (iii) transforms the
+result to the output type; and (iv) applies a coordinatewise
+nonlinearity. Feedforward nets learn interleaved sequences
+of type transforms and unary, type-preserving operations.
+
+2.3. Incoherent features in classical RNNs
+
+There is a subtle inconsistency in classical RNN designs
+that leads to incoherent features. Consider the updates:
+vanilla RNN: ht = σ(V · ht−1 + W · xt + b).
+
+(1)
+
+We drop the nonlinearity, since the inconsistency is already
+visible in the linear case. Letting zt := Wxt and unfolding
+
+t(cid:88)
+
+s=1
+
+Vt−s · zs.
+
+(2)
+
+ht =
+
+The inconsistency can be seen via dot-products and via
+types. From the dot-product perspective, observe that mul-
+tiplying an input by a matrix squared yields
+
+where vi refers to rows of V and ci to columns. Each
+coordinate of V2z is computed by measuring the similarity
+of a row of V to all of its columns, and then measuring the
+similarity of the result to z. In short, features are tangled
+and uninterpretable.
+From a type perspective, apply an SVD to V = PDQ
+observe that V2 = PDQ
+(cid:124) transforms the input to a new type, obtaining
+P or Q
+Th
+
+(cid:124) and
+(cid:124). Each multiplication by
+
+PDQ
+
+DQ
+
+(cid:124)
+
+.
+
+(cid:125)
+P−→ Tlat2
+
+DQ
+
+(cid:123)(cid:122)
+(cid:124)
+(cid:124)−−−→ Tlat3
+
+(cid:125)
+P−→ Tlat4
+
+(cid:123)(cid:122)
+(cid:124)−−−→ Tlat1
+
+V
+
+(cid:124)
+
+V
+
+Thus V sends z (cid:55)→ Tlat2 whereas V2 sends z (cid:55)→ Tlat4.
+Adding terms involving V and V2, as in Eq. (2), entails
+adding vectors expressed in different orthogonal bases –
+which is analogous to adding joules to volts. The same
+problem applies to LSTMs and GRUs.
+Two recent papers provide empirical evidence that recur-
+rent (horizontal) connections are problematic even after
+gradients are stabilized: (Zaremba et al., 2015) ﬁnd that
+Dropout performs better when restricted to vertical con-
+nections and (Laurent et al., 2015) ﬁnd that Batch Normal-
+ization fails unless restricted to vertical connections (Ioffe
+& Szegedy, 2015). More precisely, (Laurent et al., 2015)
+ﬁnd that Batch Normalization improves training but not test
+error when restricted to vertical connections; it fails com-
+pletely when also applied to horizontal connections.
+Code using GOTO can be perfectly correct, and RNNs
+with type mismatches can achieve outstanding perfor-
+mance. Nevertheless, both lead to spaghetti-like informa-
+tion/gradient ﬂows that are hard to reason about.
+
+Type-preserving transforms. One way to resolve the
+type inconsistency, which we do not pursue in this paper,
+(cid:124)
+is to use symmetric weight matrices so that V = PDP
+where P is orthogonal and D = diag(d). From the dot-
+product perspective,
+
+t(cid:88)
+
+s=1
+
+ht =
+
+PDt−sP
+
+(cid:124)
+
+zs,
+
+Strongly-Typed Recurrent Neural Networks
+
+which has the simple interpretation that z is ampliﬁed (or
+dampened) by D in the latent type provided by P. From the
+type-perspective, multiplication by Vk is type-preserving
+
+(cid:123)(cid:122)
+dk(cid:12)•−−−→ Tlat1
+
+Vk
+
+P−→ Th
+
+(cid:125)
+
+Th
+
+(cid:124)
+
+P
+
+(cid:124)−−→ Tlat1
+
+so addition is always performed in the same basis.
+A familiar example of type-preserving transforms is au-
+(cid:124) is
+toencoders – under the constraint that the decoder W
+the transpose of the encoder W. Finally, (Moczulski et al.,
+2015) propose to accelerate matrix computations in feed-
+forward nets by interleaving diagonal matrices, A and D,
+with the orthogonal discrete cosine transform, C. The re-
+sulting transform, ACDC
+
+(cid:124), is type-preserving.
+
+3. Recurrent Neural Networks
+We present three strongly-typed RNNs that purposefully
+mimic classical RNNs as closely as possible. Perhaps sur-
+prisingly, the tweaks introduced below have deep structural
+implications, yielding architectures that are signiﬁcantly
+easier to reason about, see sections 3.3 and 3.4.
+
+3.1. Weakly-Typed RNNs
+
+We ﬁrst pause to note that many classical architectures are
+weakly-typed. That is, they introduce constraints or restric-
+tions on off-diagonal operations on recurrent states.
+The memory cell c in LSTMs is only updated coordinate-
+wise and is therefore well-behaved type-theoretically –
+although the overall architecture is not type consistent.
+The gating operation zt (cid:12) ht−1 in GRUs reduces type-
+inconsistencies by discouraging (i.e. zeroing out) unnec-
+essary recurrent information ﬂows.
+SCRNs, or Structurally Constrained Recurrent Networks
+(Mikolov et al., 2015), add a type-consistent state layer:
+st = α · st−1 + (1 − α) · Wsxt, where α is a scalar.
+
+In MUT1, the best performing architecture in (Jozefowicz
+et al., 2015), the behavior of z and h is well-typed, although
+the gating by r is not. Finally, I-RNNs initialize their recur-
+rent connections as the identity matrix (Le et al., 2015). In
+other words, the key idea is a type-consistent initialization.
+
+3.2. Strongly-Typed RNNs
+
+The vanilla strongly-typed RNN is
+
+T-RNN
+
+zt = Wxt
+ft = σ(Vxt + b)
+ht = ft (cid:12) ht−1 + (1 − ft) (cid:12) zt
+
+(3)
+(4)
+(5)
+
+The T-RNN has similar parameters to a vanilla RNN,
+Eq (1), although their roles have changed. A nonlinear-
+ity for zt is not necessary because: (i) gradients do not
+explode, corollary 2, so no squashing is needed; and (ii)
+coordinatewise multiplication by ft introduces a nonlinear-
+ity. Whereas relus are binary gates (0 if zt < 0, 1 else); the
+forget gate ft is a continuous multiplicative gate on zt.
+Replacing the horizontal connection Vht−1 with a verti-
+cally controlled gate, Eq. (4), stabilizes the type-structure
+across time steps. Line for line, the type structure is:
+
+Tx
+Tx
+(Th → Th
+
+(cid:123)(cid:122)
+
+ft
+
+(cid:124)
+
+(cid:125)
+) × Th(cid:124)(cid:123)(cid:122)(cid:125)
+
+zt
+
+(3)−−−−−→ Th
+(4)−−−−−→ Tf
+(5)−−−−−→
+ht−1
+
+Th(cid:124)(cid:123)(cid:122)(cid:125)
+
+ht
+
+diag−−−→ (Th → Th)
+
+We refer to lines (3) and (4) as learnware since they have
+parameters (W, V, b). Line (5) is ﬁrmware since it has no
+parameters. The ﬁrmware depends on the previous state
+ht−1 unlike the learnware which is stateless. See sec-
+tion 3.4 for more on learnware and ﬁrmware.
+
+Strongly-typed LSTMs differ from LSTMs in two re-
+spects: (i) xt−1 is substituted for ht−1 in the ﬁrst three
+equations so that the type structure is coherent; and (ii) the
+nonlinearities in zt and ht are removed as for the T-RNN.
+
+LSTM
+
+T-LSTM
+
+zt = τ (Vzht−1 + Wzxt + bz)
+ft = σ(Vf ht−1 + Wf xt + bf )
+ot = τ (Voht−1 + Woxt + bo)
+ct = ft (cid:12) ct−1 + (1 − ft) (cid:12) zt
+ht = τ (ct) (cid:12) ot
+
+zt = Vzxt−1 + Wzxt + bz
+ft = σ(Vf xt−1 + Wf xt + bf )
+ot = τ (Voxt−1 + Woxt + bo)
+ct = ft (cid:12) ct−1 + (1 − ft) (cid:12) zt
+ht = ct (cid:12) ot
+
+We drop the input gate from the updates for simplicity; see
+(Greff et al., 2015). The type structure is
+
+Tx
+Tx
+Tx
+
+−−→ Tc
+−−→ Tf
+−−→ Th
+(Tc → Tc) × Tc −−−→
+Tc
+(Th → Th) × Th −−→ Th
+
+ct−1
+
+diag−−−→ (Tc → Tc)
+
+diag−−−→ (Th → Th)
+
+Strongly-Typed Recurrent Neural Networks
+
+Strongly-typed GRUs
+adapt GRUs similarly to how
+LSTMs were modiﬁed. In addition, the reset gate zt is re-
+purposed; it is no longer needed for weak-typing.
+
+GRU
+
+T-GRU
+
+zt = σ(Vzht−1 + Wzxt + bz)
+ft = σ(Vf ht−1 + Wf xt + bf )
+
+ot = τ(cid:0)Vo(zt (cid:12) ht−1) + Woxt + bo
+
+ht = ft (cid:12) ht−1 + (1 − ft) (cid:12) ot
+
+(cid:1)
+
+zt = Vzxt−1 + Wzxt + bz
+ft = σ(Vf xt−1 + Wf xt + bf )
+ot = τ (Voxt−1 + Woxt + bo)
+ht = ft (cid:12) ht−1 + zt (cid:12) ot
+
+The type structure is
+
+Tx
+Tx
+Tx
+
+−−→
+−−→
+−−→
+
+Th
+Tf
+To
+
+diag−−−→ (Th → Th)
+diag−−−→ (Th → Th)
+
+(Th → Th) × (Th → Th) × Th −−−→
+
+Th
+
+ht−1
+
+(cid:104)
+
+(cid:105)
+
+t(cid:88)
+
+s=1
+
+strongly-typed RNNs transform input sequences into a
+weighted average of features extracted from the sequence
+
+x1:t (cid:55)→ E
+Px1:t
+
+W ∗ x
+
+=
+
+Px1:t(s) · (W · xs) =: h[t]
+
+where the weights depends on the sequence. In detail:
+Theorem 1 (feature semantics via dynamic convolutions).
+Strongly-typed features are computed explicitly as follows.
+• T-RNN. The output is ht = Es∼Px1:t
+
+(cid:3) where
+
+(cid:2)Wxs
+
+(cid:40)
+1 − ft
+ft (cid:12) Px1:t−1(s)
+
+if s = t
+else.
+
+Px1:t(s) =
+
+• T-LSTM. Let U•
+
+:=
+[xt−1; xt; 1] denote the vertical concatenation of the
+weight matrices and input vectors respectively. Then,
+
+:= [V•; W•; b•] and ˜xt
+
+ht = τ(cid:0)Uo ˜xt
+
+(cid:1) (cid:12) E
+
+(cid:2)Uz ˜xs
+
+(cid:3)
+
+s∼Px1:t
+
+where Px1:t is deﬁned as above.
+
+• T-GRU. Using the notation above,
+
+τ(cid:0)Uo ˜xs
+
+(cid:1) (cid:12) Uz ˜xs
+
+(cid:17)
+
+ht =
+
+Fs (cid:12)(cid:16)
+(cid:40)
+
+t(cid:88)
+
+s=1
+
+Fs =
+
+1
+fs (cid:12) Fs+1
+
+if s = t
+else.
+
+3.3. Feature Semantics
+
+The output of a vanilla RNN expands as the uninterpretable
+
+where
+
+ht = σ(Vσ(Vσ(··· ) + Wxt−1 + b) + Wxt + b),
+
+with even less interpretable gradient. Similar considera-
+tions hold for LSTMs and GRUs. Fortunately, the situation
+is more amenable for strongly-typed architectures. In fact,
+their semantics are related to average-pooled convolutions.
+
+Convolutions. Applying a one-dimensional convolution
+to input sequence x[t] yields output sequence
+
+z[t] = (W ∗ x)[t] =
+
+W[s] · x[t − s]
+
+yields ht = (cid:80)t
+
+Given weights fs associated with W[s], average-pooling
+s=1 fs · z[s]. A special case is when the
+
+convolution applies the same matrix to every input:
+
+(cid:88)
+
+s
+
+(cid:40)
+
+W[s] =
+
+W if s = 0
+0
+
+else.
+
+The average-pooled convolution is then a weighted average
+of the features extracted from the input sequence.
+
+Dynamic temporal convolutions. We now show that
+strongly-typed RNNs are one-dimensional temporal con-
+volutions with dynamic average-pooling.
+Informally,
+
+Proof. Direct computation.
+
+In summary, T-RNNs compute a dynamic distribution over
+time steps, and then compute the expected feedforward fea-
+tures over that distribution. T-LSTMs store expectations
+in private memory cells that are reweighted by the output
+gate when publicly broadcast. Finally, T-GRUs drop the
+requirement that the average is an expectation, and also in-
+corporate the output gate into the memory updates.
+Strongly-typed gradients are straightforward to compute
+and interpret:
+Corollary 2 (gradient semantics). The strongly-typed gra-
+dients are
+
+• T-RNN:
+∂ht
+∂W
+∂ht
+∂V
+
+= E
+
+s∼Px1:t
+
+= E
+
+s∼Px1:t
+
+(cid:104) ∂
+(cid:104)
+
+(zs)
+
+∂W
+zs (cid:12) ∂
+∂V
+
+(cid:105)
+(cid:0) log Px1:t(s)(cid:1)(cid:105)
+
+∂b .
+and similarly for ∂
+
+Strongly-Typed Recurrent Neural Networks
+
+(cid:0) log Px1:t(s)(cid:1)(cid:105)
+
+(cid:104)
+
+zs
+
+(cid:105)
+(cid:105)
+
+s∼Px1:t
+
+(cid:104) ∂
+(cid:104)
+
+(zs)
+
+∂Uz
+zs (cid:12) ∂
+∂Uf
+
+=
+
+∂
+
+∂Uo
+
+(ot) (cid:12) E
+
+= ot (cid:12) E
+
+s∼Px1:t
+
+= ot (cid:12) E
+
+s∼Px1:t
+
+• T-LSTM:
+
+∂ht
+∂Uo
+∂ht
+∂Uz
+∂ht
+∂Uf
+
+• T-GRU:
+
+s=1
+
+t(cid:88)
+t(cid:88)
+t(cid:88)
+
+s=1
+
+s=1
+
+Fs (cid:12) ∂
+∂Uo
+
+(os) (cid:12) zs
+
+Fs (cid:12) os (cid:12) ∂
+∂Uz
+
+(cid:0)Fs
+
+(zs)
+
+(cid:1) (cid:12) os (cid:12) zs
+
+∂
+
+∂Uf
+
+∂ht
+∂Uo
+
+∂ht
+∂Uz
+
+∂ht
+∂Uf
+
+=
+
+=
+
+=
+
+It follows immediately that gradients will not explode for
+T-RNNs or LSTMs. Empirically we ﬁnd they also behave
+well for T-GRUs.
+
+3.4. Feature Algebra
+
+(cid:124)
+
+A vanilla RNN can approximate any continuous state up-
+x)| w ∈ Rd} is
+date ht = g(xt, ht−1) since span{s(w
+dense in continuous functions C(Rd) on Rd if s is a non-
+polynomial nonlinear function (Leshno et al., 1993). It fol-
+lows that vanilla RNNs can approximate any recursively
+computable partial function (Siegelmann & Sontag, 1995).
+Strongly-typed RNNs are more constrained. We show the
+constraints reﬂect a coherent design-philosophy and are
+less severe than appears.
+
+The learnware / ﬁrmware distinction. Strongly-typed
+architectures factorize into stateless learnware and state-
+dependent ﬁrmware. For example, T-LSTMs and T-GRUs
+factorize2 as
+
+(ft, zt, ot) = T-LSTMlearn{V•,W•,b•}(xt−1, xt)
+
+(ht, ct) = T-LSTMﬁrm(ft, zt, ot; ct−1
+
+)
+
+(ft, zt, ot) = T-GRUlearn{V•,W•,b•}(xt−1, xt)
+).
+
+ht = T-GRUﬁrm(ft, zt, ot; ht−1
+state
+
+(cid:124)(cid:123)(cid:122)(cid:125)state
+(cid:124)(cid:123)(cid:122)(cid:125)
+
+2A superﬁcially similar factorization holds for GRUs and
+their learnware is state-dependent, since
+
+LSTMs. However,
+(ft, zt, ot) depend on ht−1.
+
+(cid:16)
+
+(cid:17)d
+
+i=1
+
+Firmware decomposes coordinatewise, which prevents
+side-effects from interacting: e.g. for T-GRUs
+
+T-GRUﬁrm(f , z, o; h) =
+
+ϕ(f (i), z(i), o(i); h(i))
+
+where ϕ(f, z, o; h) = f h + zo
+
+and similarly for T-LSTMs. Learnware is stateless; it has
+no side-effects and does not decompose coordinatewise.
+Evidence that side-effects are a problem for LSTMs can be
+found in (Zaremba et al., 2015) and (Laurent et al., 2015),
+which show that Dropout and Batch Normalization respec-
+tively need to be restricted to vertical connections.
+In short, under strong-typing the learnware carves out fea-
+tures which the ﬁrmware uses to perform coordinatewise
+state updates hi
+t−1). Vanilla RNNs allow
+arbitrary state updates ht = g(ht−1, xt). LSTMs and
+GRUs restrict state updates, but allow arbitrary functions of
+the state. Translated from a continuous to discrete setting,
+the distinction between strongly-typed and classical archi-
+tectures is analogous to working with binary logic gates
+(AND, OR) on variables zt learned by the vertical connec-
+tions – versus working directly with n-ary boolean opera-
+tions.
+
+t = g(hi
+
+t−1, zi
+
+Representational power. Motivated by the above, we
+show that a minimal strongly-typed architecture can span
+the space of continuous binary functions on features.
+Theorem 3 (approximating binary functions). The
+strongly-typed minimal RNN with updates
+
+T-MR: ht = ρ(b (cid:12) ht−1 + Wxt + c)
+
+and parameters (b, c, W) can approximate any set of con-
+tinuous binary functions on features.
+
+(cid:124)
+
+Proof sketch. Let z = w
+x be a feature of interest.
+Combining (Leshno et al., 1993) with the observation that
+aρ(bh + z + c) = ρ(abh + az + ac) for a > 0 im-
+plies that span{ρ(b · ht−1 + zt)| b, c ∈ R} = C(R2). As
+many weighted copies az of z as necessary are obtained by
+adding rows to W that are scalar multiples of w.
+Any set of binary functions on any collection of features
+can thus be approximated. Finally, vertical connections can
+approximate any set of features (Leshno et al., 1993). (cid:3)
+
+4. Experiments
+We investigated the empirical performance of strongly-
+typed recurrent nets for sequence learning. The perfor-
+mance was evaluated on character-level and word-level text
+generation. We conducted a set of proof-of-concept exper-
+iments. The goal is not to compete with previous work or
+
+Strongly-Typed Recurrent Neural Networks
+
+Model
+Layers
+64 (no dropout)
+256
+
+Model
+Layers
+64 (no dropout)
+256
+
+Model
+Layers
+64 (no dropout)
+256
+
+Table 1. The (train, test) cross-entropy loss of RNNs and T-RNNs on WP dataset.
+T-RNN
+
+vanilla RNN
+
+1
+
+2
+
+3
+
+1
+
+(1.365, 1.435)
+(1.215, 1.274)
+
+(1.347, 1.417)
+(1.242, 1.254)
+
+(1.353, 1.423)
+(1.257, 1.273)
+
+(1.371, 1.452)
+(1.300, 1.398)
+
+2
+
+(1.323, 1.409)
+(1.251, 1.276)
+
+3
+
+(1.342, 1.423)
+(1.233, 1.266)
+
+Table 2. The (train, test) cross-entropy loss of LSTMs and T-LSTMs on WP dataset.
+T-LSTM
+
+LSTM
+
+1
+
+2
+
+3
+
+1
+
+(1.496, 1.560)
+(1.237, 1.251)
+
+(1.485, 1.557)
+(1.098, 1.193)
+
+(1.500, 1.563)
+(1.185, 1.213)
+
+(1.462, 1.511)
+(1.254, 1.273)
+
+2
+
+(1.367, 1.432)
+(1.045, 1.189)
+
+3
+
+(1.369, 1.434)
+(1.167, 1.198)
+
+Table 3. The (train, test) cross-entropy loss of GRUs and T-GRUs on WP dataset.
+T-GRU
+
+GRU
+
+1
+
+2
+
+3
+
+1
+
+(1.349, 1.435)
+(1.083, 1.226)
+
+(1.432, 1.503)
+(1.163, 1.214)
+
+(1.445, 1.559)
+(1.219, 1.227)
+
+(1.518 ,1.569)
+(1.142, 1.296)
+
+2
+
+(1.337, 1.422)
+(1.208, 1.240)
+
+3
+
+(1.377, 1.436)
+(1.216, 1.212)
+
+to ﬁnd the best performing model under a speciﬁc hyper-
+parameter setting. Rather, we investigate how the two
+classes of architectures perform over a range of settings.
+
+4.1. Character-level Text Generation
+
+The ﬁrst task is to generate text from a sequence of char-
+acters by predicting the next character in a sequence. We
+used Leo Tolstoy’s War and Peace (WP) which consists of
+3,258,246 characters of English text, split into train/val/test
+sets with 80/10/10 ratios. The characters are encoded into
+K-dimensional one-hot vectors, where K is the size of the
+vocabulary. We follow the experimental setting proposed in
+(Karpathy et al., 2015). Results are reported for two con-
+ﬁgurations: “64” and “256”, which are models with the
+same number of parameters as a 1-layer LSTM with 64
+and 256 cells per layer respectively. Dropout regulariza-
+tion was only applied to the “256” models. The dropout
+rate was taken from {0.1, 0.2} based on validation perfor-
+mance. Tables 2 and 3 summarize the performance in terms
+
+of cross-entropy loss H(y, p) =(cid:80)K
+
+i=1 yi log pi.
+
+We observe that the training error of strongly-typed models
+is typically lower than that of the standard models for ≥ 2
+layers. The test error of the two architectures are compa-
+rable. However, our results (for both classical and typed
+models) fail to match those reported in (Karpathy et al.,
+2015), where a more extensive parameter search was per-
+formed.
+
+4.2. Word-level Text Generation
+
+The second task was to generate word-level text by pre-
+dicting the next word from a sequence. We used the Penn
+
+Table 4. Perplexity on the Penn Treebank dataset.
+
+Model
+
+Train
+
+Validation
+
+vanilla RNN
+T-RNN
+LSTM
+T-LSTM
+GRU
+T-GRU
+
+small, no dropout
+
+416.50
+58.66
+36.72
+28.15
+31.14
+28.57
+
+442.31
+172.47
+122.47
+215.71
+179.47
+207.94
+
+medium, with dropout
+
+Test
+
+432.01
+169.33
+117.25
+200.39
+173. 27
+195.82
+
+82.70
+97.87
+82.71
+81.52
+93.44
+113.85
+
+LSTM (Zaremba et al., 2015)
+LSTM (3-layer)
+T-LSTM
+T-LSTM (3-layer)
+GRU
+T-GRU
+
+48.45
+71.76
+50.21
+51.45
+65.80
+55.31
+
+86.16
+98.22
+87.36
+85.98
+97.24
+121.39
+
+Treebank (PTB) dataset (Marcus et al., 1993), which con-
+sists of 929K training words, 73K validation words, and
+82K test words, with vocabulary size of 10K words. The
+PTB dataset is publicly available on web.3
+We followed the experimental setting in (Zaremba et al.,
+2015) and compared the performance of “small” and
+“medium” models. The parameter size of “small” models is
+equivalent to that of 2 layers of 200-cell LSTMs, while the
+parameter size of “medium” models is the same as that of
+2 layers of 650-cell LSTMs. For the “medium” models, we
+selected the dropout rate from {0.4, 0.5, 0.6} according to
+3http://www.fit.vutbr.cz/˜imikolov/rnnlm/
+
+simple-examples.tgz
+
+Strongly-Typed Recurrent Neural Networks
+
+validation performance. Single run performance, measured
+via perplexity, i.e., exp(H(y, p)), are reported in Table 4.
+
+Perplexity. For the “small” models, we found that the
+training perplexity of strongly-typed models is consistently
+lower than their classical counterparts, in line with the re-
+sult for War & Peace. Test error was signiﬁcantly worse
+for the strongly-typed architectures. A possible explana-
+tion for both observations is that strongly-typed architec-
+tures require more extensive regularization.
+An intriguing result is that the T-RNN performs in the same
+ballpark as LSTMs, with perplexity within a factor of two.
+By contrast, the vanilla RNN fails to achieve competitive
+performance. This suggests there may be strongly-typed
+architectures of intermediate complexity between RNNs
+and LSTMs with comparable performance to LSTMs.
+The dropout-regularized “medium” T-LSTM matches the
+LSTM performance reported in (Zaremba et al., 2015).
+The 3-layer T-LSTM obtains slightly better performance.
+The results were obtained with almost identical param-
+eters to Zaremba et al (the learning rate decay was al-
+tered), suggesting that T-LSTMs are viable alternatives to
+LSTMs for sequence learning tasks when properly regular-
+ized. Strongly-typed GRUs did not match the performance
+of GRUs, possibly due to insufﬁcient regularization.
+
+Gradients. We investigated the effect of removing gra-
+dient clipping on medium-sized LSTM and T-LSTM. T-
+LSTM gradients are well-behaved without clipping, al-
+though test performance is not competitive.
+In contrast,
+LSTM gradients explode without clipping and the archi-
+tecture is unusable. It is possible that carefully initialized
+T-LSTMs may be competitive without clipping. We defer
+the question to future work.
+
+Runtime. Since strongly-typed RNNs have fewer non-
+linearities than standard RNNs, we expect that they should
+have lower computational complexity. Training on the PTB
+dataset on an NVIDIA GTX 980 GPU, we found that T-
+LSTM is on average ∼ 1.6× faster than LSTM. Similarly,
+the T-GRU trains on average ∼ 1.4× faster than GRU.
+
+5. Conclusions
+RNNs are increasingly important tools for speech recog-
+nition, natural language processing and other sequential
+learning problems. The complicated structure of LSTMs
+and GRUs has led to searches for simpler alternatives with
+limited success (Bayer et al., 2009; Greff et al., 2015; Joze-
+fowicz et al., 2015; Le et al., 2015; Mikolov et al., 2015).
+This paper introduces strong-typing as a tool to guide the
+search for alternate architectures. In particular, we suggest
+searching for update equations that learn well-behaved fea-
+
+tures, rather than update equations that “appear simple”.
+We draw on two disparate intuitions that turn out to be sur-
+prisingly compatible: (i) that neural networks are analo-
+gous to measuring devices (Balduzzi, 2012) and (ii) that
+training an RNN is analogous to writing code.
+The main contribution is a new deﬁnition of type that is
+closely related to singular value decomposition – and is
+thus well-suited to deep learning. It turns out that classical
+RNNs are badly behaved from a type-perspective, which
+motivates modifying the architectures. Section 3 tweaked
+LSTMs and GRUs to make them well-behaved from a typ-
+ing and functional programming perspective, yielding fea-
+tures and gradients that are easier to reason about than clas-
+sical architectures.
+Strong-typing has implications for the depth of RNNs. It
+was pointed out in (Pascanu et al., 2014) that unfolding hor-
+izontal connections over time implies the concept of depth
+is not straightforward in classical RNNs. By contrast, depth
+has the same meaning in strongly-typed architectures as in
+feedforward nets, since vertical connections learn features
+and horizontal connections act coordinatewise.
+Experiments in section 4 show that strongly-typed RNNs
+achieve comparable generalization performance to classi-
+cal architectures when regularized with dropout and have
+consistently lower training error. It is important to empha-
+size that the experiments are not conclusive. Firstly, we did
+not deviate far from settings optimized for classical RNNs
+when training strongly-typed RNNs. Secondly, the archi-
+tectures were chosen to be as close as possible to classi-
+cal RNNs. A more thorough exploration of the space of
+strongly-typed nets may yield better results.
+
+Towards machine reasoning. A deﬁnition of machine
+reasoning, adapted from (Bottou, 2014), is “algebraically
+manipulating features to answer a question”. Hard-won
+experience in physics (Chang, 2004), software engineering
+(Dijkstra, 1968), and other ﬁelds has led to the conclusion
+that well-chosen constraints are crucial to effective reason-
+ing. Indeed, neural Turing machines (Graves et al., 2014)
+are harder to train than more constrained architectures such
+as neural queues and deques (Grefenstette et al., 2015).
+Strongly-typed features have a consistent semantics, theo-
+rem 1, unlike features in classical RNNs which are rotated
+across time steps – and are consequently difﬁcult to rea-
+son about. We hypothesize that strong-typing will provide
+a solid foundation for algebraic operations on learned fea-
+tures. Strong-typing may then provide a useful organizing
+principle in future machine reasoning systems.
+
+Acknowledgements. We thank Tony Butler-Yeoman,
+Marcus Frean, Theofanis Karaletsos, JP Lewis and Brian
+McWilliams for useful comments and discussions.
+
+Strongly-Typed Recurrent Neural Networks
+
+References
+Balduzzi, D. On the information-theoretic structure of distributed
+measurements. Elect. Proc. in Theor. Comp. Sci., 88:28–42,
+2012.
+
+Bayer, Justin, Wierstra, Daan, Togelius, Julian, and Schmidhuber,
+Juergen. Evolving memory cell structures for sequence learn-
+ing. In ICANN, 2009.
+
+Bengio, Yoshua, Simard, P, and Frasconi, P. Learning long-term
+IEEE Trans.
+
+dependencies with gradient descent is difﬁcult.
+Neur. Net., 5(2):157–166, 1994.
+
+Bottou, L´eon. From machine learning to machine reasoning: An
+
+essay. Machine Learning, 94:133–149, 2014.
+
+Bridgman, P W. Dimensional analysis. Yale University Press,
+
+1922.
+
+Chang, Hasok. Inventing Temperature: Measurement and Scien-
+
+tiﬁc Progress. Oxford University Press, 2004.
+
+Cho, Kyunghyun, van Merri¨enboer, Bart, Gulcehre, Caglar, Bah-
+danau, Dzmitry, Bougares, Fethi, Schwenk, Holger, and Ben-
+gio, Yoshua. Learning Phrase Representations using RNN
+Encoder–Decoder for Statistical Machine Translation.
+In
+EMNLP, 2014.
+
+Dijkstra, Edsger W. Go To Statement Considered Harmful.
+
+Comm. ACM, 11(3):147–148, 1968.
+
+Girard, Jean-Yves. Proofs and Types. Cambridge University
+
+Press, 1989.
+
+Graves, Alex, Mohamed, A, and Hinton, GE. Speech recognition
+
+with deep recurrent neural networks. In ICASSP, 2013.
+
+Graves, Alex, Wayne, Greg, and Danihelka, Ivo. Neural Turing
+
+Machines. In arXiv:1410.5401, 2014.
+
+Grefenstette, Edward, Hermann, Karl Moritz, Suleyman,
+Mustafa, and Blunsom, Phil. Learning to Transduce with Un-
+In Adv in Neural Information Processing
+bounded Memory.
+Systems (NIPS), 2015.
+
+Greff, Klaus, Srivastava, Rupesh Kumar, Koutn´ık, Jan, Steune-
+brink, Bas R, and Schmidhuber, Juergen. LSTM: A Search
+Space Odyssey. In arXiv:1503.04069, 2015.
+
+Gregor, Karol, Danihelka,
+
+Ivo, Graves, Alex, Rezende,
+Danilo Jimenez, and Wierstra, Daan. DRAW: A Recurrent
+Neural Network For Image Generation. In ICML, 2015.
+
+Hart, George W. Multidimensional Analysis: Algebras and Sys-
+
+tems for Science and Engineering. Springer, 1995.
+
+Hochreiter, S and Schmidhuber, J. Long Short-Term Memory.
+
+Neural Comp, 9:1735–1780, 1997.
+
+Hochreiter, Sepp. Untersuchungen zu dynamischen neuronalen
+Netzen. Master’s thesis, Technische Universit¨at M¨unchen,
+1991.
+
+Jozefowicz, Rafal, Zaremba, Wojciech, and Sutskever, Ilya. An
+Empirical Exploration of Recurrent Network Architectures. In
+ICML, 2015.
+
+Karpathy, Andrej and Fei-Fei, Li. Deep Visual-Semantic Align-
+
+ments for Generating Image Descriptions. In CVPR, 2015.
+
+Karpathy, Andrej, Johnson, Justin, and Fei-Fei, Li. Visu-
+In
+
+alizing and understanding recurrent neural networks.
+arXiv:1506.02078, 2015.
+
+Laurent, C, Pereyra, G, Brakel, P, Zhang, Y, and Bengio,
+In
+
+Yoshua. Batch Normalized Recurrent Neural Networks.
+arXiv:1510.01378, 2015.
+
+Le, Quoc, Jaitly, Navdeep, and Hinton, Geoffrey. A Simple Way
+to Initialize Recurrent Networks of Rectiﬁed Linear Units. In
+arXiv:1504.00941, 2015.
+
+Leshno, Moshe, Lin, Vladimir Ya., Pinkus, Allan, and Schocken,
+Shimon. Multilayer Feedforward Networks With a Nonpoly-
+nomial Activation Function Can Approximate Any Function.
+Neural Networks, 6:861–867, 1993.
+
+Macedo, Hugo Daniel and Oliveira, Jos´e Nuno. Typing linear
+algebra: A biproduct-oriented approach. Science of Computer
+Programming, 78(11):2160 – 2191, 2013.
+
+Marcus, Mitchell P., Marcinkiewics, Mary Ann, and Santorini,
+Beatrice. Building a large annotated corpus of english: The
+penn treebank. Comp. Linguistics, 19(2):313–330, 1993.
+
+Mikolov, Tomas, Joulin, Armand, Chopra, Sumit, Mathieu,
+Michael, and Ranzato, Marc’Aurelio. Learning Longer Mem-
+ory in Recurrent Neural Networks. In ICLR, 2015.
+
+Moczulski, Marin, Denil, Misha, Appleyard, Jeremy, and de Fre-
+itas, Nando. ACDC: A Structured Efﬁcient Linear Layer. In
+arXiv:1511.05946, 2015.
+
+Olah, Christopher. Neural Networks, Types, and Functional
+Programming, 2015. URL http://colah.github.io/
+posts/2015-09-NN-Types-FP/.
+
+Pascanu, Razvan, Mikolov, Tomas, and Bengio, Yoshua. On the
+difﬁculty of training recurrent neural networks. In ICML, 2013.
+Pascanu, Razvan, Gulcehre, Caglar, Cho, Kyunghyun, and Ben-
+gio, Yoshua. How to Construct Deep Recurrent Networks. In
+ICLR, 2014.
+
+Pierce, Benjamin C. Types and Programming Languages. MIT
+
+Press, 2002.
+
+Reynolds, J C. Towards a theory of type structure. In Paris collo-
+quium on programming, volume 19 of LNCS. Springer, 1974.
+Siegelmann, Hava and Sontag, Eduardo. On the Computational
+Power of Neural Nets. Journal of Computer and System Sci-
+ences, 50:132–150, 1995.
+
+Sutskever, Ilya, Vinyals, Oriol, and Le, Quoc. Sequence to Se-
+quence Learning with Neural Networks. In Adv in Neural In-
+formation Processing Systems (NIPS), 2014.
+
+Vinyals, Oriol, Toshev, Alexander, Bengio, Samy, and Erhan, Du-
+mitru. Show and tell: A neural image caption generator. In
+CVPR, 2015.
+
+Ioffe, Sergey and Szegedy, Christian. Batch normalization: Ac-
+celerating deep network training by reducing internal covariate
+shift. In arXiv:1502.03167, 2015.
+
+Zaremba, Wojciech, Sutskever, Ilya, and Vinyals, Oriol. Re-
+current Neural Network Regularization. In arXiv:1409.2329,
+2015.
+
+

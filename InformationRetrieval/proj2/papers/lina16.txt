@@ -1,0 +1,1580 @@
+Generalization Properties and Implicit Regularization for Multiple Passes SGM
+
+Junhong Lin∗
+Raffaello Camoriano†,∗,‡
+Lorenzo Rosasco∗,‡
+∗LCSL, Massachusetts Institute of Technology and Istituto Italiano di Tecnologia, Cambridge, MA 02139, USA
+‡DIBRIS, Universit`a degli Studi di Genova, Via Dodecaneso 35, Genova, Italy
+†iCub Facility, Istituto Italiano di Tecnologia, Via Morego 30, Genova, Italy
+
+JHLIN5@HOTMAIL.COM
+RAFFAELLO.CAMORIANO@IIT.IT
+LROSASCO@MIT.EDU
+
+Abstract
+
+We study the generalization properties of
+stochastic gradient methods for learning with
+convex loss functions and linearly parameterized
+in the absence of
+functions. We show that,
+penalizations or constraints,
+the stability and
+approximation properties of the algorithm can
+be controlled by tuning either the step-size or
+the number of passes over the data.
+In this
+view, these parameters can be seen to control
+a form of implicit regularization. Numerical
+results complement the theoretical ﬁndings.
+
+1. Introduction
+The stochastic gradient method (SGM), often called
+stochastic gradient descent, has become an algorithm of
+choice in machine learning, because of its simplicity and
+small computational cost especially when dealing with big
+data sets (Bousquet & Bottou, 2008).
+Despite its widespread use, the generalization properties of
+the variants of SGM used in practice are relatively little
+understood. Most previous works consider generalization
+properties of SGM with only one pass over the data,
+see e.g.
+(Nemirovski et al., 2009) or (Orabona, 2014)
+and references therein, while in practice multiple passes
+are usually considered. The effect of multiple passes
+has been studied extensively for the optimization of an
+empirical objective (Boyd & Mutapcic, 2007), but the role
+for generalization is less clear. In practice, early-stopping
+of the number of iterations, for example monitoring a
+hold-out set error, is a strategy often used to regularize.
+Moreover, the step-size is typically tuned to obtain the best
+results. The study in this paper is a step towards grounding
+theoretically these commonly used heuristics.
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+Our starting points are a few recent works considering the
+generalization properties of different variants of SGM. One
+ﬁrst series of results focus on least squares, either with one
+(Ying & Pontil, 2008; Tarres & Yao, 2014; Dieuleveut &
+Bach, 2014), or multiple (deterministic) passes over the
+data (Rosasco & Villa, 2015).
+In the former case it is
+shown that, in general, if only one pass over the data is
+considered, then the step-size needs to be tuned to ensure
+optimal results. In (Rosasco & Villa, 2015) it is shown that
+a universal step-size choice can be taken, if multiple passes
+are considered.
+In this case, it is the stopping time that
+needs to be tuned.
+In this paper, we are interested in general, possibly non
+smooth, convex loss functions. The analysis for least
+squares heavily exploits properties of the loss and does
+not generalize to this broader setting. Here, our starting
+points are the results in (Lin et al., 2016; Hardt et al.,
+2016; Orabona, 2014) considering convex loss functions.
+In (Lin et al., 2016), early stopping of a (kernelized)
+batch subgradient method is analyzed, whereas in (Hardt
+et al., 2016) the stability properties of SGM for smooth
+loss functions are considered in a general stochastic
+optimization setting and certain convergence results are
+derived.
+In (Orabona, 2014), a more complex variant of
+SGM is analyzed and shown to achieve optimal rates.
+Since we are interested in analyzing regularization and
+generalization properties of SGM, in this paper we consider
+a general non-parametric setting.
+In this latter setting,
+the effects of regularization are typically more evident
+since it can directly affect the convergence rates.
+In
+this context, the difﬁculty of a problem is characterized
+by an assumption on the approximation error. Under
+this condition, the need for regularization becomes clear.
+Indeed,
+the good
+performance of the algorithm relies on a bias-variance
+trade-off that can be controlled by suitably choosing the
+step-size and/or the number of passes.
+These latter
+parameters can be seen to act as regularization parameters.
+
+in the absence of other constraints,
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+Here, we refer to the regularization as ‘implicit’, in the
+sense that it is achieved neither by penalization nor by
+adding explicit constraints. The two main variants of the
+algorithm are the same as in least squares: one pass over
+the data with tuned step-size, or, ﬁxed step-size choice and
+number of passes appropriately tuned. While in principle
+optimal parameter tuning requires explicitly solving a
+bias-variance trade-off, in practice adaptive choices can
+be implemented by cross-validation.
+In this case, both
+algorithm variants achieve optimal results, but different
+computations are entailed.
+In the ﬁrst case, multiple
+single pass SGM need to be considered with different
+step-sizes, whereas in the second case, early stopping is
+used. Experimental results, complementing the theoretical
+analysis, are given and provide further insights on the
+properties of the algorithms.
+The rest of the paper is organized as follows. In Section
+2, we describe the supervised learning setting and the
+algorithm, and in Section 3, we state and discuss our main
+results. The proofs are postponed to the supplementary
+material.
+In Section 4, we present some numerical
+experiments on real datasets.
+Notation.
+[m] denotes
+{1, 2,··· , m} for any m ∈ N. The notation ak (cid:46) bk
+means that there exists a universal constant C > 0 such
+that ak ≤ Cbk for all k ∈ N. Denote by (cid:100)a(cid:101) the smallest
+integer greater than a for any given a ∈ R.
+
+For notational
+
+simplicity,
+
+2. Learning with SGM
+In this section, we introduce the supervised learning
+problem and the SGM algorithm.
+
+Learning Setting. Let X be a probability space and Y
+be a subset of R. Let ρ be a probability measure on Z =
+X×Y. Given a measurable loss function V : R×R → R+,
+the associated expected risk E = E V is deﬁned as
+
+(cid:90)
+
+Z
+
+E(f ) =
+
+representation/feature map Φ : X → F, mapping the data
+space in Rp, p ≤ ∞, or more generally in a (real separable)
+Hilbert space with inner product (cid:104)·,·(cid:105) and norm (cid:107)·(cid:107). Then,
+for w ∈ F we consider functions of the form
+∀x ∈ X.
+
+fw(x) = (cid:104)w, Φ(x)(cid:105),
+
+(1)
+
+(1) corresponds to fw = (cid:80)p
+
+Examples of the above setting include the case where we
+consider inﬁnite dictionaries, φj : X → R, j = 1, . . . ,
+j=1, for all x ∈ X, F = (cid:96)2 and
+so that Φ(x) = (φj(x))∞
+j=1 wjφj. Also, this setting
+includes, and indeed is equivalent to considering, functions
+deﬁned by a positive deﬁnite kernel K : X × X → R, in
+which case Φ(x) = K(x,·), for all x ∈ X, F = HK the
+reproducing kernel Hilbert space associated with K, and
+(1) corresponds to the reproducing property
+fw(x) = (cid:104)w, K(x,·)(cid:105),∀x ∈ X.
+
+(2)
+
+In the following, we assume the feature map to be
+measurable and deﬁne expected and empirical risks over
+functions of the form (1). For notational simplicity, we
+write E(fw) as E(w), and Ez(fw) as Ez(w).
+Stochastic Gradient Method. For any ﬁxed y ∈ Y ,
+assume the univariate function V (y,·) on R to be convex,
+−(y, a) exists at every a ∈
+hence its left-hand derivative V (cid:48)
+R and is non-decreasing.
+Algorithm 1. Given a sample z, the stochastic gradient
+method (SGM) is deﬁned by w1 = 0 and
+wt+1 = wt−ηtV (cid:48)
+−(yjt,(cid:104)wt, Φ(xjt)(cid:105))Φ(xjt), t = 1, . . . , T,
+(3)
+for a non-increasing sequence of step-sizes {ηt > 0}t∈N
+and a stopping rule T ∈ N. Here, j1, j2,··· , jT are
+random
+independent and identically distributed (i.i.d.)
+variables1 from the uniform distribution on [m].
+The
+(weighted) averaged iterates are deﬁned by
+
+t(cid:88)
+
+t(cid:88)
+
+wt =
+
+ηkwk/at,
+
+at =
+
+ηk,
+
+t = 1, . . . , T.
+
+V (y, f (x))dρ.
+
+k=1
+
+k=1
+
+The distribution ρ is assumed to be ﬁxed, but unknown,
+and the goal is to ﬁnd a function minimizing the expected
+risk given a sample z = {zi = (xi, yi)}m
+i=1 of size m ∈
+N independently drawn according to ρ. Many classical
+examples of learning algorithms are based on empirical risk
+minimization, that is replacing the expected risk with the
+empirical risk Ez = E V
+
+z deﬁned as
+
+m(cid:88)
+
+j=1
+
+Ez(f ) =
+
+1
+m
+
+V (yj, f (xj)).
+
+In this paper, we consider spaces of functions which are
+linearly parameterized. Consider a possibly non-linear data
+
+Note that T may be greater than m, indicating that we can
+use the sample more than once. We shall write J(t) to mean
+{j1, j2,··· , jt}, which will be also abbreviated as J when
+there is no confusion.
+The main purpose of the paper is to estimate the expected
+excess risk of the last iterate
+
+Ez,J [E(wT ) − inf
+
+w∈F E(w)],
+
+or similarly the expected excess risk of the averaged iterate
+wT , and study how different parameter settings in (1) affect
+1More precisely, j1, j2,··· , jT are conditionally independent
+
+given any z.
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+the estimates. Here, the expectation Ez,J stands for taking
+the expectation with respect to J (given any z) ﬁrst, and
+then the expectation with respect to z.
+
+3. Implicit Regularization for SGM
+In this section, we present and discuss our main results. We
+begin in Subsection 3.1 with a universal convergence result
+and then provide ﬁnite sample bounds for smooth loss
+functions in Subsection 3.2, and for non-smooth functions
+in Subsection 3.3. As corollaries of these results we derive
+different implicit regularization strategies for SGM.
+
+3.1. Convergence
+
+We begin presenting a convergence result,
+involving
+conditions on both the step-sizes and the number of
+iterations. We need some basic assumptions.
+Assumption 1. There holds
+
+(cid:112)(cid:104)Φ(x), Φ(x)(cid:105) < ∞.
+
+(4)
+
+κ = sup
+x∈X
+
+Furthermore, the loss function is convex with respect to
+its second entry, and |V |0 := supy∈Y V (y, 0) < ∞.
+Moreover, its left-hand derivative V (cid:48)
+
+−(y,·) is bounded:
+
+−(y, a)(cid:12)(cid:12) ≤ a0,
+(cid:12)(cid:12)V (cid:48)
+
+∀a ∈ R, y ∈ Y.
+
+(5)
+
+The above conditions are common in statistical learning
+theory (Steinwart & Christmann, 2008; Cucker & Zhou,
+2007). For example, they are satisﬁed for the hinge loss
+V (y, a) = |1− ya|+ = max{0, 1− ya} or the logistic loss
+V (y, a) = log(1 + e−ya) for all a ∈ R, if X is compact
+and Φ(x) is continuous.
+The bounded derivative condition (5) is implied by the
+requirement on the loss function to be Lipschitz in its
+second entry, when Y is a bounded domain. Given these
+assumptions, the following result holds.
+Theorem 1. If Assumption 1 holds, then
+
+lim
+m→∞
+
+E[E(wt∗(m))] − inf
+
+w∈F E(w) = 0,
+
+provided the sequence {ηk}k and the stopping rule t∗(·) :
+N → N satisfy
+(B) and limm→∞ 1+(cid:80)t∗ (m)
+(A) limm→∞
+(cid:80)t∗ (m)
+
+(cid:80)t∗ (m)
+
+k=1 ηk
+
+= 0.
+
+= 0,
+k=1 η2
+k=1 ηk
+
+m
+
+k
+
+2007). The difference is that here the limit is taken with
+respect to the number of points, but the number of passes
+on the data can be bigger than one.
+Theorem 1 shows that in order to achieve consistency,
+the step-sizes and the running iterations need to be
+appropriately chosen. For instance, given m sample points
+for SGM with one pass2, i.e., t∗(m) = m, possible choices
+for the step-sizes are {ηk = m−α : k ∈ [m]} and
+{ηk = k−α : k ∈ [m]} for some α ∈ (0, 1). One can
+also ﬁx the step-sizes a priori, and then run the algorithm
+with a suitable stopping rule t∗(m).
+These different parameter choices lead to different implicit
+regularization strategies as we discuss next.
+
+3.2. Finite Sample Bounds for Smooth Loss Functions
+
+In this subsection, we give explicit ﬁnite sample bounds for
+smooth loss functions, considering a suitable assumption
+on the approximation error.
+Assumption 2. The approximation error associated to the
+triplet (ρ, V, Φ) is deﬁned by
+
+λ
+2
+
+(cid:107)w(cid:107)2
+
+E(w) +
+
+D(λ) = inf
+w∈F
+
+− inf
+w∈F E(w),
+
+∀λ ≥ 0.
+(6)
+We assume that for some β ∈ (0, 1] and cβ > 0, the
+approximation error satisﬁes
+D(λ) ≤ cβλβ,
+
+∀ λ > 0.
+
+(7)
+
+(cid:26)
+
+(cid:27)
+
+Intuitively, Condition (7) quantiﬁes how hard it
+is to
+achieve the inﬁmum of the expected risk.
+In particular,
+it is satisﬁed with β = 1 when3 ∃w∗ ∈ F such that
+inf w∈F E(w) = E(w∗). More formally, the condition is
+related to classical terminologies in approximation theory,
+such as K-functionals and interpolation spaces (Steinwart
+& Christmann, 2008; Cucker & Zhou, 2007).
+The
+following remark is important for later discussions.
+Remark
+Implicit Regularization).
+Assumption 2 is standard in statistical learning theory
+when analyzing Tikhonov regularization (Cucker & Zhou,
+2007; Steinwart & Christmann, 2008). Besides, it has
+been shown that Tikhonov regularization can achieve
+best performance by choosing an appropriate penalty
+parameter which depends on the unknown parameter β
+(Cucker & Zhou, 2007; Steinwart & Christmann, 2008).
+In other words, in Tikhonov regularization, the penalty
+
+(SGM and
+
+1
+
+As seen from the proof in the appendix, Conditions
+(A) and (B) arise from the analysis of suitable sample,
+computational, and approximation errors. Condition (B) is
+similar to the one required by stochastic gradient methods
+(Bertsekas, 1999; Boyd et al., 2003; Boyd & Mutapcic,
+
+2We slightly abuse the term ‘one pass’, to mean m iterations.
+3The existence of at least one minimizer in F is met for
+example when F is compact, or ﬁnite dimensional. In general, β
+does not necessarily have to be 1, since the hypothesis space may
+be chosen as a general inﬁnite dimensional space, for example in
+non-parametric regression.
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+parameter plays a role of regularization. In this view, our
+coming results show that SGM can implicitly implement a
+form of Tikhonov regularization by controlling the step-size
+and/or the number of passes.
+
+A further assumption relates to the smoothness of the loss,
+and is satisﬁed for example by the logistic loss.
+Assumption 3. For all y ∈ Y , V (y,·) is differentiable and
+V (cid:48)(y,·) is Lipschitz continuous with a constant L > 0, i.e.
+
+|V (cid:48)(y, b) − V (cid:48)(y, a)| ≤ L|b − a|,
+
+∀a, b ∈ R.
+
+The following result characterizes the excess risk of both
+the last and the average iterate for any ﬁxed step-size and
+stopping time.
+Theorem 2. If Assumptions 1, 2 and 3 hold and ηt ≤
+2/(κ2L) for all t ∈ N, then for all t ∈ N,
+
+E[E(wt) − inf
+
+(cid:80)t
+
+k=1 ηk
+m
+
++
+
+w∈F E(w)]
+(cid:80)t
+(cid:80)t
+k=1 η2
+k
+k=1 ηk
+
+(cid:32)
+
++
+
+(cid:33)β
+
+,
+
+(cid:46)
+
+and
+
+E[E(wt) − inf
+
+w∈F E(w)] (cid:46)
+(cid:32)t−1(cid:88)
+
+η2
+k
+
+ηt(t − k)
+
+k=1
+
++
+
++ ηt
+
++
+
+ηk
+
+ηt(t − k)
+
+(cid:17)1−β
+
+.
+
+k=1 ηk
+ηtt
+
+k=1 ηk
+
+1(cid:80)t
+t−1(cid:88)
+(cid:16)(cid:80)t
+
+k=1
+
+(cid:80)t
+(cid:33)
+
+k=1 ηk
+m
+
+The proof of the above result follows more or less directly
+from combining ideas and results in (Lin et al., 2016;
+Hardt et al., 2016) and is postponed to the appendix. The
+constants in the bounds are omitted, but given explicitly
+in the proof. While the error bound for the weighted
+average looks more concise than the one for the last
+iterate,
+interestingly, both error bounds lead to similar
+generalization properties.
+The error bounds are composed of three terms related to
+sample error, computational error, and approximation error.
+Balancing these three error terms to achieve the minimum
+total error bound leads to optimal choices for the step-sizes
+{ηk} and total number of iterations t∗. In other words,
+both the step-sizes {ηk} and the number of iterations t∗
+can play the role of a regularization parameter. Using the
+above theorem, general results for step-size ηk = ηt−θ
+with some θ ∈ [0, 1), η = η(m) > 0 can be found
+in Proposition 3 from the appendix. Here, as corollaries
+we provide four different parameter choices to obtain the
+best bounds, corresponding to four different regularization
+strategies.
+
+(cid:18)√
+
+(cid:19)β
+
+m
+t
+
+. (8)
+
+The ﬁrst two corollaries correspond to ﬁxing the step-
+sizes a priori and using the number of iterations as a
+regularization parameter.
+In the ﬁrst result, the step-size
+is constant and depends on the number of sample points.
+Corollary 1. If Assumptions 1, 2 and 3 hold and ηt =
+m for all t ∈ N for some positive constant η1 ≤
+η1/
+2/(κ2L), then for all t ∈ N, and gt = wt (or wt),
+
+√
+
+E[E(gt) − inf
+
+w∈F E(w)] (cid:46) t log t√
+
+m3
+
++
+
+log t√
+m
+
++
+
+In particular, if we choose t∗ = (cid:100)m
+w∈F E(w)] (cid:46) m
+
+E[E(gt∗ ) − inf
+
+β+3
+
+2(β+1)(cid:101),
+
+− β
+
+β+1 log m.
+
+(9)
+
+√
+
+In the second result the step-sizes decay with the iterations.
+Corollary 2. If Assumptions 1, 2 and 3 hold and ηt =
+t for all t ∈ N with some positive constant η1 ≤
+η1/
+2/(κ2L), then for all t ∈ N, and gt = wt (or wt),
+
+√
+
+t log t
+m
+
++
+
+log t√
+t
+
++
+
+1
+
+tβ/2
+
+.
+
+(10)
+
+E[E(gt) − inf
+
+w∈F E(w)] (cid:46)
+Particularly, when t∗ = (cid:100)m
+
+2
+
+β+1(cid:101), we have (9).
+
+In both the above corollaries the step-sizes are ﬁxed
+a priori, and the number of iterations becomes the
+regularization parameter controlling the total error.
+Ignoring the logarithmic factor, the dominating terms in the
+bounds (8), (10) are the sample and approximation errors,
+corresponding to the ﬁrst and third terms of RHS. Stopping
+too late may lead to a large sample error, while stopping
+too early may lead to a large approximation error. The
+ideal stopping time arises from a form of bias-variance
+trade-off and requires in general more than one pass over
+the data.
+Indeed, if we reformulate the results in terms
+of number of passes, we have that (cid:100)m
+2(1+β)(cid:101) passes are
+√
+m}t, while
+needed for the constant step-size {ηt = η1/
+1+β (cid:101) passes are needed for the decaying step-size {ηt =
+(cid:100)m
+√
+t}t. These observations suggest in particular that
+η1/
+while both step-size choices achieve the same bounds,
+the constant step-size can have a computational advantage
+since it requires less iterations.
+Note that one pass over the data sufﬁces only in the limit
+case when β = 1, while in general it will be suboptimal, at
+least if the step-size is ﬁxed. In fact, Theorem 2 suggests
+that optimal results could be recovered if the step-size
+is suitably tuned. The next corollaries show that this is
+indeed the case. The ﬁrst result corresponds to a suitably
+tuned constant step-size.
+
+1−β
+
+1−β
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+Theorem 3. If Assumptions 1 and 2 hold, then ∀t ∈ N,
+
+Corollary 3. If Assumptions 1, 2 and 3 hold and ηt =
+β+1 for all t ∈ N for some positive constant η1 ≤
+− β
+η1m
+2/(κ2L), then for all t ∈ N, and gt = wt (or wt),
+
+E[E(gt) − inf
+− β+2
+(cid:46)m
+
+w∈F E(w)]
+− β
+
+β+1 t log t + m
+
+β+1 log t + m
+
+In particular, we have (9) for t∗ = m.
+
+β2
+
+β+1 t−β.
+
+(cid:46)
+
+and
+
+The second result corresponds to tuning the decay rate for
+a decaying step-size.
+Corollary 4. If Assumptions 1, 2 and 3 hold and ηt =
+β+1 for all t ∈ N for some positive constant η1 ≤
+− β
+η1t
+2/(κ2L), then for all t ∈ N, and gt = wt (or wt),
+
+E[E(gt) − inf
+(cid:46)m−1t
+
+w∈F E(w)]
+− β
+
+1
+β+1 log t + t
+
+β+1 log t + t
+
+− β
+
+β+1 .
+
+In particular, we have (9) for t∗ = m.
+
+The above two results conﬁrm that good performances can
+be attained with only one pass over the data, provided the
+step-sizes are suitably chosen, that is using the step-size as
+a regularization parameter.
+Remark 2. If we further assume that β = 1, as often done
+in the literature, the convergence rates from Corollaries 1-
+4 are of order O(m−1/2), which are the same as those in,
+e.g., (Shamir & Zhang, 2013).
+
+Finally, the following remark relates the above results to
+data-driven parameter tuning used in practice.
+Remark 3 (Bias-Variance and Cross-Validation). The
+above results show how the number of iterations/passes
+controls a bias-variance trade-off, and in this sense acts as
+a regularization parameter. In practice, the approximation
+properties of the algorithm are unknown and the question
+arises of how the parameter can be chosen. As it turns
+out, cross-validation can be used to achieve adaptively the
+best rates, in the sense that the rate in (9) is achieved
+by cross-validation or more precisely by hold-out cross-
+validation. These results follow by an argument similar
+to that in Chapter 6 from (Steinwart & Christmann, 2008)
+and are omitted.
+
+3.3. Finite Sample Bounds for Non-smooth Loss
+
+Functions
+
+Theorem 2 holds for smooth loss functions and it is natural
+to ask if a similar result holds for non-smooth losses such
+as the hinge loss.
+Indeed, analogous results hold, albeit
+current bounds are not as sharp.
+
+E[E(wt) − inf
+
+(cid:115)(cid:80)t
+
+k=1 ηk
+m
+
+w∈F E(w)]
+(cid:80)t
+(cid:80)t
+k=1 η2
+k
+k=1 ηk
+
++
+
+(cid:32)
+
++
+
+(cid:33)β
+
+,
+
+k=1 ηk
+
+1(cid:80)t
+t−1(cid:88)
+(cid:17)1−β
+
+k=1
+
+(cid:115)(cid:80)t
+(cid:16)(cid:80)t
+
+E[E(wt) − inf
+
+w∈F E(w)] (cid:46)
+
+k=1 ηk
+m
+
+ηk
+
+ηt(t − k)
+
+t−1(cid:88)
+
+k=1
+
++
+
+η2
+k
+
+ηt(t − k)
+
++ ηt +
+
+k=1 ηk
+ηtt
+
+.
+
+√
+
+(cid:18)√
+
+(cid:19)β
+
+.
+
+m
+t
+
++
+
+The proof of the above theorem is based on ideas from (Lin
+et al., 2016), where tools from Rademacher complexity
+(Bartlett & Mendelson, 2003; Meir & Zhang, 2003) are
+employed. We postpone the proof in the appendix.
+Using the above result with concrete step-sizes as those for
+smooth loss functions, we have the following explicit error
+bounds and corresponding stopping rules.
+Corollary 5. Under Assumptions 1 and 2, let ηt = 1/
+for all t ∈ N. Then for all t ∈ N, and gt = wt (or wt),
+
+√
+
+m
+
+E[E(gt) − inf
+
+w∈F E(w)] (cid:46)
+
+t log t
+m3/4
+In particular, if we choose t∗ = (cid:100)m
+w∈F E(w)] (cid:46) m
+
+E[E(gt∗ ) − inf
+
++
+
+log t√
+m
+4β+2(cid:101),
+− β
+
+2β+3
+
+(11)
+√
+Corollary 6. Under Assumptions 1 and 2, let ηt = 1/
+for all t ∈ N. Then for all t ∈ N, and gt = wt (or wt),
+
+2β+1 log m.
+
+t
+
+E[E(gt) − inf
+
+w∈F E(w)] (cid:46) t1/4 log t√
+m
+In particular, if we choose t∗ = (cid:100)m
+
++
+
+log t√
+t
+
++
+
+1
+
+tβ/2
+
+.
+
+2
+
+2β+1(cid:101), there holds (11).
+
+2β+3
+4β+2 /m
+
+√
+From the above two corollaries, we see that the algorithm
+√
+m can stop earlier than the one
+with constant step-size 1/
+t when β ≤ 1/2, while they
+with decaying step-size 1/
+have the same convergence rate, since m
+2β+1 =
+2β−1
+4β+1 . Note that the bound in (11) is slightly worse than
+m
+that in (9), see Section 3.4 for more discussion.
+Similar to the smooth case, we also have the following
+results for SGM with one pass where regularization is
+realized by step-size.
+Corollary 7. Under Assumptions 1 and 2,
+m
+
+let ηt =
+2β+1 for all t ∈ N. Then for all t ∈ N, and gt = wt (or
+− 2β
+
+2
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+wt),
+
+w∈F E(w)]
+
+E[E(gt) − inf
+− 4β+1
+(cid:46)m
+
+√
+
+4β+2
+
+t log t + m
+
+− 2β
+
+2β+1 log t + m
+
+2β2
+
+2β+1 t−β.
+
+In particular, (11) holds for t∗ = m.
+Corollary 8. Under Assumptions 1 and 2, let ηt = t
+for all t ∈ N. Then for all t ∈ N, and gt = wt (or wt),
+
+− 2β
+
+2β+1
+
+w∈F E(w)]
+
+E[E(gt) − inf
+(cid:46)m− 1
+2 t
+
+1
+
+− min(2β,1)
+In particular, (11) holds for t∗ = m.
+
+4β+2 log t + t
+
+2β+1
+
+log t + t
+
+− β
+
+2β+1 .
+
+3.4. Discussion and Proof Sketch
+
+As mentioned in the introduction,
+the literature on
+theoretical properties of the iteration in Algorithm 1 is vast,
+both in learning theory and in optimization. A ﬁrst line
+of works focuses on a single pass and convergence of the
+expected risk. Approaches in this sense include classical
+results in optimization (see (Nemirovski et al., 2009) and
+references therein), but also approaches based on so-called
+“online to batch” conversion (see (Orabona, 2014) and
+references therein). The latter are based on analyzing a
+sequential prediction setting and then on considering the
+averaged iterate to turn regret bounds in expected risk
+bounds. A second line of works focuses on multiple passes,
+but measures the quality of the corresponding iteration in
+terms of the minimization of the empirical risk.
+In this
+view, Algorithm 1 is seen as an instance of incremental
+methods for the minimization of objective functions that
+are sums of a ﬁnite, but possibly large, number of terms
+(Bertsekas, 2011). These latter works, while interesting in
+their own right, do not yield any direct information on the
+generalization properties of considering multiple passes.
+Here, we follow the approach in (Bousquet & Bottou,
+2008) advocating the combination of statistical and
+computational errors. The general proof strategy is to
+consider several intermediate steps to relate the expected
+risk of the empirical iteration to the minimal expected risk.
+The argument we sketch below is a simpliﬁed and less
+sharp version with respect to the one used in the actual
+proof, but it is easier to illustrate and still carries some
+important aspects which are useful for comparison with
+related results.
+Consider an intermediate element ˜w ∈ F and decompose
+the excess risk as
+
+EE(wt) − inf
+E(E(wt) − Ez(wt)) + E(Ez(wt) − Ez( ˜w))
++EEz( ˜w) − inf
+
+w∈F E =
+w∈F E.
+
+The ﬁrst term on the right-hand side is the generalization
+error of the iterate. The second term can be seen as a
+computational error. To discuss the last term, it is useful
+to consider a few different choices for ˜w. Assuming the
+empirical and expected risks to have minimizers w∗
+z and
+w∗, a possibility is to set ˜w = w∗
+z, this can be seen to be
+the choice made in (Hardt et al., 2016). In this case, it is
+immediate to see that the last term is negligible since,
+EEz( ˜w) = E min
+
+EEz(w) = min
+
+w∈F Ez(w) ≤ min
+w∈F
+
+w∈F E(w),
+
+and hence,
+
+EEz( ˜w) − min
+
+w∈F E ≤ 0.
+On the other hand, in this case the computational error
+depends on the norm (cid:107)w∗
+z(cid:107) which is in general hard to
+estimate. A more convenient choice is to set ˜w = w∗. A
+reasoning similar to the one above shows that the last term
+is still negligible and the computational error can still be
+controlled depending on (cid:107)w∗(cid:107). In a non-parametric setting,
+the existence of a minimizer is not ensured and corresponds
+to a limit case where there is small approximation error.
+Our approach is then to consider an almost minimizer of
+the expected risk with a prescribed accuracy. Following
+(Lin et al., 2016), we do this introducing Assumption (6)
+and choosing ˜w as the unique minimizer of E + λ(cid:107) · (cid:107)2,
+λ > 0. Then the last term in the error decomposition can
+be upper bounded by the approximation error.
+For the generalization error,
+the stability results from
+(Hardt et al., 2016) provide sharp estimates for smooth
+loss functions and in the ‘capacity independent’ limit, that
+is under no assumptions on the covering numbers of the
+considered function space. For this setting, the obtained
+bound is optimal in the sense that it matches the best
+available bound for Tikhonov regularization (Steinwart &
+Christmann, 2008; Cucker & Zhou, 2007). For the non-
+smooth case a standard argument based on Rademacher
+complexity can be used, and easily extended to be capacity
+dependent. However, the corresponding bound is not sharp
+and improvements are likely to hinge on deriving better
+norm estimates for the iterates. The question does not seem
+to be straightforward and is deferred to a future work.
+The computational error for the averaged iterates can be
+controlled using classic arguments (Boyd & Mutapcic,
+2007), whereas for the last iterate the arguments in (Lin
+et al., 2016; Shamir & Zhang, 2013) are needed. Finally,
+Theorems 2, 3 result from estimating and balancing the
+various error terms with respect to the choice of the step-
+size and number of passes.
+We conclude this section with some perspective on the
+results in the paper. We note that since the primary goal of
+this study was to analyze the implicit regularization effect
+of step-size and number of passes, we have considered
+a very simple iteration. However,
+it would be very
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+(a)
+
+(b)
+
+(a)
+
+(b)
+
+Figure 1. Test error for SIGM with ﬁxed (a) and decaying (b) step-
+size with respect to the number of passes on Adult (n = 1000).
+
+Figure 2. Test error for SGM with ﬁxed (a) and decaying (b) step-
+size cross-validation on Adult (n = 1000).
+
+interesting to consider more sophisticated, ‘accelerated’
+iterations (Schmidt et al., 2013), and assess the potential
+advantages in terms of computational and generalization
+aspects. Similarly, we chose to keep the analysis in the
+paper relatively simple, but several improvements can be
+considered for example deriving high probability bounds
+and sharper error bounds under further assumptions. Some
+of these improvements are relatively straightforward, see
+e.g. (Lin et al., 2016), but others will require non-trivial
+extensions of results developed for Tikhonov regularization
+in the last few years. Finally, here we only referred to a
+simple cross-validation approach to parameter tuning, but
+it would clearly be very interesting to ﬁnd ways to tune
+parameters online. A remarkable result in this direction
+is derived in (Orabona, 2014), where it is shown that, in
+the capacity independent setting, adaptive online parameter
+tuning is indeed possible.
+
+4. Numerical Simulations
+We carry out some numerical simulations to illustrate our
+results4. The experiments are executed 10 times each, on
+the benchmark datasets5 reported in Table 1, in which the
+Gaussian kernel bandwidths σ used by SGM and SIGM6
+for each learning problem are also shown. Here, the loss
+
+4Code: lcsl.github.io/MultiplePassesSGM
+5Datasets:
+
+archive.ics.uci.edu/ml
+
+and
+
+www.csie.ntu.edu.tw/~cjlin/libsvmtools/
+datasets/
+
+6In what follows, we name one pass SGM and multiple passes
+
+SGM as SGM and SIGM, respectively.
+
+Table 1. Benchmark datasets and Gaussian kernel width σ used in
+our experiments.
+
+Dataset
+
+BreastCancer
+
+Adult
+Ijcnn1
+
+n
+400
+32562
+49990
+
+ntest
+169
+16282
+91701
+
+d
+30
+123
+22
+
+σ
+0.4
+4
+0.6
+
+function is the hinge loss7. The experimental platform is
+a server with 12 × Intel(cid:114) Xeon(cid:114) E5-2620 v2 (2.10GHz)
+CPUs and 132 GB of RAM. Some of the experimental
+results, as speciﬁed in the following, have been obtained
+by running the experiments on subsets of the data samples
+chosen uniformly at random.
+In order to apply hold-out
+cross-validation, the training set is split in two parts: one
+for empirical risk minimization and the other for validation
+error computation (80% - 20%, respectively). All the
+samples are randomly shufﬂed at each repetition.
+
+4.1. Regularization in SGM and SIGM
+
+In this subsection, we illustrate four concrete examples
+showing different regularization effects of the step-size in
+SGM and the number of passes in SIGM. In all these four
+examples, we consider the Adult dataset with sample size
+n = 1000.
+√
+In the ﬁrst experiment, the SIGM step-size is ﬁxed as
+n. The test error computed with respect to the
+η = 1/
+
+7Experiments with the logistic loss have also been carried out,
+showing similar empirical results to those considering the hinge
+loss. The details are not included in this text due to space limit.
+
+η10010-110-210-3Test error0.20.40.60.81θ00.20.40.60.81Test error0.370.380.390.40.410.42Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+Table 2. Comparison of SGM and SIGM with cross-validation
+with decaying (D) and constant (C) step-sizes,
+in terms of
+computational time and accuracy. SGM performs cross-validation
+on 30 candidate step-sizes, while SIGM achieves implicit
+regularization via early stopping.
+
+Dataset
+
+Algorithm
+
+BreastCancer
+
+n = 400
+
+Adult
+
+n = 1000
+
+Adult
+
+n = 32562
+
+Ijcnn1
+
+n = 1000
+
+Ijcnn1
+
+n = 49990
+
+SGM
+SGM
+SIGM
+SIGM
+
+LIBSV M
+
+SGM
+SGM
+SIGM
+SIGM
+
+LIBSV M
+
+SGM
+SGM
+SIGM
+SIGM
+
+LIBSV M
+
+SGM
+SGM
+SIGM
+SIGM
+
+LIBSV M
+
+SGM
+SGM
+SIGM
+SIGM
+
+LIBSV M
+
+Step
+Size
+C
+D
+C
+D
+
+C
+D
+C
+D
+
+C
+D
+C
+D
+
+C
+D
+C
+D
+
+C
+D
+C
+D
+
+Test Error
+(hinge loss)
+0.127 ± 0.022
+0.135 ± 0.024
+0.131 ± 0.023
+0.204 ± 0.017
+0.380 ± 0.003
+0.378 ± 0.002
+0.383 ± 0.002
+0.450 ± 0.002
+0.342 ± 0.001
+0.340 ± 0.001
+0.343 ± 0.001
+0.364 ± 0.001
+0.199 ± 0.016
+0.199 ± 0.009
+0.205 ± 0.010
+0.267 ± 0.006
+0.041 ± 0.002
+0.059 ± 0.000
+0.098 ± 0.001
+0.183 ± 0.000
+
+Test Error
+
+Training
+Time (s)
+(class. error)
+1.7 ± 0.2
+3.1 ± 1.1%
+1.4 ± 0.3
+3.0 ± 1.1%
+1.4 ± 0.8
+3.2 ± 1.1%
+1.8 ± 0.5
+3.9 ± 1.0%
+0.2 ± 0.0
+2.8 ± 1.3%
+5.7 ± 0.6
+16.6 ± 0.3%
+5.4± 0.3
+16.2 ± 0.2%
+3.2 ± 0.4
+16.1 ± 0.0%
+1.6 ± 0.2
+23.6 ± 0.0%
+5.8 ± 0.5
+18.7 ± 0.0%
+320.0 ± 3.3
+15.2 ± 0.8%
+332.1 ± 3.3
+15.1 ± 0.7%
+15.7 ± 0.9%
+366.2 ± 3.9
+442.4 ± 4.2
+17.1 ± 0.8%
+15.3 ± 0.7% 6938.7±171.7
+3.9 ± 0.3
+8.4 ± 0.8%
+3.8± 0.3
+9.1 ± 0.1%
+1.7 ± 0.4
+9.3 ± 0.5%
+2.2 ± 0.4
+9.4 ± 0.6%
+7.1 ± 0.7%
+0.6 ± 0.1
+1.5 ± 0.0%
+564.9 ± 6.3
+1.7 ± 0.0%
+578.9 ± 1.8
+522.2 ± 20.7
+4.7 ± 0.1%
+9.5 ± 0.0%
+519.3 ± 25.8
+0.9 ± 0.0%
+770.4 ± 38.5
+
+hinge loss at each pass is reported in Figure 1(a). Note that
+the minimum test error is reached for a number of passes
+smaller than 20, after which it signiﬁcantly increases, a
+so-called overﬁtting regime. This result clearly illustrates
+the regularization effect of the number of passes.
+In the
+second experiment, we consider SIGM with decaying step-
+size (η = 1/4 and θ = 1/2). As shown in Figure
+1(b), overﬁtting is not observed in the ﬁrst 100 passes. In
+this case, the convergence to the optimal solution appears
+slower than that in the ﬁxed step-size case.
+In the last
+two experiments, we consider SGM and
+show that the step-size plays the role of a regularization
+parameter. For the ﬁxed step-size case, i.e., θ = 0, we
+perform SGM with different η ∈ (0, 1] (logarithmically
+scaled). We plot the errors in Figure 2(a), showing that a
+large step-size (η = 1) leads to overﬁtting, while a smaller
+one (e. g., η = 10−3) is associated to oversmoothing. For
+the decaying step-size case, we ﬁx η1 = 1/4, and run
+SGM with different θ ∈ [0, 1]. The errors are plotted in
+Figure 2(b), from which we see that the exponent θ has a
+regularization effect.
+In fact, a more ‘aggressive’ choice
+(e. g., θ = 0, corresponding to a ﬁxed step-size) leads to
+overﬁtting, while for a larger θ (e. g., θ = 1) we observe
+oversmoothing.
+
+4.2. Accuracy and Computational Time Comparison
+
+In this subsection, we compare SGM with cross-validation
+and SIGM with benchmark algorithm LIBSVM (Chang &
+Lin, 2011), both in terms of accuracy and computational
+time. For SGM, with 30 parameter guesses, we use cross-
+validation to tune the step-size (either setting θ = 0 while
+tuning η, or setting η = 1/4 while tuning θ). For SIGM,
+√
+we use two kinds of step-size suggested by Section 3: η =
+m and θ = 0, or η = 1/4 and θ = 1/2, using early
+1/
+stopping via cross-validation. The test errors with respect
+to the hinge loss, the test relative misclassiﬁcation errors
+and the computational times are collected in Table 2.
+We ﬁrst start comparing accuracies. The results in Table
+2 indicate that SGM with constant and decaying step-
+sizes and SIGM with ﬁxed step-size reach comparable
+test errors, which are in line with the LIBSVM baseline.
+Observe that SIGM with decaying step-size attains
+consistently higher test errors, a phenomenon already
+illustrated in Section 4.1 in theory.
+We now compare the computational
+times for cross-
+validation. We see from Table 2 that the training times
+of SIGM and SGM, either with constant or decaying step-
+sizes, are roughly the same. We also observe that SGM
+and SIGM are faster than LIBSVM on relatively large
+datasets (Adult with n = 32562, and Ijcnn1 with n = 49990).
+Moreover, for small datasets (BreastCancer with n = 400,
+Adult with n = 1000, and Ijcnn1 with n = 1000), SGM
+and SIGM are comparable with or slightly slower than
+LIBSVM.
+
+Acknowledgments
+This material is based upon work supported by the Center
+for Brains, Minds and Machines (CBMM), funded by
+NSF STC award CCF-1231216. L. R. acknowledges the
+ﬁnancial support of the Italian Ministry of Education,
+University and Research FIRB project RBFR12M3AC.
+The authors would like to thank Dr. Francesco Orabona
+for the fruitful discussions on this research topic, and Dr.
+Silvia Villa and the referees for their valuable comments.
+
+References
+Bartlett, Peter L and Mendelson, Shahar. Rademacher
+and gaussian complexities: Risk bounds and structural
+results. The Journal of Machine Learning Research, 3:
+463–482, 2003.
+
+Bartlett, Peter L, Bousquet, Olivier, and Mendelson,
+Shahar. Local rademacher complexities. Annals of
+Statistics, 33(4):1497–1537, 2005.
+
+Bertsekas, Dimitri P. Nonlinear Programming. Athena
+
+Generalization Properties and Implicit Regularization of Multiple Passes SGM
+
+Schmidt, Mark, Roux, Nicolas Le, and Bach, Francis.
+Minimizing ﬁnite sums with the stochastic average
+gradient. arXiv preprint arXiv:1309.2388, 2013.
+
+Shamir, Ohad and Zhang, Tong.
+
+Stochastic gradient
+descent for non-smooth optimization: Convergence
+results and optimal averaging schemes. In Proceedings
+of
+the 30th International Conference on Machine
+Learning, pp. 71–79, 2013.
+
+Steinwart, Ingo and Christmann, Andreas. Support Vector
+
+Machines. Springer Science Business Media, 2008.
+
+Tarres, Pierre and Yao, Yuan. Online learning as stochastic
+regularization paths: Optimality
+IEEE Transactions on
+
+approximation of
+and almost-sure convergence.
+Information Theory, 60(9):5716–5735, 2014.
+
+Ying, Yiming and Pontil, Massimiliano.
+
+Online
+gradient descent learning algorithms. Foundations of
+Computational Mathematics, 8(5):561–596, 2008.
+
+scientiﬁc, 1999.
+
+Bertsekas, Dimitri P.
+
+Incremental gradient, subgradient,
+and proximal methods for convex optimization: A
+survey. Optimization for Machine Learning, 2010:1–38,
+2011.
+
+Bousquet, Olivier and Bottou, L´eon. The tradeoffs of
+large scale learning. In Advances in Neural Information
+Processing Systems, pp. 161–168, 2008.
+
+Boyd, Stephen and Mutapcic, Almir.
+
+Stochastic
+subgradient methods. Notes for EE364b, Standford
+University, Winter 2007.
+
+Boyd, Stephen, Xiao, Lin,
+
+Subgradient methods.
+Stanford University, Autumn Quarter 2003.
+
+and Mutapcic, Almir.
+Lecture notes of EE392o,
+
+Chang, Chih-Chung and Lin, Chih-Jen.
+
+LIBSVM: A
+library for support vector machines. ACM Transactions
+on Intelligent Systems and Technology, 2:27:1–27:27,
+2011.
+
+Cucker, Felipe and Zhou, Ding-Xuan. Learning Theory:
+an Approximation Theory Viewpoint, volume 24.
+Cambridge University Press, 2007.
+
+Dieuleveut, Aymeric and Bach, Francis. Non-parametric
+stochastic approximation with large step sizes. arXiv
+preprint arXiv:1408.0361, 2014.
+
+Hardt, Moritz, Recht, Benjamin, and Singer, Yoram. Train
+faster, generalize better: Stability of stochastic gradient
+descent. arXiv preprint arXiv:1509.01240, 2016.
+
+Lin, Junhong, Rosasco, Lorenzo, and Zhou, Ding-Xuan.
+Iterative regularization for learning with convex loss
+functions. The Journal of Machine Learning Research,
+To appear, 2016.
+
+Meir, Ron and Zhang, Tong. Generalization error bounds
+The Journal of
+
+for Bayesian mixture algorithms.
+Machine Learning Research, 4:839–860, 2003.
+
+Nemirovski, Arkadi, Juditsky, Anatoli, Lan, Guanghui, and
+Shapiro, Alexander. Robust stochastic approximation
+approach to stochastic programming. SIAM Journal on
+Optimization, 19(4):1574–1609, 2009.
+
+Orabona, Francesco. Simultaneous model selection and
+optimization through parameter-free stochastic learning.
+In Advances in Neural Information Processing Systems,
+pp. 1116–1124, 2014.
+
+Learning with
+Rosasco, Lorenzo and Villa, Silvia.
+In Advances in
+incremental iterative regularization.
+Neural Information Processing Systems, pp. 1621–1629,
+2015.
+
+

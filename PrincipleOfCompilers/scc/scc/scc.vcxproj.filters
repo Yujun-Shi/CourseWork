@@ -1,0 +1,495 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TableNode.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="NodeType.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="GrammarTree.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\yydefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\clex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\cyacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\lex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\milconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\miyconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\mlconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\mlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\myacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\myconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wclex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wcyacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wlconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmilconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmiyconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmlconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmyacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wmyconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wyacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\wyconv.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yacc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yybdefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yyclex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yycpars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yyglobal.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yylex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yymlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yympars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yypars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yytdefs.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywclex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywcpars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywmlex.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywmpars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\yywpars.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="IdType.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="myparser.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="mylexer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="TableNode.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="GrammarTree.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacback.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaccpya.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdci.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdcic.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdela.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdisc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacdpop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacecho.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacgetc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacgtok.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacinp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclcln.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclcon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclcre.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacldbg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacldes.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclerr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacless.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclex.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclexc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclvts.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyaclvtv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacnewa.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacoutp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpar.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpcln.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpcon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpcre.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpdbg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpdes.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacperr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacpush.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacres.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacserr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsin.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsskp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsssz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacstsz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacstv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsup.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacsusz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyactofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacucin.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacunp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacuofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacvtlv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacvts.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacwip.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacwrap.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacwrk.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yyacwrkc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcback.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywccpya.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdci.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdcic.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdela.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdisc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcdpop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcecho.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcgetc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcgtok.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcinp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclcln.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclcon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclcre.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcldbg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcldes.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclerr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcless.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclex.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclexc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclvts.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywclvtv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcnewa.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcoutp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpar.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpcln.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpcon.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpcre.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpdbg.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpdes.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcperr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpop.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcpush.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcres.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcserr.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsin.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsskp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsssz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcstsz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcstv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsup.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcsusz.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywctofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcucin.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcunp.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcuofw.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcvtlv.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcvts.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcwipe.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcwrap.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcwrk.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\yywcwrkc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="mylexer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="myparser.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

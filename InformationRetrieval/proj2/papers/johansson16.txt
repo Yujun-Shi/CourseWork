@@ -1,0 +1,1402 @@
+Learning Representations for Counterfactual Inference
+
+Fredrik D. Johansson∗
+CSE, Chalmers University of Technology, G¨oteborg, SE-412 96, Sweden
+Uri Shalit∗
+David Sontag
+CIMS, New York University, 251 Mercer Street, New York, NY 10012 USA
+∗ Equal contribution
+
+FREJOHK@CHALMERS.SE
+
+SHALIT@CS.NYU.EDU
+DSONTAG@CS.NYU.EDU
+
+Abstract
+
+Observational studies are rising in importance
+due to the widespread accumulation of data in
+ﬁelds such as healthcare, education, employment
+and ecology. We consider the task of answering
+counterfactual questions such as, “Would this pa-
+tient have lower blood sugar had she received a
+different medication?”. We propose a new algo-
+rithmic framework for counterfactual inference
+which brings together ideas from domain adapta-
+tion and representation learning. In addition to a
+theoretical justiﬁcation, we perform an empirical
+comparison with previous approaches to causal
+inference from observational data. Our deep
+learning algorithm signiﬁcantly outperforms the
+previous state-of-the-art.
+
+1. Introduction
+Inferring causal relations is a fundamental problem in the
+sciences and commercial applications. The problem of
+causal inference is often framed in terms of counterfactual
+questions (Lewis, 1973; Rubin, 1974; Pearl, 2009) such as
+“Would this patient have lower blood sugar had she re-
+ceived a different medication?”, or “Would the user have
+clicked on this ad had it been in a different color?”. In this
+paper we propose a method to learn representations suited
+for counterfactual inference, and show its efﬁcacy in both
+simulated and real world tasks.
+We focus on counterfactual questions raised by what are
+known as observational studies. Observational studies
+are studies where interventions and outcomes have been
+recorded, along with appropriate context. For example,
+consider an electronic health record dataset collected over
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+several years, where for each patient we have lab tests and
+past diagnoses, as well as data relating to their diabetic sta-
+tus, and the causal question of interest is which of two ex-
+isting anti-diabetic medications A or B is better for a given
+patient. Observational studies are rising in importance due
+to the widespread accumulation of data in ﬁelds such as
+healthcare, education, employment and ecology. We be-
+lieve machine learning will be called on more and more
+to help make better decisions in these ﬁelds, and that re-
+searchers should be careful to pay attention to the ways in
+which these studies differ from classic supervised learning,
+as explained in Section 2 below.
+In this work we draw a connection between counterfac-
+tual inference and domain adaptation. We then introduce
+a form of regularization by enforcing similarity between
+the distributions of representations learned for populations
+with different interventions. For example, the representa-
+tions for patients who received medication A versus those
+who received medication B. This reduces the variance from
+ﬁtting a model on one distribution and applying it to an-
+other. In Section 3 we give several methods for learning
+such representations. In Section 4 we show our methods
+approximately minimizes an upper bound on a regret term
+in the counterfactual regime. The general method is out-
+lined in Figure 1. Our work has commonalities with recent
+work on learning fair representations (Zemel et al., 2013;
+Louizos et al., 2015) and learning representations for trans-
+fer learning (Ben-David et al., 2007; Gani et al., 2015). In
+all these cases the learned representation has some invari-
+ance to speciﬁc aspects of the data: either an identity of a
+certain group such as racial minorities for fair representa-
+tions, or the identity of the data source for domain adapta-
+tion, or, in the case of counterfactual learning, the type of
+intervention enacted in each population.
+In machine learning, counterfactual questions typically
+arise in problems where there is a learning agent which
+performs actions, and receives feedback or reward for that
+
+Learning Representations for Counterfactual Inference
+
+choice without knowing what would be the feedback for
+other possible choices. This is sometimes referred to as
+bandit feedback (Beygelzimer et al., 2010). This setup
+comes up in diverse areas, for example off-policy evalu-
+ation in reinforcement learning (Sutton & Barto, 1998),
+learning from “logged implicit exploration data” (Strehl
+et al., 2010) or “logged bandit feedback” (Swaminathan &
+Joachims, 2015), and in understanding and designing com-
+plex real world ad-placement systems (Bottou et al., 2013).
+Note that while in contextual bandit or robotics applica-
+tions the researcher typically knows the method underlying
+the action choice (e.g.
+the policy in reinforcement learn-
+ing), in observational studies we usually do not have con-
+trol or even a full understanding of the mechanism which
+chooses which actions are performed and which feedback
+or reward is revealed. For instance, for anti-diabetic med-
+ication, more afﬂuent patients might be insensitive to the
+price of a drug, while less afﬂuent patients could bring this
+into account in their choice.
+Given that we do not know beforehand the particulars de-
+termining the choice of action, the question remains, how
+can we learn from data which course of action would have
+better outcomes. By bringing together ideas from represen-
+tation learning and domain adaptation, our method offers a
+novel way to leverage increasing computation power and
+the rise of large datasets to tackle consequential questions
+of causal inference.
+The contributions of our paper are as follows. First, we
+show how to formulate the problem of counterfactual infer-
+ence as a domain adaptation problem, and more speciﬁcally
+a covariate shift problem. Second, we derive new fami-
+lies of representation algorithms for counterfactual infer-
+ence: one is based on linear models and variable selection,
+and the other is based on deep learning of representations
+(Bengio et al., 2013). Finally, we show that learning repre-
+sentations that encourage similarity (balance) between the
+treated and control populations leads to better counterfac-
+tual inference; this is in contrast to many methods which at-
+tempt to create balance by re-weighting samples (e.g., Bang
+& Robins, 2005; Dud´ık et al., 2011; Austin, 2011; Swami-
+nathan & Joachims, 2015). We show the merit of learning
+balanced representations both theoretically in Theorem 1,
+and empirically in a set of experiments across two datasets.
+
+2. Problem setup
+Let T be the set of potential interventions or actions we
+wish to consider, X the set of contexts, and Y the set of
+possible outcomes. For example, for a patient x ∈ X the
+set T of interventions of interest might be two different
+treatments, and the set of outcomes might be Y = [0, 200]
+indicating blood sugar levels in mg/dL. For an ad slot on a
+webpage x, the set of interventions T might be all possi-
+
+ble ads in the inventory that ﬁt that slot, while the potential
+outcomes could be Y = {click, no click}. For a context
+x (e.g. patient, webpage), and for each potential interven-
+tion t ∈ T , let Yt(x) ∈ Y be the potential outcome for x.
+The fundamental problem of causal inference is that only
+one potential outcome is observed for a given context x:
+even if we give the patient one medication and later the
+other, the patient is not in exactly the same state. In ma-
+chine learning this type of partial feedback is often called
+“bandit feedback”. The model described above is known as
+the Rubin-Neyman causal model (Rubin, 1974; 2011).
+We are interested in the case of a binary action set T =
+{0, 1}, where action 1 is often known as the “treated”
+and action 0 is the “control”.
+In this case the quantity
+Y1(x) − Y0(x) is of high interest: it is known as the in-
+dividualized treatment effect (ITE) for context x (van der
+Laan & Petersen, 2007; Weiss et al., 2015). Knowing this
+quantity enables choosing the best of the two actions when
+confronted with the choice, for example choosing the best
+treatment for a speciﬁc patient. However, the fact that we
+only have access to the outcome of one of the two ac-
+tions prevents the ITE from being known. Another com-
+monly sought after quantity is the average treatment effect,
+ATE = Ex∼p(x)[ITE(x)] for a population with distribution
+p(x). In the binary action setting, we refer to the observed
+and unobserved outcomes as the factual outcome yF (x),
+and counterfactual outcome yCF (x) respectively.
+A common approach for estimating the ITE is by direct
+modelling: given n samples {(xi, ti, yF
+i =
+ti·Y1(xi)+(1−ti)Y0(xi), learn a function h : X ×T → Y
+such that h(xi, ti) ≈ yF
+i . The estimated transductive ITE
+is then:
+
+i=1, where yF
+
+i )}n
+
+(cid:40)
+
+ˆITE(xi) =
+
+i − h(xi, 1 − ti),
+yF
+h(xi, 1 − ti) − yF
+i ,
+
+ti = 1.
+ti = 0.
+
+(1)
+
+While in principle any function ﬁtting model might be
+used for estimating the ITE (Prentice, 1976; Gelman &
+Hill, 2006; Chipman et al., 2010; Wager & Athey, 2015;
+Weiss et al., 2015), it is important to note how this task
+differs from standard supervised learning. The problem
+is as follows:
+the observed sample consists of the set
+ˆP F = {(xi, ti)}n
+i=1. However, calculating the ITE requires
+inferring the outcome on the set ˆP CF = {(xi, 1 − ti)}n
+i=1.
+We call the set ˆP F ∼ P F the empirical factual distribu-
+tion, and the set ˆP CF ∼ P CF the empirical counterfac-
+tual distribution, respectively. Because P F and P CF need
+not be equal, the problem of causal inference by counter-
+factual prediction might require inference over a different
+distribution than the one from which samples are given. In
+machine learning terms, this means that the feature distri-
+bution of the test set differs from that of the train set. This
+is a case of covariate shift, which is a special case of do-
+
+Learning Representations for Counterfactual Inference
+
+We accomplish low-error prediction by the usual means of
+error minimization over a training set and regularization in
+order to enable good generalization error. We accomplish
+the second objective by a penalty that encourages counter-
+factual predictions to be close to the nearest observed out-
+come from the respective treated or control set. Finally, we
+accomplish the third objective by minimizing the so-called
+discrepancy distance, introduced by Mansour et al. (2009),
+which is a hypothesis class dependent distance measure tai-
+lored for domain adaptation. For hypothesis space H, we
+denote the discrepancy distance by discH. See Section 4
+for the formal deﬁnition and motivation. Other discrepancy
+measures such as Maximum Mean Discrepancy (Gretton
+et al., 2012) could also be used for this purpose.
+Intuitively, representations that reduce the discrepancy be-
+tween the treated and control populations prevent
+the
+learner from using “unreliable” aspects of the data when
+trying to generalize from the factual to counterfactual do-
+mains. For example, if in our sample almost no men ever
+received medication A, inferring how men would react to
+medication A is highly prone to error and a more conserva-
+tive use of the gender feature might be warranted.
+Let X = {xi}n
+i=1, and Y F = {yF
+i=1 de-
+note the observed units, treatment assignments and factual
+outcomes respectively. We assume X is a metric space with
+a metric d. Let j(i) ∈ arg minj∈{1...n} s.t. tj =1−ti d(xj, xi)
+be the nearest neighbor of xi among the group that received
+the opposite treatment from unit i. Note that the nearest
+neighbor is computed once, in the input space, and does
+not change with the representation Φ. The objective we
+minimize over representations Φ and hypotheses h ∈ H is
+
+i=1, T = {ti}n
+
+i }n
+
+n(cid:88)
+
+i=1
+
+n(cid:88)
+
+i=1
+
+BH,α,γ(Φ, h) =
+
+1
+n
+
+|h(Φ(xi), ti) − yF
+
+i | +
+
+(2)
+
+α disc H( ˆP F
+
+Φ , ˆP CF
+
+Φ ) +
+
+γ
+n
+
+|h(Φ(xi), 1 − ti) − yF
+
+j(i)| ,
+
+where α, γ > 0 are hyperparameters to control the strength
+of the imbalance penalties, and disc is the discrepancy
+measure deﬁned in 4.1. When the hypothesis class H is
+the class of linear functions, the term disc H( ˆP F
+Φ , ˆP CF
+Φ )
+has a closed form brought in 4.1 below, and h(Φ, ti) =
+h(cid:62)[Φ(xi) ti]. For more complex hypothesis spaces there
+is in general no exact closed form for disc H( ˆP F
+Φ ).
+Once the representation Φ is learned, we ﬁt a ﬁnal hypoth-
+esis minimizing a regularized squared loss objective on the
+factual data. Our algorithm is summarized in Algorithm 1.
+Note that our algorithm involves two minimization proce-
+dures. In Section 4 we motivate our method, by showing
+that our method of learning representations minimizes an
+upper bound on the regret error over the counterfactual dis-
+tribution, using results of Cortes & Mohri (2014).
+
+Φ , ˆP CF
+
+Figure 1. Contexts x are representated by Φ(x), which are used,
+with group indicator t, to predict the response y while minimizing
+the imbalance in distributions measured by disc(ΦC , ΦT ).
+
+Algorithm 1 Balancing counterfactual regression
+1: Input: X, T, Y F ;H,N ; α, γ, λ
+2: Φ∗, g∗ = arg min
+BH,α,γ(Φ, g)
+Φ∈N ,g∈H
+3: h∗ = arg minh∈H 1
+4: Output: h∗, Φ∗
+
+(cid:80)n
+(2)
+i=1(h(Φ, ti)− yF
+
+n
+
+i )2 + λ(cid:107)h(cid:107)H
+
+main adaptation (Daume III & Marcu, 2006; Jiang, 2008;
+Mansour et al., 2009). A somewhat similar connection was
+noted in Sch¨olkopf et al. (2012) with respect to covariate
+shift, in the context of a very simple causal model.
+Speciﬁcally, we have that P F (x, t) = P (x) · P (t|x) and
+P CF (x, t) = P (x) · P (¬t|x). The difference between
+the observed (factual) sample and the sample we must per-
+form inference on lies precisely in the treatment assignment
+mechanism, P (t|x). For example, in a randomized con-
+trol trial, we typically have that t and x are independent.
+In the contextual bandit setting, there is typically an algo-
+rithm which determines the choice of the action t given the
+context x. In observational studies, which are the focus of
+this work, the treatment assignment mechanism is not un-
+der our control and in general will not be independent of
+the context x. Therefore, in general, the counterfactual dis-
+tribution will be different from the factual distribution.
+
+3. Balancing counterfactual regression
+We propose to perform counterfactual inference by amend-
+ing the direct modeling approach, taking into account the
+fact that the learned estimator h must generalize from the
+factual distribution to the counterfactual distribution.
+Our method, see Figure 1, learns a representation Φ : X →
+Rd, (either using a deep neural network, or by feature re-
+weighting and selection), and a function h : Rd × T → R,
+such that the learned representation trades off three objec-
+tives: (1) enabling low-error prediction of the observed out-
+comes over the factual representation, (2) enabling low-
+error prediction of unobserved counterfactuals by taking
+into account relevant factual outcomes, and (3) the distri-
+butions of treatment populations are similar or balanced.
+
+Context  xRepresentation ΦOutcome error loss(h (Φ, t), y)Treatment tImbalance disc(ΦC, ΦT)3.1. Balancing variable selection
+
+Learning Representations for Counterfactual Inference
+
+A na¨ıve way of obtaining a balanced representation is to
+use only features that are already well balanced, i.e. fea-
+tures which have a similar distribution over both treated and
+control sets. However, imbalanced features can be highly
+predictive of the outcome, and should not always be dis-
+carded. A middle-ground is to restrict the inﬂuence of im-
+balanced features on the predicted outcome. We build on
+this idea by learning a sparse re-weighting of the features
+that minimizes the bound in Theorem 1. The re-weighting
+determines the inﬂuence of a feature by trading off its pre-
+dictive capabilities and its balance.
+We implement the re-weighting as a diagonal matrix W ,
+forming the representation Φ(x) = W x, with diag(W )
+subject to a simplex constraint to achieve sparsity. Let N =
+i wi = 1} de-
+note the space of such representations. We can now apply
+Algorithm 1 with Hl the space of linear hypotheses. Be-
+cause the hypotheses are linear, disc(Φ) is a function of
+the distance between the weighted population means, see
+i=1 ti,
+
+{x (cid:55)→ W x : W = diag(w), wi ∈ [0, 1], (cid:80)
+Section 4.1. With p = E[t], c = p − 1/2, nt = (cid:80)n
+
+(cid:80)n
+
+µ1 = 1
+nt
+
+i:ti=1 xi, and µ0 analogously deﬁned,
+
+disc Hl (XW ) = c +
+
+c2 + (cid:107)W (pµ1 − (1 − p)µ0)](cid:107)2
+To minimize the discrepancy, features k that differ a lot be-
+tween treatment groups will receive a smaller weight wk.
+Minimizing the overall objective B, involves a trade-off
+between maximizing balance and predictive accuracy. We
+minimize (2) using alternating sub-gradient descent.
+
+2
+
+(cid:113)
+
+3.2. Deep neural networks
+
+Deep neural networks have been shown to successfully
+learn good representations of high-dimensional data in
+many tasks (Bengio et al., 2013). Here we show that they
+can be used for counterfactual inference and, crucially, for
+accommodating imbalance penalties. We propose a modi-
+ﬁcation of the standard feed-forward architecture with fully
+connected layers, see Figure 2. The ﬁrst dr hidden layers
+are used to learn a representation Φ(x) of the input x. The
+output of the dr:th layer is used to calculate the discrepancy
+discH( ˆP F
+Φ ). The do layers following the ﬁrst dr lay-
+ers take as additional input the treatment assignment ti and
+generate a prediction h([Φ(xi), ti]) of the outcome.
+
+Φ , ˆP CF
+
+Figure 2. Neural network architecture.
+
+fect, as they involve no interactions between Φ(x) and
+t. Such interactions could be introduced by for example
+(polynomial) feature expansion, or in the case of neural net-
+works, by adding non-linear layers after the concatenation
+[Φ(x), t]. For both approaches however, we no longer have
+a closed form expression for disc H( ˆP F
+
+Φ , ˆP CF
+
+Φ ).
+
+1 ), . . . , (xn, tn, yF
+
+4. Theory
+In this section we derive an upper bound on the rela-
+tive counterfactual generalization error of a representation
+function Φ. The bound only uses quantities we can mea-
+sure directly from the available data. In the previous sec-
+tion we gave several methods for learning representations
+which approximately minimize the upper bound.
+Recall that for an observed context or instance xi ∈ X
+with observed treatment ti ∈ {0, 1}, the two potential out-
+comes are Y0(xi), Y1(xi) ∈ Y, of which we observe the
+i = tiY1(xi) + (1 − ti)Y0(xi). Let
+factual outcome yF
+n ) be a sample from the factual
+(x1, t1, yF
+), . . . , (xn, 1 −
+distribution. Similarly, let (x1, 1 − t1, yCF
+n ) be the counterfactual sample. Note that while we
+tn, yCF
+know the factual outcomes yF
+i , we do not know the coun-
+. Let Φ : X → Rd be a repre-
+terfactual outcomes yCF
+sentation function, and let R(Φ) denote its range. Denote
+by ˆP F
+Φ the empirical distribution over the representations
+and treatment assignments (Φ(x1), t1), . . . , (Φ(xn), tn),
+and similarly ˆP CF
+the empirical distribution over the
+representations and counterfactual treatment assignments
+(Φ(x1), 1 − t1), . . . , (Φ(xn), 1 − tn). Let Hl be the hy-
+pothesis set of linear functions β : R(Φ) × {0, 1} → Y.
+Deﬁnition 1 (Mansour et al. 2009). Given a hypothesis set
+H and a loss function L, the empirical discrepancy between
+the empirical distributions ˆP F
+
+Φ and ˆP CF
+
+Φ is:
+
+Φ
+
+1
+
+i
+
+discH( ˆP F
+
+Φ , ˆP CF
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) E
+
+x∼ ˆP F
+
+Φ
+
+Φ ) =
+[L(β(x), β(cid:48)(x))] − E
+
+x∼ ˆP CF
+
+Φ
+
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12)
+
+[L(β(x), β(cid:48)(x))]
+
+3.3. Non-linear hypotheses and individual effect
+
+max
+β,β(cid:48)∈H
+
+We note that both in the case of variable re-weighting,
+and for neural nets with a single linear outcome layer, the
+hypothesis space H comprises linear functions of [Φ, t]
+and the discrepancy, discH(Φ) can be expressed in closed-
+form. A less desirable consequence is that such models
+cannot capture difference in the individual treatment ef-
+
+where L is a loss function L : Y × Y → R with weak Lip-
+schitz constant µ relative to H 1. Note that the discrepancy
+1When L is the squared loss we can show that if (cid:107)Φ(x)(cid:107)2 ≤
+m and |y| ≤ M, and the hypothesis set H is that of linear func-
+tions with norm bounded by m/λ, then µ ≤ 2M (1 + m2/λ).
+
+txloss(h (Φ, t), y)…	  …	  ΦtΦdisc(Φt=0, Φt=1)drdoLearning Representations for Counterfactual Inference
+
+i )}n
+
+Φ = (Φ(x1), t1), . . . , (Φ(xn), tn), ˆP CF
+
+is deﬁned with respect to a hypothesis class and a loss func-
+tion, and is therefore very useful for obtaining generaliza-
+tion bounds involving different distributions. Throughout
+this section we always have L denote the squared loss. We
+prove the following, based on Cortes & Mohri (2014):
+Theorem 1. For a sample {(xi, ti, yF
+i=1, xi ∈ X , ti ∈
+{0, 1} and yi ∈ Y, and a given representation function Φ :
+X → Rd, let ˆP F
+Φ =
+(Φ(x1), 1−t1), . . . , (Φ(xn), 1−tn). We assume that X is a
+metric space with metric d, and that the potential outcome
+functions Y0(x) and Y1(x) are Lipschitz continuous with
+constants K0 and K1 respectively, such that d(xa, xb) ≤
+c =⇒ |Yt(xa) − Yt(xb)| ≤ Kt · c for t = 0, 1.
+Let Hl ⊂ Rd+1 be the space of
+linear
+func-
+tions β : X × {0, 1} → Y, and for β ∈ Hl,
+let LP (β) = E(x,t,y)∼P [L(β(x, t), y)] be the ex-
+Let r =
+pected loss of β over distribution P .
+
+max(cid:0)E(x,t)∼P F [(cid:107)[Φ(x), t](cid:107)2] , E(x,t)∼P CF [(cid:107)[Φ(x), t](cid:107)2](cid:1)
+
+be the maximum expected radius of the distributions. For
+(β) + λ(cid:107)β(cid:107)2
+λ > 0, let ˆβF (Φ) = arg minβ∈Hl
+2,
+Φ , i.e. ˆβF (Φ) and ˆβCF (Φ)
+and ˆβCF (Φ) similarly for ˆP CF
+are the ridge regression solutions for the factual and
+counterfactual empirical distributions, respectively.
+
+L ˆP F
+
+Φ
+
+i
+
+i (Φ, h) = h(cid:62)[Φ(xi), ti] and ˆyCF
+
+Let ˆyF
+(Φ, h) =
+h(cid:62)[Φ(xi), 1 − ti] be the outputs of the hypothesis h ∈
+Hl over the representation Φ(xi) for the factual and
+for
+counterfactual settings of ti, respectively. Finally,
+each i, j ∈ {1 . . . n}, let di,j ≡ d(xi, xj) and j(i) ∈
+arg minj∈{1...n} s.t. tj =1−ti d(xj, xi) be the nearest neigh-
+bor in X of xi among the group that received the oppo-
+site treatment from unit i. Then for both Q = P F and
+Q = P CF we have:
+
+(LQ( ˆβF (Φ)) − LQ( ˆβCF (Φ)))2 ≤
+
+λ
+µr
+discHl ( ˆP F
+
+min
+h∈Hl
+
+1
+n
+
+Φ , ˆP CF
+
+Φ ) +
+i (Φ, h) − yF
+
+n(cid:88)
+
+i=1
+
+i | + |ˆyCF
+
+i
+
+(Φ, h) − yCF
+
+i
+
+(cid:0)|ˆyF
+(cid:16)|ˆyF
+
+(3)
+
+|(cid:1) ≤
+j(i)|(cid:17)
+
++
+
+(4)
+
+(5)
+
+(6)
+
+discHl ( ˆP F
+
+Φ , ˆP CF
+
+1
+n
+
+n(cid:88)
+(cid:88)
+
+i=1
+
+min
+h∈Hl
+
+K0
+n
+
+Φ )+
+i (Φ, h) − yF
+(cid:88)
+
+K1
+n
+
+di,j(i) +
+
+di,j(i).
+
+i:ti=1
+
+i:ti=0
+
+i | + |ˆyCF
+
+i
+
+(Φ, h) − yF
+
+The proof is in the supplemental material.
+Theorem 1 gives, for all ﬁxed representations Φ, a bound
+
+i
+
+i − yCF
+
+on the relative error for a ridge regression model ﬁt on the
+factual outcomes and evaluated on the counterfactual, as
+compared with ridge regression had it been ﬁt on the un-
+observed counterfactual outcomes. It does not take into ac-
+count how Φ is obtained, and applies even if h(Φ(x), t) is
+not convex in x, e.g. if Φ is a neural net. Since the bound in
+the theorem is true for all representations Φ, we can attempt
+to minimize it over Φ, as done in Algorithm 1.
+The term on line (4) of the bound includes the unknown
+counterfactual outcomes yCF
+. It measures how well could
+we in principle ﬁt the factual and counterfactual outcomes
+together using a linear hypothesis over the representation
+Φ. For example, if the dimension of the representation is
+greater than the number of samples, and in addition if there
+i − b| ≤ , then
+exist constants b and  such that |yF
+this term is upper bounded by . In general however, we
+cannot directly control its magnitude.
+The term on line (3) measures the discrepancy between the
+factual and counterfactual distributions over the represen-
+tation Φ. In 4.1 below, we show that this term is closely
+related to the norm of the difference in means between the
+representation of the control group and the treated group.
+A representation for which the means of the treated and
+control are close (small value of (3)), but at the same time
+allows for a good prediction of the factuals and counterfac-
+tuals (small value of (4)), is guaranteed to yield structural
+risk minimizers with similar generalization errors between
+factual and counterfactual.
+We further show that the term on line (4), which can-
+not be evaluated since we do not know yCF
+, can be up-
+per bounded by a sum of the terms on lines (5) and (6).
+The term (5) includes two empirical data ﬁtting terms:
+|ˆyF
+i (Φ, v)−yF
+j(i)|. The ﬁrst is simply
+ﬁtting the observed factual outcomes using a linear func-
+tion over the representation Φ. The second term is a form
+of nearest-neighbor regression, where the counterfactual
+outcomes for a treated (resp. control) instance are ﬁt to
+the most similar factual outcome among the control (resp.
+treated) set, where similarity is measured in the original
+space X . Finally, the term on line (6), is the only quan-
+tity which is independent of the representation Φ. It mea-
+sures the average distance between each treated instance to
+the nearest control, and vice-versa, scaled by the Lipschitz
+constants of the true treated and control outcome functions.
+This term will be small when: (a) the true outcome func-
+tions Y0(x) and Y1(x) are relatively smooth, and (b) there
+is overlap between the treated and control groups, lead-
+ing to small average nearest neighbor distance across the
+groups. It is well-known that when there is not much over-
+lap between treated and control, causal inference in general
+is more difﬁcult since the extrapolation from treated to con-
+trol and vice-versa is more extreme (Rosenbaum, 2009).
+
+i | and |ˆyCF
+
+(Φ, v)−yF
+
+i
+
+i
+
+Learning Representations for Counterfactual Inference
+
+The upper bound in Theorem 1 suggests the following ap-
+proach for counterfactual regression. First minimize the
+terms (3) and (5) as functions of the representation Φ. Once
+Φ is obtained, perform a ridge regression on the factual out-
+comes using the representations Φ(x) and the treatment as-
+signments as input. The terms in the bound ensure that Φ
+would have a good ﬁt for the data (term (5)), while remov-
+ing aspects of the treated and control which create a large
+discrepancy term (3)). For example, if there is a feature
+which is much more strongly associated with the treatment
+assignment than with the outcome, it might be advisable to
+not use it (Pearl, 2011).
+
+4.1. Linear discrepancy
+A straightforward calculation shows that for a class Hl of
+linear hypotheses,
+
+(P, Q) = (cid:107)µ2(P ) − µ2(Q)(cid:107)2 .
+
+discHl
+
+Here, (cid:107)A(cid:107)2 is the spectral norm of A and µ2(P ) =
+Ex∼P [xx(cid:62)] is the second-order moment of x ∼ P .
+In
+the special case of counterfactual inference, P and Q differ
+only in the treatment assignment. Speciﬁcally,
+
+(cid:13)(cid:13)(cid:13)(cid:13)(cid:20)0d,d
+(cid:114)
+
+v(cid:62)
+(2p − 1)2
+
+(cid:21)(cid:13)(cid:13)(cid:13)(cid:13)2
+
+v
+
+2p − 1
+
+(7)
+
+4
+
++ (cid:107)v(cid:107)2
+
+(8)
+[Φ(x)· (1− t)]
+
+2
+
+disc( ˆP F
+
+Φ , ˆP CF
+
+Φ ) =
+
+= p − 1
+2
+
++
+
+Φ
+
+Φ
+
+(x,t)∼ ˆP F
+
+(x,t)∼ ˆP F
+
+(x,t)∼ ˆP F
+
+[Φ(x)· t]− E
+
+where v = E
+and p = E[t].
+[Φ(x)|t = 1] and µ0(Φ) =
+Let µ1(Φ) = E
+[Φ(x)|t = 0] be the treated and control means in
+E
+(x,t)∼ ˆP F
+Φ space. Then v = p· µ1(Φ)− (1− p)· µ0(Φ), exactly the
+difference in means between the treated and control groups,
+weighted by their respective sizes. As a consequence, min-
+imizing the discrepancy with linear hypotheses constitutes
+matching means in feature space.
+
+Φ
+
+Φ
+
+5. Related work
+Counterfactual inference for determining causal effects in
+observational studies has been studied extensively in statis-
+tics, economics, epidemiology and sociology (Morgan &
+Winship, 2014; Robins et al., 2000; Rubin, 2011; Cher-
+nozhukov et al., 2013) as well as in machine learning
+(Langford et al., 2011; Bottou et al., 2013; Swaminathan
+& Joachims, 2015).
+Non-parametric methods do not attempt to model the rela-
+tion between the context, intervention, and outcome. The
+methods include nearest-neighbor matching, propensity
+score matching, and propensity score re-weighting (Rosen-
+baum & Rubin, 1983; Rosenbaum, 2002; Austin, 2011).
+
+Parametric methods, on the other hand, attempt to con-
+cretely model the relation between the context, interven-
+tion, and outcome. These methods include any type of
+regression including linear and logistic regression (Pren-
+tice, 1976; Gelman & Hill, 2006), random forests (Wager
+& Athey, 2015) and regression trees (Chipman et al., 2010).
+Doubly robust methods combine aspects of parametric and
+non-parametric methods, typically by using a propensity
+score weighted regression (Bang & Robins, 2005; Dud´ık
+et al., 2011). They are especially of use when the treat-
+ment assignment probability is known, as is the case for
+off-policy evaluation or learning from logged bandit data.
+Once the treatment assignment probability has to be esti-
+mated, as is the case in most observational studies, their
+efﬁcacy might wane considerably (Kang & Schafer, 2007).
+Tian et al. (2014) presented one of the few methods that
+achieve balance by transforming or selecting covariates,
+modeling interactions between treatment and covariates.
+
+1
+n
+
+(cid:113)
+
+6. Experiments
+We evaluate the two variants of our algorithm proposed in
+Section 3 with focus on two questions: 1) What is the effect
+of imposing imbalance regularization on representations?
+2) How do our methods fare against established methods
+for counterfactual inference? We refer to the variable se-
+lection method of Section 3.1 as Balancing Linear Regres-
+sion (BLR) and the neural network approach as BNN for
+Balancing Neural Network.
+We report the RMSE of the estimated individual treatment
+effect, denoted IT E, and the absolute error in estimated
+average treatment effect, denoted AT E, see Section 2.
+(cid:80)n
+Further, following Hill (2011), we report the Precision
+in Estimation of Heterogeneous Effect (PEHE), PEHE =
+i=1 (ˆy1(xi) − ˆy0(xi) − (Y1(xi) − Y0(xi)))2. Un-
+like for ITE, obtaining a good (small) PEHE requires ac-
+curate estimation of both the factual and counterfactual re-
+sponses, not just the counterfactual. Standard methods for
+hyperparameter selection, including cross-validation, are
+unavailable when training counterfactual models on real-
+world data, as there are no samples from the counterfactual
+outcome. In our experiments, all outcomes are simulated,
+and we have access to counterfactual samples. To avoid
+ﬁtting parameters to the test set, we generate multiple re-
+peated experiments, each with a different outcome function
+and pick hyperparameters once, for all models (and base-
+lines), based on a held-out set of experiments. While not
+possible for real-world data, this approach gives an indica-
+tion of the robustness of the parameters.
+The neural network architectures used for all experiments
+consist of fully-connected ReLU layers trained using RM-
+
+Learning Representations for Counterfactual Inference
+
+SProp, with a small l2 weight decay, λ = 10−3. We
+evaluate two architectures. BNN-4-0 consists of 4 ReLU
+representation-only layers and a single linear output layer,
+dr = 4, do = 0.
+BNN-2-2 consists of 2 ReLU
+representation-only layers, 2 ReLU output layers after the
+treatment has been added, and a single linear output layer,
+dr = 2, do = 2, see Figure 2. For the IHDP data we use
+layers of 25 hidden units each. For the News data repre-
+sentation layers have 400 units and output layers 200 units.
+The nearest neighbor term, see Section 3, did not improve
+empirical performance, and was omitted for the BNN mod-
+els. For the neural network models, the hypothesis and the
+representation were ﬁt jointly.
+We include several different linear models in our compari-
+son, including ordinary linear regression (OLS) and doubly
+robust linear regression (DR) (Bang & Robins, 2005). We
+also include a method were variables are ﬁrst selected us-
+ing LASSO and then used to ﬁt a ridge regression (LASSO
++ RIDGE). Regularization parameters are picked based on
+a held out sample. For DR, we estimate propensity scores
+using logistic regression and clip weights at 100. For the
+News dataset (see below), we perform the logistic regres-
+sion on the ﬁrst 100 principal components of the data.
+Bayesian Additive Regression Trees (BART) (Chipman
+et al., 2010) is a non-linear regression model which has
+been used successfully for counterfactual inference in the
+past (Hill, 2011). We compare our results to BART
+using the implementation provided in the BayesTree R-
+package (Chipman & McCulloch, 2016). Like (Hill, 2011),
+we do not attempt to tune the parameters, but use the de-
+fault. Finally, we include a standard feed-forward neural
+network, trained with 4 hidden layers, to predict the factual
+outcome based on X and t, without a penalty for imbal-
+ance. We refer to this as NN-4.
+
+6.1. Simulation based on real data – IHDP
+
+Hill (2011) introduced a semi-simulated dataset based on
+the Infant Health and Development Program (IHDP). The
+IHDP data has covariates from a real randomized exper-
+iment, studying the effect of high-quality child care and
+home visits on future cognitive test scores. The experiment
+proposed by Hill (2011) uses a simulated outcome and ar-
+tiﬁcially introduces imbalance between treated and control
+subjects by removing a subset of the treated population.
+In total, the dataset consists of 747 subjects (139 treated,
+608 control), each represented by 25 covariates measuring
+properties of the child and their mother. For details, see
+Hill (2011). We run 100 repeated experiments for hyper-
+parameter selection and 1000 for evaluation, all with the
+log-linear response surface implemented as setting “B” in
+the NPCI package (Dorie, 2016).
+
+Figure 3. Visualization of one of the News sets (left). Each dot
+represents a single news item x. The radius represents the out-
+come y(x), and the color the treatment t. The two black dots
+represent the two centroids. Histogram of ITE in News (right).
+
+6.2. Simulation based on real data – News
+
+1 (mobile), and zc
+
+0 + ti · z(x)(cid:62)zc
+
+1
+
+(cid:1) +  , where C is
+
+t , yF (xi) = C(cid:0)z(x)(cid:62)zc
+
+We introduce a new dataset, simulating the opinions of a
+media consumer exposed to multiple news items. Each
+item is consumed either on a mobile device or on desk-
+top. The units are different news items represented by
+word counts xi ∈ NV , and the outcome yF (xi) ∈ R is
+the readers experience of xi. The intervention t ∈ {0, 1}
+represents the viewing device, desktop (t = 0) or mobile
+(t = 1). We assume that the consumer prefers to read
+about certain topics on mobile. To model this, we train a
+topic model on a large set of documents and let z(x) ∈ Rk
+represent the topic distribution of news item x. We deﬁne
+two centroids in topic space, zc
+0 (desk-
+top), and let the readers opinion of news item x on de-
+vice t be determined by the similarity between z(x) and
+zc
+a scaling factor and  ∼ N (0, 1). Here, we let the mobile
+centroid, zc
+1 be the topic distribution of a randomly sam-
+pled document, and zc
+0 be the average topic representation
+of all documents. We further assume that the assignment
+of a news item x to a device t ∈ {0, 1} is biased towards
+the device preferred for that item. We model this using the
+softmax function, p(t = 1 | x) =
+,
+0 +eκ·z(x)(cid:62) zc
+where κ ≥ 0 determines the strength of the bias. Note that
+κ = 0 implies a completely random device assignment.
+We sample n = 5000 news items and outcomes accord-
+ing to this model, based on 50 LDA topics, trained on
+documents from the NY Times corpus (downloaded from
+UCI (Newman, 2008)). The data available to the algo-
+rithms are the raw word counts, from a vocabulary of
+k = 3477 words, selected as union of the most 100 prob-
+able words in each topic. We set the scaling parameters to
+C = 50, κ = 10 and sample 50 realizations for evaluation.
+Figure 3 shows a visualization of the outcome and device
+assignments for a sample of 500 documents. Note that the
+device assignment becomes increasingly random, and the
+outcome lower, further away from the centroids.
+
+eκ·z(x)(cid:62)zc
+
+1
+
+eκ·z(x)(cid:62) zc
+
+1
+
+ITE(x)051015200100200300400500600700800900ATE = 3.45Learning Representations for Counterfactual Inference
+
+Table 1. IHDP. Results and standard errors for 1000 repeated ex-
+periments. (Lower is better.) Proposed methods: BLR, BNN-4-
+0 and BNN-2-2. † (Chipman et al., 2010)
+
+IT E
+
+AT E
+
+PEHE
+
+LINEAR OUTCOME
+OLS
+DOUBLY ROBUST
+LASSO + RIDGE
+BLR
+BNN-4-0
+NON-LINEAR OUTCOME
+NN-4
+BART†
+BNN-2-2
+
+4.6 ± 0.2
+3.0 ± 0.1
+2.8 ± 0.1
+2.8 ± 0.1
+3.0 ± 0.0
+2.0 ± 0.0
+2.1 ± 0.2
+1.7 ± 0.0
+
+0.7 ± 0.0
+0.2 ± 0.0
+0.2 ± 0.0
+0.2 ± 0.0
+0.3 ± 0.0
+0.5 ± 0.0
+0.2 ± 0.0
+0.3 ± 0.0
+
+5.2 ± 0.3
+5.7 ± 0.3
+5.7 ± 0.2
+5.7 ± 0.3
+5.6 ± 0.3
+1.9 ± 0.1
+1.7 ± 0.2
+1.6 ± 0.1
+
+Table 2. News. Results and standard errors for 50 repeated exper-
+iments. (Lower is better.) Proposed methods: BLR, BNN-4-0
+and BNN-2-2. † (Chipman et al., 2010)
+
+IT E
+
+AT E
+
+PEHE
+
+LINEAR OUTCOME
+OLS
+DOUBLY ROBUST
+LASSO + RIDGE
+BLR
+BNN-4-0
+NON-LINEAR OUTCOME
+NN-4
+BART†
+BNN-2-2
+
+3.1 ± 0.2
+3.1 ± 0.2
+2.2 ± 0.1
+2.2 ± 0.1
+2.1 ± 0.0
+2.8 ± 0.0
+5.8 ± 0.2
+2.0 ± 0.0
+
+0.2 ± 0.0
+0.2 ± 0.0
+0.6 ± 0.0
+0.6 ± 0.0
+0.3 ± 0.0
+1.1 ± 0.0
+0.2 ± 0.0
+0.3 ± 0.0
+
+3.3 ± 0.2
+3.3 ± 0.2
+3.4 ± 0.2
+3.3 ± 0.2
+3.4 ± 0.2
+3.8 ± 0.2
+3.2 ± 0.2
+2.0 ± 0.1
+
+6.3. Results
+
+The results of the IHDP and News experiments are pre-
+sented in Table 1 and Table 2 respectively. We see that, in
+general, the non-linear methods perform better in terms of
+individual prediction (ITE, PEHE). Further, we see that our
+proposed balancing neural network BNN-2-2 performs
+the best on both datasets in terms of estimating the ITE
+and PEHE, and is competitive on average treatment effect,
+ATE. Particularly noteworthy is the comparison with the
+network without balance penalty, NN-4. These results in-
+dicate that our proposed regularization can help avoid over-
+ﬁtting the representation to the factual outcome. Figure 4
+plots the performance of BNN-2-2 for various imbalance
+penalties α. The valley in the region α = 1, and the fact
+that we don’t experience a loss in performance for smaller
+values of α, show that the penalizing imbalance in the rep-
+resentation Φ has the desired effect.
+For the linear methods, we see that the two variable selec-
+tion approaches, our proposed BLR method and LASSO +
+RIDGE, work the best in terms of estimating ITE. We would
+
+Figure 4. Error in estimated treatment effect (ITE, PEHE) and
+counterfactual response (RMSE) on the IHDP dataset. Sweep
+over α for the BNN-2-2 neural network model.
+
+like to emphasize that LASSO + RIDGE is a very strong
+baseline and it’s exciting that our theory-guided method is
+competitive with this approach. On News, BLR and LASSO
++ RIDGE perform equally well yet again, although this time
+with qualitatively different results, as they do not select the
+same variables. Interestingly, BNN-4-0, BLR and LASSO
++ RIDGE all perform better on News than the standard neu-
+ral network, NN-4. The performance of BART on News is
+likely hurt by the dimensionality of the dataset, and could
+improve with hyperparameter tuning.
+
+7. Conclusion
+As machine learning is becoming a major tool for re-
+searchers and policy makers across different ﬁelds such as
+healthcare and economics, causal inference becomes a cru-
+cial issue for the practice of machine learning. In this paper
+we focus on counterfactual inference, which is a widely ap-
+plicable special case of causal inference. We cast counter-
+factual inference as a type of domain adaptation problem,
+and derive a novel way of learning representations suited
+for this problem.
+Our models rely on a novel type of regularization criteria:
+learning balanced representations, representations which
+have similar distributions among the treated and untreated
+populations. We show that trading off a balancing criterion
+with standard data ﬁtting and regularization terms is both
+practically and theoretically prudent.
+Open questions which remain are how to generalize this
+method for cases where more than one treatment is in
+question, deriving better optimization algorithms and using
+richer discrepancy measures.
+
+Acknowledgements
+DS and US were supported by NSF CAREER award
+#1350965.
+
+Imbalance penalty, , (log-scale)010-410-2100102ITE / PEHE1.522.533.54////PEHEITEITE (BART)Imbalance penalty, , (log-scale)010-410-2100102Factual / counterfactual RMSE11.522.533.54////Factual RMSECounterfactual RMSECounterfactual RMSE (BART)Learning Representations for Counterfactual Inference
+
+References
+Austin, Peter C. An introduction to propensity score meth-
+ods for reducing the effects of confounding in observa-
+tional studies. Multivariate behavioral research, 46(3):
+399–424, 2011.
+
+Bang, Heejung and Robins, James M. Doubly robust es-
+timation in missing data and causal inference models.
+Biometrics, 61(4):962–973, 2005.
+
+Ben-David, Shai, Blitzer, John, Crammer, Koby, Pereira,
+Fernando, et al. Analysis of representations for domain
+adaptation. Advances in neural information processing
+systems, 19:137, 2007.
+
+Bengio, Yoshua, Courville, Aaron, and Vincent, Pierre.
+Representation learning: A review and new perspectives.
+Pattern Analysis and Machine Intelligence, IEEE Trans-
+actions on, 35(8):1798–1828, 2013.
+
+Beygelzimer, Alina, Langford, John, Li, Lihong, Reyzin,
+Lev, and Schapire, Robert E. Contextual bandit al-
+arXiv
+gorithms with supervised learning guarantees.
+preprint arXiv:1002.4058, 2010.
+
+Bottou, L´eon, Peters, Jonas, Quinonero-Candela, Joaquin,
+Charles, Denis X, Chickering, D Max, Portugaly, Elon,
+Ray, Dipankar, Simard, Patrice, and Snelson, Ed. Coun-
+terfactual reasoning and learning systems: The example
+of computational advertising. The Journal of Machine
+Learning Research, 14(1):3207–3260, 2013.
+
+Chernozhukov, Victor, Fern´andez-Val, Iv´an, and Melly,
+Blaise. Inference on counterfactual distributions. Econo-
+metrica, 81(6):2205–2268, 2013.
+
+Chipman, Hugh and McCulloch, Robert. BayesTree:
+Bayesian additive regression trees. https://cran.
+r-project.org/package=BayesTree/, 2016.
+Accessed: 2016-01-30.
+
+Chipman, Hugh A, George, Edward I, and McCulloch,
+Robert E. Bart: Bayesian additive regression trees. The
+Annals of Applied Statistics, pp. 266–298, 2010.
+
+Cortes, Corinna and Mohri, Mehryar. Domain adaptation
+and sample bias correction theory and algorithm for re-
+gression. Theoretical Computer Science, 519:103–126,
+2014.
+
+Daume III, Hal and Marcu, Daniel. Domain adaptation for
+statistical classiﬁers. Journal of Artiﬁcial Intelligence
+Research, pp. 101–126, 2006.
+
+Dorie, Vincent. NPCI: Non-parametrics for causal in-
+ference. https://github.com/vdorie/npci,
+2016. Accessed: 2016-01-30.
+
+Dud´ık, Miroslav, Langford, John, and Li, Lihong. Dou-
+bly robust policy evaluation and learning. arXiv preprint
+arXiv:1103.4601, 2011.
+
+Gani, Yaroslav, Ustinova, Evgeniya, Ajakan, Hana, Ger-
+main, Pascal, Larochelle, Hugo, Laviolette, Franc¸ois,
+Marchand, Mario, and Lempitsky, Victor. Domain-
+adversarial training of neural networks. arXiv preprint
+arXiv:1505.07818, 2015.
+
+Gelman, Andrew and Hill, Jennifer. Data analysis using re-
+gression and multilevel/hierarchical models. Cambridge
+University Press, 2006.
+
+Gretton, Arthur, Borgwardt, Karsten M., Rasch, Malte J.,
+Sch¨olkopf, Bernhard, and Smola, Alexander. A ker-
+nel two-sample test. J. Mach. Learn. Res., 13:723–773,
+March 2012. ISSN 1532-4435.
+
+Hill, Jennifer L. Bayesian nonparametric modeling for
+causal inference. Journal of Computational and Graph-
+ical Statistics, 20(1), 2011.
+
+Jiang, Jing. A literature survey on domain adaptation of
+statistical classiﬁers. Technical report, University of Illi-
+nois at Urbana-Champaign, 2008.
+
+Kang, Joseph DY and Schafer, Joseph L. Demystifying
+double robustness: A comparison of alternative strate-
+gies for estimating a population mean from incomplete
+data. Statistical science, pp. 523–539, 2007.
+
+Langford, John, Li, Lihong, and Dud´ık, Miroslav. Doubly
+robust policy evaluation and learning. In Proceedings of
+the 28th International Conference on Machine Learning
+(ICML-11), pp. 1097–1104, 2011.
+
+Lewis, David. Causation. The journal of philosophy, pp.
+
+556–567, 1973.
+
+Louizos, Christos, Swersky, Kevin, Li, Yujia, Welling,
+Max, and Zemel, Richard. The variational fair auto en-
+coder. arXiv preprint arXiv:1511.00830, 2015.
+
+Mansour, Yishay, Mohri, Mehryar, and Rostamizadeh, Af-
+shin. Domain adaptation: Learning bounds and algo-
+rithms. arXiv preprint arXiv:0902.3430, 2009.
+
+Morgan, Stephen L and Winship, Christopher. Counterfac-
+tuals and causal inference. Cambridge University Press,
+2014.
+
+Newman, David. Bag of words data set.
+
+https:
+
+//archive.ics.uci.edu/ml/datasets/
+Bag+of+Words, 2008.
+
+Pearl, Judea. Causality. Cambridge university press, 2009.
+
+Learning Representations for Counterfactual Inference
+
+Pearl, Judea. Invited commentary: understanding bias am-
+pliﬁcation. American journal of epidemiology, 174(11):
+1223–1227, 2011.
+
+Wager, Stefan and Athey, Susan. Estimation and inference
+of heterogeneous treatment effects using random forests.
+arXiv preprint arXiv:1510.04342, 2015.
+
+Weiss, Jeremy C, Kuusisto, Finn, Boyd, Kendrick, Lui,
+Jie, and Page, David C. Machine learning for treatment
+assignment: Improving individualized risk attribution.
+American Medical Informatics Association Annual Sym-
+posium, 2015.
+
+Zemel, Rich, Wu, Yu, Swersky, Kevin, Pitassi, Toni, and
+Dwork, Cynthia. Learning fair representations. In Pro-
+ceedings of the 30th International Conference on Ma-
+chine Learning (ICML-13), pp. 325–333, 2013.
+
+Prentice, Ross. Use of the logistic model in retrospective
+
+studies. Biometrics, pp. 599–606, 1976.
+
+Robins, James M, Hernan, Miguel Angel, and Brumback,
+Babette. Marginal structural models and causal inference
+in epidemiology. Epidemiology, pp. 550–560, 2000.
+
+Rosenbaum, Paul R. Observational studies. Springer,
+
+2002.
+
+Rosenbaum, Paul R. Design of Observational Studies.
+
+Springer Science & Business Media, 2009.
+
+Rosenbaum, Paul R and Rubin, Donald B. The central
+role of the propensity score in observational studies for
+causal effects. Biometrika, 70(1):41–55, 1983.
+
+Rubin, Donald B. Estimating causal effects of treatments
+in randomized and nonrandomized studies. Journal of
+educational Psychology, 66(5):688, 1974.
+
+Rubin, Donald B. Causal inference using potential out-
+comes. Journal of the American Statistical Association,
+2011.
+
+Sch¨olkopf, B., Janzing, D., Peters, J., Sgouritsa, E., Zhang,
+K., and Mooij, J. On causal and anticausal learning.
+In Proceedings of the 29th International Conference
+on Machine Learning, pp. 1255–1262, New York, NY,
+USA, 2012. Omnipress.
+
+Strehl, Alex, Langford, John, Li, Lihong, and Kakade,
+Sham M. Learning from logged implicit exploration
+data. In Advances in Neural Information Processing Sys-
+tems, pp. 2217–2225, 2010.
+
+Sutton, Richard S and Barto, Andrew G. Reinforcement
+learning: An introduction, volume 1. MIT press Cam-
+bridge, 1998.
+
+Swaminathan, Adith and Joachims, Thorsten. Batch learn-
+ing from logged bandit feedback through counterfactual
+Journal of Machine Learning Re-
+risk minimization.
+search, 16:1731–1755, 2015.
+
+Tian, Lu, Alizadeh, Ash A, Gentles, Andrew J, and Tib-
+shirani, Robert. A simple method for estimating interac-
+tions between a treatment and a large number of covari-
+ates. Journal of the American Statistical Association,
+109(508):1517–1532, 2014.
+
+van der Laan, Mark J and Petersen, Maya L. Causal effect
+models for realistic individualized treatment and inten-
+tion to treat rules. The International Journal of Biostatis-
+tics, 3(1), 2007.
+
+

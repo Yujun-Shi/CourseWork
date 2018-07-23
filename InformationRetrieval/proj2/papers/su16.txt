@@ -1,0 +1,1710 @@
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+Qinliang Su, Xuejun Liao, Changyou Chen, Lawrence Carin
+Duke University, Durham, NC 27519, USA
+
+QS15, XJLIAO, CC448, LCARIN@DUKE.EDU
+
+Abstract
+
+We introduce the truncated Gaussian graphical
+model (TGGM) as a novel framework for design-
+ing statistical models for nonlinear learning. A
+TGGM is a Gaussian graphical model (GGM)
+with a subset of variables truncated to be nonneg-
+ative. The truncated variables are assumed latent
+and integrated out to induce a marginal model.
+We show that the variables in the marginal model
+are non-Gaussian distributed and their expected
+relations are nonlinear. We use expectation-
+maximization to break the inference of the non-
+linear model into a sequence of TGGM inference
+problems, each of which is efﬁciently solved by
+using the properties and numerical methods of
+multivariate Gaussian distributions. We use the
+TGGM to design models for nonlinear regres-
+sion and classiﬁcation, with the performances of
+these models demonstrated on extensive bench-
+mark datasets and compared to state-of-the-art
+competing results.
+
+1. Introduction
+Graphical models, which use graph-based visualization to
+represent statistical dependencies among random variables,
+have been widely used to construct multivariate statistical
+models (Koller & Friedman, 2009). A sophisticated model
+can generally represent richer statistical dependencies, but
+the inference can quickly become intractable as the model’s
+complexity increases. A simple model, on the contrary, is
+easy to infer, but its representational power is limited.
+To balance representational versatility and inferential
+tractability, latent variables are often added into the graph-
+ical model to obtain a tractable joint probability distribu-
+tion which, when the latent variables are integrated out, in-
+duces a complicated and expressive marginal distribution
+over the target variables, i.e., the variables of interest (Gal-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+braith et al., 2002). Since the complexity of these models
+is induced by integration, expectation-maximization (EM)
+(Dempster et al., 1977) can be employed to facilitate in-
+ference. The approach of EM is to break the original prob-
+lem of inferring the marginal distribution into a sequence of
+easier problems, each of which is to infer the expected log-
+arithmic joint distribution, where the expectation is taken
+over the terms of latent variables in the logarithmic domain,
+using the information from the previous iteration of this
+sequential procedure. The restricted Boltzmann machine
+(RBM) (Hinton, 2002) and sigmoid belief network (SBN)
+(Neal, 1992; Gan et al., 2015), as well as the deep networks
+built upon them (Salakhutdinov & Hinton, 2009; Hinton
+et al., 2006), are good examples of using latent variables to
+enhance modeling versatility while at the same time admit-
+ting tractable statistical inference.
+Gaussian graphical models (GGM) constitute a subset of
+graphical models that have found successful application in
+a diverse range of areas (Honorio et al., 2009; Liu & Will-
+sky, 2013; Oh & Deasy, 2014; Meng et al., 2014; Su &
+Wu, 2015a;b). The popularity of GGM may partially be
+attributed to the abundant applications for which the data
+are Gaussian distributed or approximately so, and partially
+attributed to the attractive properties of the multivariate
+Gaussian distribution which facilitate inference. However,
+there are many applications where the data are distributed
+in a way that heavily deviates from Gaussianity, and the
+GGM may not reveal meaningful statistical dependencies
+underlying the data.
+What is worse, adding latent variables into a GGM does
+not induce enhanced marginal versatility for the target vari-
+ables, as it typically does in other graphical models; this is
+so because the marginals of a multivariate Gaussian dis-
+tribution are still Gaussian.
+In addition, the conditional
+mean of y given x is always linear in x whenever (y, x) are
+jointly Gaussian. In this sense, a GGM is inherently a lin-
+ear model no matter how many latent variables are added.
+To overcome the linearity of GGMs, Frey (1997), Hinton &
+Ghahramani (1997), and Frey & Hinton (1999) proposed to
+apply nonlinear transformations to Gaussian hidden vari-
+ables. More recently, a deep latent Gaussian model was
+proposed in (Rezende et al., 2014), in which each hid-
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+den layer is connected to the output layer through a neu-
+ral network with Gaussian noise.
+In these models, non-
+linear transforms are applied to Gaussian variables to ob-
+tain nonlinearity at the output layer. The non-linear trans-
+forms, however, destroy the nice structure of a GGM, such
+as the quadratic energy function and a simple conditional
+dependency structure, rendering it difﬁcult to obtain ana-
+lytic learning rules and, as a result, one has to resort to less
+efﬁcient sampling-based inference.
+In this paper, we introduce a novel approach to inducing
+nonlinearity in a GGM. The new approach is simple:
+it
+adds latent variables into a GGM and truncates them be-
+low zero so that they are nonnegative. We term the re-
+sulting framework as truncated Gaussian graphical model
+(TGGM). Although simple, the truncation leads to a re-
+markable result: after the truncated latent variables are inte-
+grated out, the target variables are no longer Gaussian dis-
+tributed and their expected relations are no longer linear.
+Therefore the TGGM induces a nonlinear marginal model
+for the target variables, forming a striking contrast to the
+GGM. It should be emphasized that the approach proposed
+here is different from those in (Socci et al., 1998; Downs
+et al., 1999), which constrain the target (observed) vari-
+ables to be nonnegative, without using latent variables; the
+nonnegative constraint in those approaches relaxes the con-
+vex function in the Gaussian distribution to a non-convex
+energy function that admits multimodal distributions.
+The foremost advantage of the TGGM-induced nonlinear
+model over previous nonlinear models is the ease and ef-
+ﬁciency with which inference can be performed. The ad-
+vantage is attributed to the following two facts. First, as
+the nonlinear model is induced from a TGGM by integrat-
+ing out the latent variables, EM can be used to break the
+inference into a sequence of TGGM inference problems.
+Second, as the truncation in a TGGM does not alter the
+quadratic energy function or the conditional dependency
+structure of the GGM, it is possible for a TGGM inference
+algorithm to utilize many well-studied properties of multi-
+variate Gaussian distributions and the associated numerical
+methods (Johnson et al., 1994; Genz & Bretz, 2009). A sec-
+ond important advantage is that the conditional dependency
+structure of a TGGM is uniquely encoded in the precision
+matrix (or inverse covariance matrix) of the corresponding
+GGM (before the truncation is performed). By working
+with the precision matrix, one can conveniently design di-
+verse structures and construct abundant types of nonlinear
+statistical models to ﬁt the application at hand.
+We provide several examples of leveraging the TGGM to
+solve machine-learning problems. In the ﬁrst, we use the
+TGGM to construct a nonlinear regression model that can
+be understood as a probabilistic version of the rectiﬁed lin-
+ear unit (ReLU) neural network (Glorot et al., 2011). In
+
+the second, we solve multi-class classiﬁcation by using the
+multinomial probit link function (Albert & Chib, 1993) to
+transform the continuous target variables of a TGGM into
+categorical variables. Our main focus in the ﬁrst two ex-
+amples is on shallow structures, with one latent (hidden)
+layer of nonlinear units used in a TGGM. In the third ex-
+ample, we consider extensions to deep structures, by mod-
+ifying the blocks in the precision matrix that are related to
+latent truncated variables. We use EM as the primary infer-
+ence method, with the variational Bayesian (VB) approx-
+imation used for multivariate truncated Gaussian distribu-
+tions. The performances of the TGGM models are demon-
+strated on extensive benchmark datasets and compared to
+state-of-the-art competing results.
+2. Nonlinearity from Truncated Gaussian
+
+Graphical Models (TGGMs)
+
+1
+
+0
+
+(cid:1)NT
+
+Let y ∈ Rn and h ∈ Rm respectively denote the target
+and latent variables of a TGGM, and we use x to denote
+the input variable. The TGGM is deﬁned by the following
+joint probability density function
+p(y, h|x )
+
+= N(cid:0)y(cid:12)(cid:12)W1h+b1, P−1
+(cid:0)h(cid:12)(cid:12)W0x+b0, P−1
+(cid:1) , (1)
+where N (x(cid:12)(cid:12)µ, P−1 ) is a multivariate Gaussian density of
+x with mean µ and precision matrix P and NT (x(cid:12)(cid:12)µ, P−1 )
+NT (x(cid:12)(cid:12)µ, P−1 ) (cid:44) N (x(cid:12)(cid:12)µ, P−1 )I(x ≥ 0)
+where I(·) is an indicator function and(cid:82) +∞
+
+is the associated truncated density deﬁned as
+
+(cid:82) ∞
+0 N (z|µ, P−1 )dz
+(cid:90) +∞
+
+integral. The marginal TGGM model is deﬁned by
+
+dz is multiple
+
+(2)
+To see how the truncation h ≥ 0 affects the marginal
+TGGM p(y |x ), we rewrite (1) equivalently as
+p(y, h|x )
+
+N (h|µh|x,y, Σh|x,y)N (y|µy|x, Σy|x)I(h≥ 0)
+
+0 N(cid:0)z(cid:12)(cid:12)W0x+b0, P−1
+(cid:82) +∞
+
+(cid:1) dz
+
+p(y, h|x )dh.
+
+, (3)
+
+p(y |x ) =
+
+0
+
+=
+
+,
+
+0
+
+0
+
+1 P1W1)−1(P0(W0x + b0) + WT
+
+where µy|x
+Σy|x = W1P−1
+WT
+Σh|x,y = (P0 + WT
+p(y |x )
+= N (y|µy|x, Σy|x)
+
+= W1(W0x + b0) + b1,
+0 W1 + P−1
+1 , µh|x,y = (P0 +
+1 P1(y − b1)), and
+1 P1W1)−1. From (3) and (2) follows
+(cid:82) +∞
+0 N(cid:0)h(cid:12)(cid:12)W0x+b0, P−1
+(cid:82) +∞
+0 N (h|µh|x,y, Σh|x,y)dh
+
+(cid:1) dh
+
+.(4)
+
+0
+
+It is seen from (4) that the target distribution induced by a
+TGGM consists of two multiplicative terms. The ﬁrst term
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+is a Gaussian distribution induced by the associated GGM
+(for which h is not truncated). The second term modu-
+lates the Gaussian term into a more complicated and non-
+Gaussian distribution. As an example, one can verify that
+(4) is a skewed normal with w0 = b0 = b1 = 0, p0 = 1,
+p1 = 2, and w1 = 1/2 (Mudholkar & Hutson, 2000).
+The modeling versatility of a TGGM is primarily inﬂu-
+enced by m, the number of truncated latent variables, and
+P0, which encodes marginal dependencies of these vari-
+ables. With a proper choice of m and P0, one can con-
+struct TGGM models to solve diverse nonlinear learning
+tasks. The nonlinearity induced by a TGGM is seen from
+the expression of E[y|x] which, using (1), is found to be
+
+(5)
+
+E[y|x] = W1E[h|x] + b1,
+
+0
+
+is
+
+the
+
+expectation with respect
+
+(cid:0)h(cid:12)(cid:12)W0x+b0, P−1
+
+(cid:1). Due to the truncation h ≥ 0, the
+
+where E[h|x]
+to
+NT
+expectation E[h|x] is a nonlinear function of x. By con-
+trast, if h is not truncated, one has E[h|x] = W0x + b0,
+which is a linear function of x. Thus, a TGGM induces
+nonlinearity through the truncation of its latent variables.
+The nonlinearity can be controlled by adjusting P0. For
+σ2 Im, where Im is a m × m
+example, if we set P0 = 1
+identity matrix, we obtain
+
+E[h(k)|x] = g (W0(k, :)x + b0(k), σ) ,
+
+(6)
+
+where h(k) is the k-th element of h and W0(k, :) the
+k-th row of W0 using Matlab notations, and g(µ, σ) is
+the mean of the univariate truncated normal distribution
+
+NT (x(cid:12)(cid:12)µ, σ2 ). The formula of g(µ, σ) is given by (Johnson
+
+et al., 1994)
+
+(cid:1)
+(cid:1) ,
+
+φ(cid:0) µ
+Φ(cid:0) µ
+
+σ
+
+σ
+
+g(µ, σ) (cid:44) µ + σ
+
+(7)
+
+2
+
+2π
+
+exp− z2
+
+Φ(z) (cid:44) (cid:82) z
+
+where φ(z) (cid:44) 1√
+is the probability density
+function (PDF) of the standard normal distribution, and
+−∞ φ(t)dt its cumulative distribution function
+(CDF). Figure 1 shows g(µ, σ) as a function of µ, for var-
+ious values of σ, alongside max(0, µ), which is the activa-
+tion function used in ReLU neural networks (Glorot et al.,
+2011). It is seen that g(µ, σ) is a soft version of max(0, µ)
+and limσ→0 g(µ, σ) = max(0, µ).
+
+3. Nonlinear Regression with TGGMs
+We begin with a nonlinear regression model constructed
+from a simple TGGM, in which we restrict P0 and P1 to
+diagonal matrices: P0 = σ2
+1In. By (6)-(7)
+and the arguments there, the E(y|x) in such a TGGM im-
+plements the output of a soft-version ReLU neural network,
+
+0Im and P1 = σ2
+
+Figure 1. Visualization of g(µ, σ) as a function of µ, for various
+values of σ, in comparison to max(0, µ).
+
+which has a single layer of m hidden units with the activa-
+tion function g(·, σ), and uses W0 and W1 as the input-to-
+hidden and hidden-to-output weights, respectively.
+
+3.1. Maximum-Likelihood (ML) Parameter Estimation
+
+Given a training dataset consisting of the inputs (covari-
+ates) X = [x1, x2,··· , xN ] and the outputs (responses)
+Y = [y1, y2,··· , yN ], the log-likelihood function is
+
+L(Θ) (cid:44) ln
+
+p(Y, H|X; Θ)dH
+
+(8)
+
+(cid:90) ∞
+
+0
+
+0
+
+≥
+
+(9)
+
+1In
+
+dH,
+
+0Im
+
+i=1 NT
+
+L(Θ) = ln
+
+p(Y, H|X; Θ)
+
+p(Y, H|X; Θ)
+
+q(H|(cid:101)Θ)
+q(H|(cid:101)Θ)
+
+where Θ (cid:44) {W0, W1, b1, b0}, and
+
+ﬁned on {H : H ≥ 0}. It follows from (8)
+
+(cid:12)(cid:12)W0xi + b0, σ2
+(cid:0)hi
+(cid:12)(cid:12)W1hi + b1, σ2
+(cid:1) .
+
+(cid:1)
+p(Y, H|X, Θ ) =(cid:81)N
+×N(cid:0)yi
+Let q(H|(cid:101)Θ) be an arbitrary PDF with parameters (cid:101)Θ, de-
+(cid:90) ∞
+q(H|(cid:101)Θ)
+(cid:90) ∞
+q(H|(cid:101)Θ) ln
+= L(Θ) − KL(q(·|(cid:101)Θ)||p(·|Y, X; Θ)),
+(cid:44) Qq(·|(cid:101)Θ)(Θ).
+
+(10)
+where KL(q(·)||p(·)) denotes the Kullback-Leibler (KL)
+distance, and, if ∃ H such that q(H) = 0, the limit val-
+ues are used to lead to q(H)
+q(H) = 1 and q(H) ln q(H) = 0. In
+general q(·) is parameterized differently from the TGGM;
+
+when q(H|(cid:101)Θ) = p(H|Y, X, Θ), however, we let q(·) use
+the same parameterization as the TGGM so that(cid:101)Θ = Θ. In
+this case, we drop the subscript to simply write Q(Θ|(cid:101)Θ) ≡
+Qp(·|Y,X,(cid:101)Θ)(Θ), which, by (10), can be further written as
+Q(Θ|(cid:101)Θ) =L(Θ)−KL(p(·|Y, X;(cid:101)Θ)||p(·|Y, X; Θ)), (11)
+
+0
+(Jensen’s Inequality)
+
+dH,
+
+7-10-505g(7,<)02468<=2<=1< = 0.5ReLUNonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+Θ
+
+Θt+1 = arg max
+
+Q(Θ|Θt),
+
+From (11) follows the EM algorithm. First, it is clear that
+Q(Θ|Θ) = L(Θ). Thus, for a sequence {Θt} satisfying
+(12)
+one deduces L(Θt) = Q(Θt|Θt) ≤ Q(Θt+1|Θt) ≤
+L(Θt+1), where the last inequality follows from (11). By
+successively solving (12), starting from initial Θ1, the EM
+algorithm produces a sequence {Θt : t ≥ 1} that mono-
+tonically increases L(Θt). To ensure L(Θt+1) > L(Θt),
+one only requires Q(Θt+1|Θt) > Q(Θt|Θt). Therefore it
+is not necessary to solve (12) completely; rather it is sufﬁ-
+cient to perform a single-step gradient ascent from Θt,
+
+(13)
+0 p(H|Y, X; Θt) ln p(Y, H|X; Θ)dZ.
+To ﬁnd the gradient, it is helpful to write p(Y, H|X; Θ) =
++
+
+Θt+1= Θt + γt∇ΘQ(Θ|Θt)(cid:12)(cid:12)Θ=Θt
+where Q(Θ|Θt) =(cid:82) ∞
+Z(X;Θ) e−E(Y,H|X;Θ), where E = (cid:80)N
+(cid:80)N
+(cid:20) ∂E
+
+malization. The gradient can then be expressed as
+
+is the energy function and Z the nor-
+
+(cid:20) ∂E
+
+(cid:107)hi−W0xi(cid:107)2
+
+(cid:107)yi−W1hi(cid:107)2
+
+(cid:21)
+
+(cid:21)
+
+2σ2
+0
+
+i=1
+
+i=1
+
+σ2
+1
+
+1
+
+,
+
+∇ΘQ = −E
+
+(cid:12)(cid:12)(cid:12)(cid:12) Y, X
+
+∂Θ
+
++ E
+
+∂Θ
+
+,
+
+(14)
+
+(cid:12)(cid:12)(cid:12)(cid:12) X
+
+where E[·|Y, X] denotes the expectation with respect to
+(w.r.t.) p(H|X, Y; Θt), and E[·|X] the expectation w.r.t.
+p(Y, H|X; Θt) = p(Y|H; Θt) p(H|X; Θt). Speciﬁcally,
+the partial derivatives of Q w.r.t. W0 and W1 can respec-
+tively be derived as
+
+∂Q
+∂W0
+∂Q
+∂W1
+
+= − 1
+σ2
+0
+= − 1
+σ2
+1
+
+(cid:16)
+
+(E[H|X] − E[H|Y, X]) XT ,
+
+W1E(cid:2)HHT|Y, X(cid:3)
+
+(cid:17)
+N )E[HT|Y, X]
+
+− (Y − b11T
+
+(15)
+
+,
+
+(16)
+
+where 1N is a column vector of ones. The derivatives w.r.t.
+b0 and b1 can be derived similarly.
+
+3.2. ML Estimation versus Backpropagation
+
+As mentioned earlier, for a TGGM with diagonal P0
+and P1, E(y|x) implements the output of a soft-version
+ReLU neural network that use (7) as the activation func-
+tion at each hidden unit. This suggests one can use back-
+propagation (BP) to minimize the error between E(Y|X)
+and the training samples of Y, as one does in training a
+standard ReLU network (Glorot et al., 2011).
+A popular choice of the error function used by BP is the
+squared error which, in the case here, is given by E (cid:44)
+
+N − Y(cid:13)(cid:13)2. Minimization of the
+
+(cid:13)(cid:13)W1E(H|X) + b11T
+
+1
+2σ2
+1
+squared error is equivalent to maximization of the likeli-
+hood under the assumption that y|x ∼ N (y|E(y|x), σ2
+1).
+
+However, we have shown in (4) that p(y|x) is a non-
+Gaussian distribution. Therefore, BP does not maximize
+the likelihood of the TGGM in the rigorous sense.
+To gain a deeper understanding of the relation between BP
+and ML estimation, we analyze the update equations of BP
+and compare them to those of the ML estimator. The BP
+performs gradient descent of the squared error, with the re-
+quired partial derivatives given by
+∂E
+∂W0
+∂E
+∂W1
+
+(cid:18)(cid:0)WT
+1 (E(Y|X)−Y)(cid:1)(cid:12) Var(H|X)
+(cid:16)
+
+W1E(H|X) E(HT|X)
+
+= − 1
+σ2
+1
+
+XT , (17)
+
+=−
+
+− (Y − b11T
+
+(18)
+
+σ2
+0
+
+(cid:19)
+(cid:17)
+N )E(HT|X)
+(cid:105)
+
+,
+
+σ2
+1
+
+∂W1
+
+∂E
+∂W1
+
+is an approximation to that of ∂Q
+
+N )E[HT|Y, X](cid:1)
+
+E(cid:104)(cid:0)H − E(H|X)(cid:1) (cid:12)(cid:0)H − E(H|X)(cid:1)(cid:12)(cid:12)(cid:12)X
+(cid:0)W1E(cid:2)HHT|Y, X(cid:3)−(Y−b11T
+
+where (cid:12) is the Hadamard product and Var(H|X) (cid:44)
+is a matrix of
+variances. Comparing (18) to (16), we can see that the
+direction of
+=
+− 1
+by
+replacing the posterior expectations E[HHT|Y, X] and
+E[H|Y, X] with the corresponding prior expectations
+E[H|X]E[HT|X] and E[H|X]. Hence, the ML estimator
+makes a more sufﬁcient use of the available information,
+in the sense that it takes Y into account while BP does not.
+To relate ∂E
+Lemma 1. Let U be a matrix of random numbers with
+U(:, j) ∼ N (E[H(:, j)|X(:, j)], ρ2). If Y are generated
+according to yj|U(:, j)∼N (yj|W1U(:, j)+b1, σ2
+1I), ∀j,
+then the ∂E
+∂E
+∂W0
+
+(cid:1) (E[H|X]−E[U|Y, X])(cid:1)
+(cid:105)
+
+in (17) can be equivalently expressed as
+
+, we require the lemma below.
+
+(cid:104)(cid:0)(cid:0)σ2
+
+=− 1
+ρ2
+
+1I+ρ2WT
+
+to ∂Q
+
+1 W1
+
+∂W0
+
+∂W0
+
+∂W0
+
+(cid:12) Var(H|X)/σ2
+
+0
+
+XT .
+
+(19)
+
+Proof. Since the prior p(U) and the conditional p(Y|U)
+are both Gaussian, the joint distribution p(Y, U) is also
+Gaussian. As a result, the posterior p(U|Y) is a Gaus-
+sian distribution with the mean given by E[U|Y, X] =
+1 (Y − E[Y|X]) + E[H|X].
+1 (Y − E[Y|X])
+=
+
+(cid:1)−1
+(cid:1) (E[U|Y, X] − E[H|X]), which is
+
+1/ρ2)I + WT
+then
+follows
+1/ρ2)I + WT
+
+(cid:0)(σ2
+(cid:0)(σ2
+
+that WT
+
+1 W1
+
+1 W1
+
+WT
+
+It
+
+substituted into (17) to yield (19).
+
+ciently small such that (cid:0)σ2
+
+As (19) holds for any ρ2 > 0, it is also true when ρ2 ≈
+0, in which case the value of ρ2 has little inﬂuence on
+; Therefore, we can make ρ2 sufﬁ-
+the direction of
+1I, and
+((E[H|X]−E[U|Y, X])) (cid:12)
+
+(cid:1) ≈ σ2
+
+consequently ∂E
+
+1I + ρ2WT
+
+∂E
+∂W0
+
+1 W1
+
+(cid:104)
+
+≈ − σ2
+1
+0 ρ2
+
+σ2
+
+∂W0
+
+(cid:105)
+
+∂W0
+
+∂W0
+
+∂W0
+
+∂W0
+
+∂E
+∂W0
+
+∂E
+∂W0
+
+Var(H|X)
+XT . Comparing the latter equation to (15),
+and ∂Q
+we see that the gradients
+are different in
+three aspects: (i) the E[H|Y, X] in ∂Q
+is replaced by
+E[U|Y, X] in ∂E
+; (ii) a new factor Var(H|X) arises in
+∂E
+; and (iii) the multiplicative constants are different.
+∂W0
+Since (iii) has no inﬂuence on the directions of the gra-
+dients, we focus on (i) and (ii). The new factor Var(H|X)
+in ∂E
+does not depend on Y, so it plays no direct role
+in back-propagating the information from the output layer
+to the input layer. The only term of
+that contains
+Y is E[U|Y, X], which plays the primary and direct role
+in sending back the information from the output layer
+when updating the input-to-hidden weights W0. Since
+E[U|Y, X] is obtained under the assumption that Y is gen-
+erated from Gaussian latent variables U, it is clear that the
+gradient ∂E
+used by BP does not fully reﬂect the under-
+lying truncated characteristics of H in the TGGM model.
+On the contrary, E[H|Y, X] is the true posterior mean of
+H under the truncation assumption.
+In summary, BP uses update rules that are closely related
+to those of the ML estimator, but it does not fully exploit
+the available information in updating the TGGM parame-
+In particular, BP ignores Y when it uses E(H|X),
+ters.
+instead of E(H|Y, X), to update W1; it makes an in-
+correct assumption about the latent variables when it uses
+E(U|Y, X), instead of E(H|Y, X), to update W0. These
+somewhat defective update equations are attributed to the
+fact that BP makes a wrong assumption from the very be-
+ginning, i.e., BP assumes p(y|x) is a Gaussian distribution
+while the distribution is truly non-Gaussian as shown in (4).
+For these reasons, BP usually produces worse learning re-
+sults for a TGGM than the ML estimator, and this will be
+discussed further in the experiments.
+
+∂W0
+
+3.3. Technical Details
+
+i=1
+
+A key step of the ML estimator is calculation of the prior
+and posterior expectations E[·|X] and E[·|Y, X] in (15)
+0Im is diagonal, the components
+and (16). Since P0 = σ2
+in hi|xi are independent; further, the training samples are
+assumed independent to each other. Therefore p(H|X)
+(cid:81)m
+factorizes into a product of univariate truncated nor-
+k=1 NT (hi(k)|W0(k, :
+0), where each univariate density is associated with
+)xi, σ2
+a single truncated variable and a particular training sam-
+ple. Each of these densities has its mean and variance
+given by E[hi(k)|xi] = g(W0(k, :)xi + b0(k), σ2
+0) and
+tively, where g(·,·) is deﬁned in (7) , and
+
+mal densities, p(H|X) =(cid:81)N
+(cid:1), respec-
+Var[hi(k)|xi] = ω2(cid:0)W0(k, :)xi + b0(k), σ2
+(cid:1)(cid:33)
+(cid:1)
+(cid:1) − φ2(cid:0) µ
+(cid:1)
+Φ2(cid:0) µ
+
+ω2 (µ, σ) (cid:44) σ2
+
+φ(cid:0) µ
+Φ(cid:0) µ
+
+1 − µ
+σ
+
+(cid:32)
+
+(20)
+
+σ
+
+σ
+
+0
+
+σ
+
+σ
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+i=1
+
+i=1
+
+KL
+
+is the variance of the truncated normal NT (z|µ, σ2) (John-
+son et al., 1994). Due to the independences, one can
+
+easily compute E(cid:2)HHT|X(cid:3) = (cid:80)N
+E(cid:2)hihT
+
+(cid:3) = E[hi|xi]E[hT
+
+i |xi] + diag (Var[hi|xi]).
+
+E(cid:2)hihT
+
+(cid:3), with
+
+i |xi
+
+i |xi
+
+, or maximizing the lower
+
+For the posterior expectation E[·|Y, X], it could be com-
+puted by means of numerical integration. Multivariate in-
+tegrations in normal distributions have been well studied
+and many effective algorithms have been developed (Genz,
+1992; Genz & Bretz, 2009). Another approach is to use
+the mean-ﬁeld variational Bayesian (VB) method (Jordan
+et al., 1999; Corduneanu & Bishop, 2001), which approxi-
+mates the true posterior p(H|Y, X) with a factorized distri-
+
+is independent of hj, ∀ i, j, given Y and
+the KL distance can be equivalently expressed as
+and each term in the
+sum can be minimized independently. Given {q(hj((cid:96))) :
+(cid:96) (cid:54)= k}, the ith term of the KL distance is minimized by
+
+bution q(H|(cid:101)Θ) =(cid:81)N
+(cid:81)m
+k=1 q(hi(k)|(cid:101)Θ), parameterized
+by (cid:101)Θ. The approximate posterior is found by minimizing
+(cid:17)
+(cid:16)
+q(H|(cid:101)Θ)||p(H|Y, X; Θ)
+bound Qq(·|(cid:101)Θ)(Θ), as shown in (10).
+(cid:17)
+(cid:80)N
+q(hi|(cid:101)Θ)||p(hi|Y, X; Θ)
+q(hi(k)|(cid:101)Θ) ∝ e(cid:104)ln p(yi,hi|xi)(cid:105)−k ,
+(cid:12)(cid:12)W0xi + b0, σ2
+(cid:0)hi
+(cid:1) ×
+(cid:1) and (cid:104)·(cid:105)−k denotes the expec-
+(cid:12)(cid:12)(cid:12)(cid:12)ξi(k),
+(cid:19)
+
+(cid:12)(cid:12)W1hi + b1, σ2
+N(cid:0)yi
+tation w.r.t.(cid:81)
+(cid:16)
+hi(k)|(cid:101)Θ
+
+where p(yi, hi|xi) = NT
+
+(cid:96)(cid:54)=k q(hj((cid:96))). From (21), one obtains
+
+As hi
+X,
+
+=NT
+
+i=1 KL
+
+P(k, k)
+
+(cid:18)
+
+hi(k)
+
+(cid:17)
+
+(cid:16)
+
+(22)
+
+(21)
+
+0Im
+
+1In
+
+1
+
+q
+
+,
+
+σ2
+0
+
+P(k,k)
+
+WT
+
+, γi
+
+(cid:16)
+
+Im + 1
+σ2
+1
+
+(W0xi +b0) + 1
+σ2
+1
+
+where P (cid:44) 1
+element deﬁned as ξi(k) =
+1
+WT
+σ2
+0
+
+gence, q(hi(k)|(cid:101)Θ) is used as the best approximation to
+
+1 W1, ξi is a vector with its k-th
+γi(k)− ˜P(k,−k)(cid:104)hi(−k)(cid:105)−k
+(cid:44)
+1 (yi− b1), ˜P (cid:44) P − diag(P),
+P(k,−k) is the k-th row of P with its k-th element deleted,
+(cid:17)
+and hi(−k) is the subvector of hi missing the k-th element.
+q(hi|(cid:101)Θ)||p(hi|Y, X; Θ)
+The KL distance KL
+mono-
+tonically decreases as one cyclically computes (22) through
+k = 1, 2,··· , m.
+One shall perform enough cy-
+cles until
+the KL distance converges. Upon conver-
+p(hi|Y, X; Θ), ∀ i, k, and their means and variances, as
+given by the formulae in (7) and (20), are used to compute
+the posterior expectations E[·|Y, X] in (15) and (16).
+After (15)-(16) are computed and the TGGM parameters
+in Θ are improved based on the gradient ascent in (13) ,
+one iteration of the ML estimator is completed. Given the
+updated Θ, one then repeat the cycles with (22) to ﬁnd the
+approximate posteriors and again make another update of
+Θ, and so on. The complete ML estimation algorithm is
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+summarized in Algorithm 1, where T1 represents the num-
+ber of cycles with (22) to ﬁnd the best posterior distribution
+
+q(H|(cid:101)Θ) for each newly-updated Θ. We can see that the
+
+complexity mainly comes from the estimation of expecta-
+tion E[hi|yi, xi], which is O(T1M 2).
+
+for t = 1 to T1 do
+
+Algorithm 1 ML Estimator for TGGM Regression
+1: Randomly initialize the model parameters Θ;
+2: repeat
+3:
+4:
+5:
+6:
+
+Update E[hi(k)|yi, xi] using (7);
+Replace the k-th value of E[hi|yi, xi] with
+E[hi(k)|yi, xi];
+
+for k = 1 to M do
+
+end for
+
+7:
+8:
+9:
+10:
+
+i |yi, xi] using (7) and (20);
+
+end for
+Compute E[hihT
+Calculate the gradients of log-likelihood using (15)
+and (16);
+Update model parameters Θ with gradient ascend;
+
+11:
+12: until Convergence of log-likelihood
+
+2π
+
+e− z2
+
+(cid:82) a
+
+Finally, it should be noted that the expectations require
+frequent calculation of the ratio of φ(a)
+In practice, if
+Φ(a).
+it is computed directly, we easily encounter two issues.
+First, repeated computation of the integration Φ(a) =
+−∞ 1√
+2 dz is a waste of time; second, when a is
+small, e.g. a ≤ −37, the CDF Φ(a) and the PDF φ(a)
+are so tiny that a double-precision ﬂoating number can no
+longer represent them accurately. If we compute them with
+the double-precision numbers, we easily encounter the is-
+sue of 0
+0. Fortunately, both these issues can be solved by
+using a lookup table. Speciﬁcally, we pre-compute φ(a)
+Φ(a) at
+densely-sampled discrete values of a using high-accuracy
+computation, such as the symbolic calculation in Matlab,
+and store the results in a table. When we need φ(b)
+Φ(b) for any
+b, we look for two values of a that are closest to b and use
+the interpolation of the two φ(a)
+
+Φ(a) to estimate φ(b)
+Φ(b).
+
+4. Extension to Other Learning Tasks
+4.1. Nonlinear Classiﬁcation
+Let c ∈ {1,··· , n} denote n possible classes. Let Tc ∈
+R(n−1)×n be a class-dependent matrix obtained from −In
+by setting the c-th column to one and deleting the c-th row
+(Liao et al., 2007). We deﬁne a nonlinear classiﬁer as
+
+(cid:90) ∞
+
+(cid:90) ∞
+
+0
+
+0
+
+× NT
+
+N(cid:0)z(cid:12)(cid:12)Tc(W1h + b1), TcTT
+(cid:0)h(cid:12)(cid:12)W0x + b0, σ2
+(cid:1) dh.
+
+0Im
+
+c
+
+(cid:1) dz
+
+p(c) =
+
+(23)
+
+The inner integral is due to the multinomial probit model
+(Albert & Chib, 1993) which transforms the TGGM’s out-
+
+put vector y in (1) into a class label according to c =
+arg maxk y(k) = arg maxk I(Tky ≥ 0). Therefore,
+Tcy≥0 N (y |W1h + b1, In ) dy.
+A change of variables z (cid:44) Tcy leads to p(c) =
+
+p(c) = p(Tcy ≥ 0) =(cid:82)
+0 N(cid:0)z(cid:12)(cid:12)Tc(W1h + b1), TcTT
+(cid:82) ∞
+
+(cid:1) dz.
+
+c
+
+The model described by (23) can be trained by an ML es-
+timator, similarly to the case of regression, with the main
+difference being the additional latent vector z, which can
+be treated in a similar way as h. The posterior p(z, h|x, c)
+is still a truncated Gaussian distribution, whose moments
+can be computed using the methods in Section 3. The
+model predicts the class label of x using the rule ˆc =
+E[y(k)|x], where E[y|x] = W1E[h|x] + b1 and
+arg max
+E[h(k)|xi] = g (W0(k, :)x + b0(k), σ0).
+
+k
+
+4.2. Deep Learning
+
+0
+
+0
+
+0
+
+0 , b(t)
+
+0 , σ(t)2
+
+0 x − b(1)
+
+0 h(1)−b(2)
+
+(cid:107)h(1) − W(1)
+
+(cid:0)h(cid:12)(cid:12)ζ, P−1
+
+(cid:1), where ζ and P0 depend
+
+The TGGM deﬁned in (1) can be viewed as a neural net-
+work, where the input, hidden, and output layers are re-
+spectively constituted by y, h, and x, and the hidden layer
+has outgoing connections to the output layer and incoming
+connections from the input layer. The topology of the hid-
+den layer is determined by P0. So far, we have focused on
+0Im , which deﬁnes a single layer of hidden nodes
+P0 = σ2
+that are not interconnected. By using a more sophisticated
+P0, we can construct a deep TGGM with two or more hid-
+den layers and enhanced representational versatility.
+As an example, we let h (cid:44) [h(1); h(2)] and deﬁne
+0 (cid:107)2} ×
+p(h|x) ∝ exp{− 1
+2σ(1)2
+exp{− 1
+0 (cid:107)2}I (h ≥ 0). Taking
+(cid:107)h(2)−W(2)
+2σ(2)2
+into account the normalization, the distribution can be writ-
+ten as p(h) = NT
+}2
+on {W(t)
+t=1. This distribution, along with
+p(y|h(2)) = N (y|W1h(2) + b1, σ2
+1In), yields a TGGM
+with two hidden layers. Extensions to three or more hidden
+layers and to classiﬁcation can be constructed similarly. A
+deep TGGM can be learned by using EM to maximize the
+likelihood, wherein the derivatives of the lower bound Q
+can be represented as ∂Q
+as in Section 3.1.
+Training a multi-hidden-layer TGGM is almost the same
+as training a single-hidden-layer TGGM, except for the dif-
+∂Θ|X]. In the
+ference in estimating the prior expectation E[ ∂E
+single-hidden-layer case, since P0 is diagonal, p(hi|xi; Θ)
+factorizes into a set of univariate truncated normals, and
+therefore the expectation can be computed efﬁciently. In
+the multi-hidden-layer case, however, p(hi|xi; Θ) is a mul-
+tivariate truncated normal, and thus the prior expectation is
+as difﬁcult to compute as the posterior expectation. Fol-
+lowing Section 3.3, we use mean-ﬁled VB to approximate
+p(hi|xi, Θ) by factorized univariate truncated normals and
+
+∂Θ|Y, X(cid:3) + E(cid:2) ∂E
+∂Θ|X(cid:3),
+
+∂Θ = −E(cid:2) ∂E
+
+0
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+∂Θ|X] with the univariate distributions.
+
+estimate E[ ∂E
+In practice, we ﬁnd that starting from the VB approxima-
+tion of p(hi|yi, xi, Θ) can improve the VB approximation
+of p(hi|xi, Θ), a feature similar to that observed in the con-
+trastive divergence (CD) (Hinton, 2002).
+
+5. Experiments
+We report the performance of the proposed TGGM models
+on publicly available data sets, in comparison to competing
+models. In all experiments below, RMSProp (Tieleman &
+Hinton, 2012) is applied to update the model parameters by
+using the current estimated gradients, with RMSprop delay
+set to be 0.95.
+Regression The root mean square error (RMSE), averaged
+over multiple trials of splitting each data set into training
+and testing subsets, is used as a performance measure to
+evaluate the TGGM against the ReLU neural network. The
+results reported in (Hern´andez-Lobato & Adams, 2015) are
+used as the reference to the performances of ReLU neural
+networks. The comparison is based on the same data and
+same training/testing protocols in (Hern´andez-Lobato &
+Adams, 2015), by using a consistent setting for the TGGM
+as follows: a single hidden layer is used in the TGGM for
+all data sets, with 100 hidden nodes used for Protein Struc-
+ture and Year Prediction MSD, the two largest data sets,
+and 50 hidden nodes used for the other data sets.
+Two methods, BP and ML estimation, are applied to train
+each TGGM, resulting in two versions of the TGGM for
+each data set, referred to TGGM-BP and TGGM-ML, re-
+spectively. For both training methods, Θ is initialized as
+Gaussian random numbers, with each component a random
+draw from N (0, 0.01). To speed up, each gradient update
+uses a mini-batch of training samples, resulting in stochas-
+tic gradient search. The batch size is 100 for the two largest
+data sets and 50 for the others. For ML estimation, the
+number of cycles used by mean-ﬁeld VB is set to 10, and
+σ2
+1 = σ2
+The testing RMSE’s of the TGGM are summarized in Table
+1, alongside the corresponding results (Hern´andez-Lobato
+& Adams, 2015) for the ReLU neural networks trained by
+BP and probabilistic backpropagation (PBP). BP provides
+a point estimate of the model parameters while PBP pro-
+vides the posterior distribution. It is seen from Table 1 that
+TGGM-BP performs slightly better than ReLU on most
+data sets. The gain may be attributed to the soft activation
+function g(µ, σ) which provides the freedom in choosing
+appropriate σ0 according to data’s characteristics, unlike
+ReLU which ﬁxes σ to 0. The nonzero slope in g(µ, σ)
+for µ < 0 may be another contributing factor, as it has
+been shown in (He et al., 2015) that replacing the zero
+part of ReLU with a sloping line leads to better results.
+
+0 = 0.5.
+
+Figure 2. Illustration of the impact of σ2
+the RMSEs for Concrete Strength in a single trial.
+
+0 on TGGM-BP, based on
+
+Furthermore, it can be observed that TGGM-ML outper-
+forms TGGM-BP on most data sets. This is because ML-
+based training fully exploits the ﬂexibilities provided by
+a probabilistic model and, as discussed in Section 3.2, is
+more accurate in reﬂecting the underlying model, in con-
+trast to TGGM-BP which made a wrong assumption about
+the model at the very beginning.
+We also observe that, if σ2
+0 is set close to 0, the performance
+of TGGM-BP approaches that of the ReLU neural network.
+This is not surprising since g(µ, σ0) approaches the ReLU
+0 → 0. As we increase the value
+activation function as σ2
+of σ2
+0, the TGGM’s performance improves gradually, until
+it reaches a saturating value. This is reasonable because
+g(µ, σ0) becomes more linearly (w.r.t. µ) as σ2
+0 becomes
+larger, which weakens its nonlinear representational abil-
+ities. Empirically, we ﬁnd that TGGM-BP performs simi-
+larly within an appropriate range of σ2
+0. The results in Table
+0 = 0.01, which is found to be a good set-
+1 are based on σ2
+ting for all data sets. The impact of σ2
+0 on the RMSE results
+is illustrated in Fig. 2. Note that σ2
+0 can also be learned di-
+rectly from the data, which is an interesting future work.
+We found that the optimal σ2
+0 for TGGM-ML is typically
+larger than that for TGGM-BP. This is perhaps because
+0 provides increased ﬂexibility in the TGGM,
+a larger σ2
+which can be exploited by a probabilistic inference method
+like expectation-maximization. As a result, we use σ2
+0 =
+0.5 for TGGM-ML in the experiments.
+Classiﬁcation Three public benchmark data sets are con-
+sidered for this task: MNIST, 20 NewsGroups, and Blog.
+The MNIST data set includes 60,000 training images and
+10,000 testing images of handwritten digits of zero through
+ten. The 20 NewsGroups data sets is composed of 18,845
+documents, written with a vocabulary of 2,000 words, from
+20 different groups, with the data partitioned into a training
+set of 11,315 documents and a testing set of 7,531 docu-
+ments (Li et al., 2016). The Blog data set contains 13,245
+documents, written with 17,292 words, about the US pres-
+idential elections; the data are partitioned into 7,832 train-
+
+Epoches0100020003000400050006000RMSE456789<20=0.5<20=0.01<20=0.005ReLUNonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+Dataset
+Boston Housing
+Concrete Strength
+Energy Efﬁciency
+Kin8nm
+Naval Propulsion
+Cycle Power Plant
+Protein Structure
+Wine Quality Red
+Yacht Hydrodynamic
+Year Prediction MSD 515,345
+
+N
+506
+1030
+768
+8192
+11934
+9568
+45730
+1599
+308
+
+Table 1. Averaged Test RMSE and Std. Errors
+d
+13
+8
+8
+8
+16
+4
+9
+11
+6
+90
+
+ReLU-PBP
+3.014± 0.1800
+5.667± 0.0933
+1.804 ± 0.0481
+0.098± 0.0007
+0.006± 0.0000
+4.124± 0.0345
+4.732± 0.0130
+0.635±0.0079
+1.015± 0.0542
+8.878 ± N/A
+
+ReLU-BP
+
+3.228±0.1951
+5.977± 0.0933
+1.098 ± 0.0738
+0.091± 0.0015
+0.001± 0.0001
+4.182± 0.0402
+4.539± 0.0288
+0.645± 0.0098
+1.182± 0.1645
+8.932 ± N/A
+
+TGGM-BP
+
+2.927 ± 0.2910
+5.657 ± 0.2685
+1.029 ± 0.1206
+0.088 ± 0.0025
+0.00057± 0.0001
+3.949 ± 0.1478
+4.477± 0.0483
+0.640 ± 0.0469
+0.957 ± 0.2319
+8.918 ± N/A
+
+TGGM-ML
+2.820± 0.2565
+5.395± 0.2404
+1.244 ± 0.0979
+0.083 ± 0.0034
+0.003 ± 0.0002
+4.183 ± 0.0955
+4.431 ± 0.0292
+0.625 ± 0.0340
+0.841 ± 0.2028
+9.002 ± N/A
+
+ing documents and 5,413 testing documents (Chen et al.,
+2015). One-hidden-layer and two-hidden-layer TGGM
+models are considered, with each hidden layer containing
+100 or 200 nodes. Similar to the regression model, the
+TGGM classiﬁer is trained by both BP and ML, with the
+resulting models termed as TGGM-BP and TGGM-ML, re-
+spectively.
+The models are randomly initialized with Gaussian random
+numbers drawn from N (0, 0.01). The step-size for gradi-
+ent ascent is chosen from [10−4, 5 × 10−3] by maximizing
+the accuracy on a cross-validation set. The TGGMs use
+a minibatch size of 500 for MNIST and 200 for the other
+two data sets, while the ReLU uses 100 for all data sets.
+Variance parameters {σ2
+1} are set to 0.5 for TGGM-ML
+and 0.01 for TGGM-BP, in both one and two-layer models.
+When ML estimation is applied, the number of VB cycles
+is initially set to 30 and then gradually decreases to 5. The
+data sets are also used to train and test a ReLU neural net-
+work implemented in Caffe (Jia et al., 2014), to produce
+the competing results for comparison. From Table 2, it
+can be seen that TGGM-BP generally outperforms ReLU
+on the two document data sets and maintains a comparable
+performance on the image data set, for both one- and two-
+hidden-layer models.
+It is further observed that TGGM-
+ML has the best performance on all three data sets, with the
+best performance achieved by the two-hidden-layer models
+on MNIST and Blog, and by the one-hidden-layer model
+on 20 NewsGroup.
+
+0, σ2
+
+6. Conclusions
+We have proposed a nonlinear statistical learning frame-
+work termed TGGM. By introducing truncated latent vari-
+ables into the traditional GGM, we obtain the TGGM as a
+non-Gaussian nonlinear model with signiﬁcantly enhanced
+modeling ability compared to the GGM. We demonstrate
+that regression and classiﬁcation can be realized through
+appropriately constructed TGGMs. With carefully de-
+signed graphical structures, deep versions of TGGMs have
+
+Table 2. Test Accuracy of Classiﬁcation
+
+Methods
+ReLU (100)
+ReLU (200)
+ReLU (100-100)
+ReLU (200-200)
+TGGM-BP (100)
+TGGM-BP (200)
+TGGM-BP (100-100)
+TGGM-BP (200-200)
+TGGM-ML (100)
+TGGM-ML (200)
+TGGM-ML (100-100)
+TGGM-ML(200-200)
+
+Blog
+MNIST 20 News
+97.58%
+72.8% 65.86%
+97.89% 73.27% 67.02%
+97.83% 69.94% 67.93%
+98.04% 69.91% 65.07%
+97.52% 73.65% 67.50%
+97.56% 73.62% 67.52%
+97.76% 71.06% 66.82%
+98.12% 71.18% 67.73%
+97.75% 73.74% 69.83%
+97.97% 73.38% 69.75%
+98.05% 68.01% 69.89%
+98.31% 67.52% 66.64%
+
+also been obtained. It is shown that, for regression and clas-
+siﬁcation, TGGMs can be approximately viewed as a deter-
+ministic neural network with an activation function similar
+to ReLU. Because of this, TGGMs can be trained with BP.
+However, BP does not exactly maximize the likelihood of a
+TGGM, due to the inherent Gaussian assumption it makes.
+To overcome this limitation, we have developed an algo-
+rithm to correctly maximize the likelihood under the trun-
+cated Gaussian assumption. Experimental results show that
+the TGGM trained by BP generally performs better than the
+ReLU network, indicating the advantage of the new activa-
+tion function. It is further shown that the TGGM trained
+by ML learning achieves the best performance on most
+data sets in consideration.
+It should be emphasized that
+the tasks considered in this paper are only speciﬁc applica-
+tions of the TGGM framework under special forms of the
+precision matrices. In the future, we will consider TGGMs
+with lateral connections between hidden nodes. We may
+also generalize the supervised TGGM to the unsupervised
+case, using constructs similar to RBMs. Moreover, inves-
+tigation of how the quality of uncertainty estimates affects
+the performance is also of interest.
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+Acknowledgements
+The authors would like to thank the anonymous review-
+ers for their valuable and constructive comments. This re-
+search was supported in part by ARO, DARPA, DOE, NGA
+and ONR.
+
+References
+Albert, James H and Chib, Siddhartha. Bayesian analysis
+of binary and polychotomous response data. Journal of
+the American statistical Association, 88(422):669–679,
+1993.
+
+Chen, Changyou, Buntine, Wray, Ding, Ni, Xie, Lihua, and
+Du, Liang. Differential topic models. Pattern Analysis
+and Machine Intelligence, IEEE Transactions on, 37(2):
+230–242, 2015.
+
+He, Kaiming, Zhang, Xiangyu, Ren, Shaoqing, and Sun,
+Jian. Delving deep into rectiﬁers: Surpassing human-
+In Pro-
+level performance on imagenet classiﬁcation.
+ceedings of the IEEE International Conference on Com-
+puter Vision, pp. 1026–1034, 2015.
+
+Hern´andez-Lobato, Jos´e Miguel and Adams, Ryan P.
+Probabilistic backpropagation for scalable learning of
+bayesian neural networks. Proceedings of The 32nd In-
+ternational Conference on Machine Learning, 2015.
+
+Hinton, G. E. and Ghahramani, Z. Generative models
+for discovering sparse distributed representations. Phil.
+Trans. Roy. Soc., B, 352:1177–90, 1997.
+
+Hinton, Geoffrey E. Training products of experts by min-
+imizing contrastive divergence. Neural computation, 14
+(8):1771–1800, 2002.
+
+Corduneanu, A. and Bishop, C. Variational Bayesian
+In AI and
+
+model selection for mixture distributions.
+Statistics, pp. 27–34, 2001.
+
+Hinton, Geoffrey E, Osindero, Simon, and Teh, Yee-Whye.
+A fast learning algorithm for deep belief nets. Neural
+computation, 18(7):1527–1554, 2006.
+
+Dempster, A., Laird, N., and Rubin, D. Maximum likeli-
+hood from incomplete data via the EM algorithm. Jour-
+nal of Royal Statistical Society B, 39:1–38, 1977.
+
+Downs, Oliver B, MacKay, David JC, Lee, Daniel D, et al.
+The nonnegative boltzmann machine. In NIPS, pp. 428–
+434, 1999.
+
+Frey, Brendan J. Continuous sigmoidal belief networks
+trained using slice sampling. Advances in Neural Infor-
+mation Processing Systems, pp. 452–458, 1997.
+
+Frey, Brendan J and Hinton, Geoffrey E. Variational learn-
+ing in nonlinear gaussian belief networks. Neural Com-
+putation, 11(1):193–213, 1999.
+
+Galbraith, JI, Moustaki, Irini, Bartholomew, David J, and
+Steele, Fiona. The analysis and interpretation of multi-
+variate data for social scientists. CRC Press, 2002.
+
+Gan, Zhe, Henao, Ricardo, Carlson, David E, and Carin,
+Lawrence. Learning deep sigmoid belief networks with
+data augmentation. In AISTATS, 2015.
+
+Genz, Alan. Numerical computation of multivariate normal
+probabilities. Journal of computational and graphical
+statistics, 1(2):141–149, 1992.
+
+Genz, Alan and Bretz, Frank. Computation of multivariate
+normal and t probabilities, volume 195. Springer Sci-
+ence & Business Media, 2009.
+
+Glorot, Xavier, Bordes, Antoine, and Bengio, Yoshua.
+Deep sparse rectiﬁer neural networks. In International
+Conference on Artiﬁcial Intelligence and Statistics, pp.
+315–323, 2011.
+
+Honorio, Jean, Samaras, Dimitris, Paragios, Nikos, Gold-
+stein, Rita, and Ortiz, Luis E. Sparse and locally constant
+gaussian graphical models. In Advances in Neural Infor-
+mation Processing Systems, pp. 745–753, 2009.
+
+Jia, Yangqing, Shelhamer, Evan, Donahue, Jeff, Karayev,
+Sergey, Long, Jonathan, Girshick, Ross, Guadarrama,
+Sergio, and Darrell, Trevor. Caffe: Convolutional ar-
+chitecture for fast feature embedding. arXiv preprint
+arXiv:1408.5093, 2014.
+
+Johnson, Norman L, Kotz, Samuel, and Balakrishnan,
+Narayanaswamy. Continuous univariate distributions,
+vol. 1-2, 1994.
+
+Jordan, Michael
+
+I, Ghahramani, Zoubin,
+
+Jaakkola,
+Tommi S, and Saul, Lawrence K. An introduction
+to variational methods for graphical models. Machine
+learning, 37(2):183–233, 1999.
+
+Koller, Daphne and Friedman, Nir. Probabilistic graphical
+
+models: principles and techniques. MIT press, 2009.
+
+Li, Chunyuan, Stevens, Andrew, Chen, Changyou, Pu,
+Yunchen, Gan, Zhen, and Carin, Lawrence. Learning
+weight uncertainty with stochastic gradient mcmc for
+shape classiﬁcation. In CVPR, 2016.
+
+Liao, Xuejun, Li, Hui, and Carin, Lawrence. Quadratically
+gated mixture of experts for incomplete data classiﬁca-
+In Proceedings of the 24th International Confer-
+tion.
+ence on Machine learning, pp. 553–560. ACM, 2007.
+
+Liu, Ying and Willsky, Alan. Learning gaussian graphi-
+cal models with observed or latent fvss. In Advances in
+
+Nonlinear Statistical Learning with Truncated Gaussian Graphical Models
+
+Neural Information Processing Systems, pp. 1833–1841,
+2013.
+
+Meng, Zhaoshi, Eriksson, Brian, and Hero, Al. Learning
+latent variable gaussian graphical models. In Proceed-
+ings of the 31st International Conference on Machine
+Learning (ICML-14), pp. 1269–1277, 2014.
+
+Mudholkar, Govind S and Hutson, Alan D. The epsilon–
+skew–normal distribution for analyzing near-normal
+data. Journal of Statistical Planning and Inference, 83
+(2):291–309, 2000.
+
+Neal, Radford M. Connectionist learning of belief net-
+
+works. Artiﬁcial intelligence, 56(1):71–113, 1992.
+
+Oh, Jung Hun and Deasy, Joseph O.
+
+Inference of radio-
+responsive gene regulatory networks using the graphical
+lasso algorithm. BMC bioinformatics, 15(Suppl 7):S5,
+2014.
+
+Rezende, Danilo Jimenez, Mohamed, Shakir, and Wierstra,
+Daan. Stochastic backpropagation and approximate in-
+In Proceedings of
+ference in deep generative models.
+The 31st International Conference on Machine Learn-
+ing, pp. 1278–1286, 2014.
+
+Salakhutdinov, Ruslan and Hinton, Geoffrey E. Deep boltz-
+mann machines. In International Conference on Artiﬁ-
+cial Intelligence and Statistics, pp. 448–455, 2009.
+
+Socci, Nicholas D, Lee, Daniel D, and Sebastian Seung, H.
+The rectiﬁed gaussian distribution. Advances in Neural
+Information Processing Systems, pp. 350–356, 1998.
+
+Su, Qinliang and Wu, Yik-Chung. On convergence condi-
+tions of gaussian belief propagation. Signal Processing,
+IEEE Transactions on, 63(5):1144–1155, 2015a.
+
+Su, Qinliang and Wu, Yik-Chung. Distributed estimation
+of variance in gaussian graphical model via belief prop-
+agation: Accuracy analysis and improvement. Signal
+Processing, IEEE Transactions on, 63(23):6258–6271,
+2015b.
+
+Tieleman, Tijmen and Hinton, Geoffrey. Lecture 6.5-
+rmsprop: Divide the gradient by a running average of
+its recent magnitude. COURSERA: Neural Networks for
+Machine Learning, 4, 2012.
+
+

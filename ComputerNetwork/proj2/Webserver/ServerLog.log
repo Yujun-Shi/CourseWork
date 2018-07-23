@@ -1,0 +1,118 @@
+十一月 18, 2017 12:10:05 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+信息: 11-18_001005
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+信息: GET /src/Webserver.java HTTP/1.1
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:05 上午 HttpRequest digestRequest
+严重: file not exists
+十一月 18, 2017 12:10:42 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+信息: 11-18_001042
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+信息: GET /src/Serverlog.log HTTP/1.1
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:42 上午 HttpRequest digestRequest
+严重: file not exists
+十一月 18, 2017 12:10:53 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+信息: 11-18_001053
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+信息: GET /src/ServerLog.log HTTP/1.1
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:10:53 上午 HttpRequest digestRequest
+严重: file not exists
+十一月 18, 2017 12:11:05 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: 11-18_001105
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: GET /ServerLog.log HTTP/1.1
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: HTTP/1.1 200 OK
+
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: Content-type:other
+
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: send data
+十一月 18, 2017 12:11:05 上午 HttpRequest digestRequest
+信息: send data finish
+十一月 18, 2017 12:38:36 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: 11-18_003836
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: GET /home/bear.gif HTTP/1.1
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+严重: file not exists
+十一月 18, 2017 12:38:36 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: 11-18_003836
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: GET /favicon.ico HTTP/1.1
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:36 上午 HttpRequest digestRequest
+严重: file not exists
+十一月 18, 2017 12:38:44 上午 HttpRequest run
+信息: connection establisged: /127.0.0.1
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+信息: 11-18_003844
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+信息: GET /home/bear.gif HTTP/1.1
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+信息: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+信息: Content-type: text/html
+
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+严重: HTTP/1.1 404 NOT FOUND
+
+十一月 18, 2017 12:38:44 上午 HttpRequest digestRequest
+严重: file not exists

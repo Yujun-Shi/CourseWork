@@ -1,0 +1,869 @@
+Graying the black box: Understanding DQNs
+
+Tom Zahavy*
+Nir Ben Zrihem*
+Shie Mannor
+Electrical Engineering Department, The Technion - Israel Institute of Technology, Haifa 32000, Israel
+
+TOMZAHAVY@CAMPUS.TECHNION.AC.IL
+NIRB@TX.TECHNION.AC.IL
+SHIE@EE.TECHNION.AC.IL
+
+Abstract
+
+In recent years there is a growing interest in us-
+ing deep representations for reinforcement learn-
+ing.
+In this paper, we present a methodology
+and tools to analyze Deep Q-networks (DQNs)
+in a non-blind matter. Using our tools we re-
+veal that the features learned by DQNs aggregate
+the state space in a hierarchical fashion, explain-
+ing its success. Moreover we are able to under-
+stand and describe the policies learned by DQNs
+for three different Atari2600 games and suggest
+ways to interpret, debug and optimize deep neu-
+ral networks in reinforcement learning.
+
+1. Introduction
+In the Reinforcement Learning (RL) paradigm, an agent
+autonomously learns from experience in order to maximize
+some reward signal. Learning to control agents directly
+from high-dimensional inputs like vision and speech is
+a long standing problem in RL, known as the curse of
+dimensionality. Countless solutions to this problem have
+been offered including linear
+function approximators
+(Tsitsiklis & Van Roy, 1997), hierarchical representations
+(Dayan & Hinton, 1993), state aggregation (Singh et al.,
+1995) and options (Sutton et al., 1999). These methods
+rely upon engineering problem-speciﬁc state representa-
+tions, hence, reducing the agent’s ﬂexibility and making
+the learning more tedious. Therefore, there is a growing
+interest in using nonlinear function approximators, that are
+more general and require less domain speciﬁc knowledge,
+e.g., TD-gammon (Tesauro, 1995). Unfortunately, such
+methods are known to be unstable or even to diverge when
+used to represent the action-value function (Tsitsiklis &
+Van Roy, 1997; Gordon, 1995; Riedmiller, 2005).
+
+*These authors have contributed equally.
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+The Deep Q-Network (DQN) algorithm (Mnih et al., 2015)
+increased training stability by introducing the target net-
+work and by using Experience Replay (ER) (Lin, 1993). Its
+success was demonstrated in the Arcade Learning Environ-
+ment (ALE) (Bellemare et al., 2012), a challenging frame-
+work composed of dozens of Atari games used to evaluate
+general competency in AI. DQN achieved dramatically bet-
+ter results than earlier approaches, showing a robust ability
+to learn representations.
+While using Deep Learning (DL) in RL seems promising,
+there is no free lunch. Training a Deep Neural Network
+(DNNs) is a complex two-levels optimization process. At
+the inner level we ﬁx a hypothesis class and learn it us-
+ing some gradient descent method. The optimization of the
+outer level addresses the choice of network architecture,
+setting hyper-parameters, and even the choice of optimiza-
+tion algorithm. While the optimization of the inner level is
+analytic to a high degree, the optimization of the outer level
+is far from being so. Currently, most practitioners tackle
+this problem by either a trial and error methodology, or by
+exhaustively searching over the space of possible conﬁgu-
+rations. Moreover, in Deep Reinforcement Learning (DRL)
+we also need to choose how to model the environment as
+a Markov Decision Process (MDP), i.e., to choose the dis-
+count factor, the amount of history frames that represent
+a state, and to choose between the various algorithms and
+architectures (Nair et al., 2015; Van Hasselt et al., 2015;
+Schaul et al., 2015; Wang et al., 2015; Bellemare et al.,
+2015).
+A key issue in RL is that of representation, i.e., allowing the
+agent to locally generalize the policy across similar states.
+Unfortunately, spatially similar states often induce different
+control rules (”labels”) in contrast to other machine learn-
+ing problems that enjoy local generalization.
+In fact, in
+many cases the optimal policy is not a smooth function of
+the state, thus using a linear approximation is far from be-
+ing optimal. For example, in the Atari2600 game Seaquest,
+whether or not a diver has been collected (represented by a
+few pixels) controls the outcome of the submarine surface
+action (with: ﬁll air, without: loose a life) and therefore the
+
+Graying the black box: Understanding DQNs
+
+optimal policy. Another cause for control discontinuities is
+that for a given problem, two states with similar represen-
+tations may in fact be far from each other in terms of the
+number of state transitions required to reach one from the
+other. This observation can also explain the lack of pooling
+layers in DRL architectures(e.g., Mnih et al. (2015; 2013);
+Levine et al. (2015)).
+Differnt methods that focus on the temporal structure of the
+policy, has also been proposed. Such methods decompose
+the learning task into simpler subtasks using graph parti-
+tioning (Menache et al., 2002; Mannor et al., 2004; S¸ims¸ek
+et al., 2005) and path processing mechanisms (Stolle, 2004;
+Thrun, 1998). Given a good temporal representation of
+the states, varying levels of convergence guarantees can be
+promised (Dean & Lin, 1995; Parr, 1998; Hauskrecht et al.,
+1998; Dietterich, 2000).
+In this work we analyze the state representation learned by
+DRL agents. We claim that the success of DQN should be
+attributed to its ability to learn spatio-temporal hierarchies
+using different sub manifolds. We show that by doing so we
+can offer an interpertation of learned policies that may help
+formalizing the outer optimization step. Our methodology
+is to record the neural activations of the last DQN hid-
+den layer, and then apply t-Distributed Stochastic Neighbor
+Embedding (t-SNE) (Van der Maaten & Hinton, 2008) for
+dimensionality reduction and visualization. On top of this
+low dimensional representation we display features of the
+policy and other hand crafted features, so that we are able
+to describe what each sub-manifold represents. We also use
+saliency maps to analyze the inﬂuence of different features
+on the network. In particular, our main contributions are
+the following:
+Understanding: We show that DQNs are learning tem-
+poral abstractions of the state space such as hierarchical
+state aggregation and options. Temporal abstractions were
+known to the RL community before as mostly manual tools
+to tackle the curse of dimensionality; however, we observe
+that a DQN is ﬁnding abstractions automatically. Thus, we
+believe that our analysis explains the success of DRL from
+a reinforcement learning research perspective.
+Interpretability: We give an interpretation for the agents
+policy in a clear way, thus allowing to understand what are
+its weaknesses and strengths.
+Debugging: We propose debugging methods that help to
+reduce the hyper parameters grid search of DRL. Exam-
+ples are given on game modelling, termination and initial
+states and score over-ﬁtting.
+
+2. Related work
+The goal behind visualization of DNNs is to give better un-
+derstanding of these inscrutable black boxes. While some
+
+approaches study the type of computation performed at
+each layer as a group (Yosinski et al., 2014), others try to
+explain the function computed by each individual neuron
+(similar to the ”Jennifer Aniston Neuron” Quiroga et al.
+(2005)). Dataset-centric approaches display images from
+the data set that cause high activations of individual units.
+For example, the deconvolution method (Zeiler & Fergus,
+2014) highlights the areas of a particular image that are re-
+sponsible for the ﬁring of each neural unit. Network-centric
+approaches investigate a network directly without any data
+from a dataset, e.g., Erhan et al. (2009) synthesized images
+that cause high activations for particular units. Other works
+used the input gradient to ﬁnd images that cause strong acti-
+vations (e.g., Simonyan & Zisserman (2014); Nguyen et al.
+(2014); Szegedy et al. (2013)).
+Since RL research had been mostly focused on linear func-
+tion approximations and policy gradient methods, we are
+less familiar with visualization techniques and attempts
+to understand the structure learnt by an agent. Wang
+et al. (2015), suggested to use saliency maps and analyzed
+which pixels affect network predications the most. Us-
+ing this method they compared between the standard DQN
+and their duelling network architecture. Engel & Mannor
+(2001) learned an embedded map of Markov processes and
+visualized it on two dimensions. Their analysis is based
+on the state transition distribution while we will focus on
+distances between the features learned by DQN.
+
+3. Background
+The goal of RL agents is to maximize its expected total
+reward by learning an optimal policy (mapping states to
+actions). At time t the agent observes a state st, selects an
+action at, and receives a reward rt, following the agents
+decision it observes the next state st+1 . We consider in-
+ﬁnite horizon problems where the cumulative return is dis-
+counted by a factor of γ ∈ [0, 1] and the return at time t
+t(cid:48)=t γt(cid:48)−trt, where T is the termina-
+tion step. The action-value function Qπ(s, a) measures the
+expected return when choosing action at at state st, after-
+wards following policy π: Q(s, a) = E[Rt|st = s, at =
+a, π]. The optimal action-value obeys a fundamental recur-
+sion known as the Bellman equation,
+
+is given by Rt = (cid:80)T
+
+Q∗(st, at) = E(cid:104)
+
+(cid:105)
+a(cid:48) Q∗(st+1, a(cid:48))
+
+rt + γmax
+
+Deep Q Networks (Mnih et al., 2015; 2013) approximate
+the optimal Q function using a Convolutional Neural Net-
+work (CNN). The training objective is to minimize the ex-
+pected TD error of the optimal Bellman equation:
+
+Est,at,rt,st+1 (cid:107)Qθ (st, at) − yt(cid:107)2
+
+2
+
+rt
+
+rt + γmax
+a’
+
+yt =
+
+(cid:16)
+
+(cid:48)(cid:17)
+
+st+1, a
+
+Qθtarget
+
+Graying the black box: Understanding DQNs
+
+st+1 is terminal
+otherwise
+
+Notice that this is an off-line algorithm, meaning that the
+tuples {st,at, rt, st+1, γ} are collected from the agents ex-
+perience, stored in the ER and later used for training. The
+reward rt is clipped to the range of [−1, 1] to guarantee
+stability when training DQNs over multiple domains with
+different reward scales. The DQN algorithm maintains two
+separate Q-networks: one with parameters θ, and a second
+with parameters θtarget that are updated from θ every ﬁxed
+number of iterations. In order to capture the game dynam-
+ics, the DQN algorithm represents a state by a sequence of
+history frames and pads initial states with zero frames.
+t-SNE is a non-linear dimensionality reduction method
+used mostly for visualizing high dimensional data. The
+technique is easy to optimize, and it has been proven to out-
+perform linear dimensionality reduction methods and non-
+linear embedding methods such as ISOMAP (Tenenbaum
+et al., 2000) in several research ﬁelds including machine-
+learning benchmarks and hyper-spectral remote sensing
+data (Lunga et al., 2014).
+t-SNE reduces the tendency to
+crowd points together in the center of the map by employ-
+ing a heavy tailed Student-t distribution in the low dimen-
+sional space. It is known to be particularly good at creating
+a single map that reveals structure at many different scales,
+which is particularly important for high-dimensional data
+that lies on several low-dimensional manifolds. This en-
+ables us to visualize the different sub-manifolds learned by
+the network and interpret their meaning.
+
+4. Methods
+Our methodology comprises the following steps:
+
+1. Train a DQN.
+
+2. Evaluate the DQN. For each visited state record: (a)
+activations of the last hidden layer, (b) the gradient
+information and (c) the game state (raw pixel frame).
+
+3. Apply t-SNE on the activations data.
+
+4. Visualize the data.
+
+5. Analyze manually.
+
+Figure 1 presents our Visualization tool. Each state is rep-
+resented as a point in the t-SNE map (Left). The color
+of the points is set manually using global features (Top
+right) or game speciﬁc hand crafted features (Middle right).
+Clicking on each data point displays the corresponding
+game image and saliency map (Bottom right).
+It is pos-
+sible to move between states along the trajectory using the
+F/W and B/W buttons.
+
+Figure 1. Graphical user interface for our methodology.
+
+Feature extraction: During the DQN run, we collect
+statistics for each state such as Q values estimates, gen-
+eration time, termination signal, reward and played action.
+We also extract hand-crafted features, directly from the em-
+ulator raw frames, such as player position, enemy position,
+number of lives, and so on. We use these features to color
+and ﬁlter points on the t-SNE map. The ﬁltered images re-
+veal insightful patterns that cannot be seen otherwise. From
+our experience, hand-crafted features are very powerful,
+however the drawback of using them is that they require
+manual work. In all the ﬁgures below we use a heat color
+map (red corresponds to high values and blue to low ones).
+Similar to Engel & Mannor (2001) we visualize the dynam-
+ics (state transitions) of the learned policy. To do so we use
+a 3D t-SNE state representation wich we found insightfull.
+The transistions are displayed with arrows using Mayavi
+(Ramachandran & Varoquaux, 2011).
+t-SNE: We apply the t-SNE algorithm directly on the col-
+lected neural activations, similar to Mnih et al. (2015). The
+input X ∈ R120k×512 consists of 120k game states with
+512 features each (size of the last layer). Since these data
+are relatively large, we pre-processed it using Principal
+Component Analysis to dimensionality of 50 and used the
+Barnes Hut t-SNE approximation (Van Der Maaten, 2014).
+Saliency maps: We generate Saliency maps (similar to Si-
+monyan & Zisserman (2014)) by computing the Jacobian
+of the network with respect to the input, and presenting it
+above the input image itself (Figure 1, bottom right). These
+maps helps to understand which pixels in the image affect
+the value prediction of the network the most.
+Analysis: Using these features we are able to understand
+the common attributes of a given cluster (e.g, Figure 3 in
+the appendix). Moreover, by analyzing the dynamics be-
+tween clusters we can identify a hierarchical aggregation
+of the state space. We deﬁne clusters with a clear entrance
+and termination areas as options, and interpretat the agent
+policy there. For some options we are able to derive rules
+
+Graying the black box: Understanding DQNs
+
+Figure 2. Breakout aggregated states on the t-SNE map.
+
+for initiation and termination (i.e., landmark options, Sut-
+ton et al. (1999); Mann et al. (2015)).
+
+5. Experiments
+We applied our methodology on three ATARI games:
+Breakout, Pacman and Seaquest. For each one we give a
+short description of the game, analyze the optimal policy,
+detail the features we designed, interpret the DQN’s pol-
+icy and derive conclusions. We ﬁnally analyze initial and
+terminal states and the inﬂuence of score pixels.
+
+5.1. Breakout
+
+In Breakout, a layer of bricks lines the top of the screen.
+A ball travels across the screen, bouncing off the top and
+side walls. When a brick is hit, the ball bounces away,
+the brick is destroyed and the player receives reward. The
+player loses a turn when the ball touches the bottom of the
+screen. To prevent this from happening, the player has a
+movable paddle to bounce the ball upward, keeping it in
+play. The highest score achievable for one player is 896;
+this is done by eliminating exactly two screens of bricks
+worth 448 points each.
+We extract features for the player (paddle) position, ball’s
+position, balls direction of movement, number of missing
+bricks, and a tunnel feature (a tunnel exists when there is a
+clear path between the area below the bricks and the area
+above it, and we approximate this event by looking for at
+least one clear column of bricks).
+
+A good strategy for Breakout is leading the ball above the
+bricks by digging a tunnel in one side of the bricks block.
+Doing so enables the agent to achieve high reward while
+being safe from losing the ball. By introducing a discount
+factor to Breakout’s MDP, this strategy becomes even more
+favourable since it achieves high immediate reward.
+Figure 2 presents the t-SNE of Breakout. The agent learns
+a hierarchical policy: (a) carve a tunnel in the left side of
+the screen and (b) keep the ball above the bricks as long
+as possible. In clusters (1-3) the agent is carving the left
+tunnel. Once the agent enters those clusters, it will not exit
+until the tunnel is carved (see Figure 4). We identify these
+clusters as a landmark option. The clusters are separated
+from each other by the ball position and direction.
+In
+cluster 1 the ball is heading toward the tunnel, in cluster 2
+the ball is at the right side and in cluster 3 the ball bounces
+back from the tunnel after hitting bricks. As less bricks
+remain in the tunnel the value is gradually rising till the
+tunnel is carved where the value is maximal (this makes
+sense since the agent is enjoying high reward rate straight
+after reaching it). Once the tunnel is carved, the option
+is terminated and the agent moves to clusters 4-7 (dashed
+red line), differentiated by the ball position with regard
+to the bricks (see Figure 2). In cluster 4 and 6 the ball is
+above the bricks and in 5 it is below them. Clusters 8 and
+9 represent termination and initial states respectively (see
+Figure 2 in the appendix for examples of states along the
+option path).
+
+          1  2 3 4 5 6 5 7 8 9 9 Graying the black box: Understanding DQNs
+
+5.2. Seaquest
+
+the player’s goal
+
+In Seaquest,
+is to retrieve as many
+treasure-divers, while dodging and blasting enemy subs
+and killer sharks before the oxygen runs out. When the
+game begins, each enemy is worth 20 points and a res-
+cued diver worth 50. Every time the agent surface with six
+divers, killing an enemy (rescuing a diver) is increased by
+10 (50) points up to a maximum of 90 (1000). Moreover,
+the agent is awarded an extra bonus based on its remain-
+ing oxygen level. However, if it surfaces with less than six
+divers the oxygen ﬁlls up with no bonus, and if it surfaces
+with none it loses a life.
+DQN’s performance on Seaquest (∼5k) is inferior to hu-
+man experts (∼100k). What makes Seaquest hard for DQN
+is that shooting enemies is rewarded immediately, while
+rescuing divers is rewarded only once six divers are col-
+lected and rescued to sea level. Moreover, the bonus points
+for collecting 6 divers is diminished by reward clipping.
+This sparse and delayed reward signal requires much longer
+planning that is harder to learn.
+We extract features for player position, direction of move-
+ment (ascent/descent), oxygen level, number of enemies,
+number of available divers to collect, number of available
+divers to use, and number of lives.
+Figure 3 shows the t-SNE map divided into different clus-
+ters. We notice two main partitions of the t-SNE clusters:
+(a) by oxygen level (low: clusters 4-10, high: cluster 3 and
+other unmarked areas), and (b) by the amount of collected
+divers (clusters 2 and 11 represent having a diver). We
+also identiﬁed other partitions between clusters such as re-
+fuelling clusters (1: pre-episode and 2: in-episode), various
+termination clusters (8: agent appears in black and white,
+
+Figure 4. Breakout tunnel digging option. Left: states that the
+agent visits once it entered the option clusters (1-3 in Figure 2)
+until it ﬁnishes to carve the left tunnel are marked in red. Right:
+Dynamics is displayed by arrows above a 3d t-SNE map. The
+option termination zone is marked by a black annotation box and
+corresponds to carving the left tunnel. All transitions from clus-
+ters 1-3 into clusters 4-7 pass through a singular point.
+
+Cluster 7 is created due to a bug in the emulator that allows
+the ball to pass the tunnel without completely carving it.
+The agent learned to represent this incident to its own clus-
+ter and assigned it high value estimates (same as the other
+tunnel clusters). This observation is interesting since it in-
+dicates that the agent is learning a representation based on
+the game dynamics and not only on the pixels.
+By coloring the t-SNE map by time, we can identify some
+policy downsides. States with only a few remaining bricks
+are visited for multiple times along the trajectory (see Fig-
+ure 1 in the appendix).
+In these states, the ball bounces
+without hitting any bricks which causes a ﬁxed reﬂection
+pattern, indicating that the agent is stuck in a local optima.
+We discuss the inability of the agent to perform well in the
+second screen of the game in Section 5.5.
+
+Figure 3. Seaquest aggregated states on the t-SNE map, colored by value function estimate.
+
+     10 9 8 7 6 5 1 1 1 1 2 4 2 3 11 Graying the black box: Understanding DQNs
+
+we identify a refuel option. We noticed that the option can
+be initiated from two different zones based on the oxygen
+level but has a singular termination cluster (3b). If the diver
+is taken while having a high level of oxygen, then it enters
+the option at the northern (red) part of cluster 1. Otherwise
+it will enter on a point further along the direction of the op-
+tion (red arrows). In cluster 1, the agent keeps following
+the normal shooting policy. Eventually the agent reaches a
+critical level of oxygen (cluster 3) and ascends to sea level.
+From there the agent jumps to the fueling cluster (area 1b).
+The fueling cluster is identiﬁed by its rainbow appearance
+because the level of oxygen is increasing rapidly. How-
+ever, the refuel option was not learned perfectly. Area 2 is
+another refuel cluster, there, the agent does not exploit its
+oxygen before ascending to get air (area 2b).
+
+5.3. Pacman
+
+In Pacman, an agent navigates in a maze while being
+chased by two ghosts. The agent is positively rewarded
+(+1) for collecting bricks. An episode ends when a preda-
+tor catches the agent, or when the agent collects all bricks.
+There are also 4 bonus bricks, one at each corner of the
+maze. The bonus bricks provide larger reward (+5), and
+more importantly, they make the ghosts vulnerable for a
+short period of time, during which they cannot kill the
+agent. Occasionally, a bonus box appears for a short time
+providing high reward (+100) if collected.
+
+Figure 5. Seaquest refuel option. Left: Option path above the t-
+SNE map colored by the amount of remaining oxygen. Shaded
+blue mark the clusters with a collected diver, and red arrows mark
+the direction of progress. Right: 3d t-SNE with colored arrows
+representing transitions. All transitions from cluster 3 are leading
+to cluster 3b in order to reach the refuel cluster (1b), thus indicat-
+ing a clear option termination structure.
+
+9: agent’s ﬁgure is replaced with drops, 10: agent’s ﬁg-
+ure disappears) and low oxygen clusters characterized by
+ﬂickering in the oxygen bar (4 and 7).
+While the agent distinguishes states with a collected diver,
+Figure 6 implies that the agent did not understand the con-
+cept of collecting a diver and sometimes treats it as an en-
+emy. Moreover, we see that the clusters share a similar
+value estimate that is highly correlated with the amount
+of remaining oxygen and the number of present enemies.
+However, states with an available or collected diver do not
+raise the value estimates nor do states that are close to re-
+fueling. Moreover, the agent never explores the bottom of
+the screen, nor collects more than two divers.
+As a result, the agent’s policy is to kill as many enemies as
+possible while avoiding being shot. If it hasn’t collected a
+diver, the agent follows a sub-optimal policy and ascends
+near to sea level as the oxygen decreases. There, it contin-
+ues to shoot at enemies but not collecting divers. However,
+it also learned not to surface entirely without a diver.
+If the agent collects a diver it moves to the blue shaded clus-
+ters (all clusters in this paragraph refer to Figure 5), where
+
+Figure 6. Salincy maps of states with available diver. Left: A
+diver is noticed in the saliency map but misunderstood as an en-
+emy and being shot at. Center: Both diver and enemy are noticed
+by the network. Right: The diver is unnoticed by the network.
+
+Figure 8. t-SNE for Pacman colored by the number of left bricks
+with state examples from each cluster.
+
+   1 1b 2b 2 3 3b  3 3b 3b 1b    Graying the black box: Understanding DQNs
+
+Figure 7. Pacman aggregated states on the t-SNE map colored by value function estimates.
+
+We extract features for the player position, direction of
+movement, number of left bricks to eat, minimal distance
+(L1) between the player and the predators, number of lives,
+ghost mode that indicates that the predators are vulnerable,
+and bonus box feature that indicate when the highly valued
+box appears.
+Figure 7 shows the t-SNE colored by value function, while
+Figure 8 shows the t-SNE colored by the number of left
+bricks with examples of states from each cluster. We can
+see that the clusters are well partitioned by the number of
+remaining bricks and value estimates. Moreover, examin-
+ing the states in each cluster (Figure 8) we see that the clus-
+ters share speciﬁc bricks pattern and agent location.
+
+Figure 9. Histogram showing the time passed until each bonus
+brick is collected.
+
+From Figure 9 we also learn that the agent collects the
+bonus bricks at very speciﬁc times and order. Thus, we
+conclude that the agent has learned a location-based policy
+that is focused on collecting the bonus bricks (similar to
+maze problems) while avoiding the ghosts.
+The agent starts at cluster 1, heading for the bottom-left
+bonus brick and collecting it in cluster 2. Once collected, it
+moves to cluster 3 where it is heading to the top-right bonus
+brick and collects it in cluster 4. The agent is then moving
+to clusters 5 and 6 where it is taking the bottom-right and
+top-left bonus bricks respectively. We also identiﬁed clus-
+ter 7 and 9 as termination clusters and cluster 8 as a hiding
+cluster in which the agent hides from the ghosts in the top-
+left corner. The effects of reward-clipping can be clearly
+seen in the case of the bonus box. Cluster 10 comprises of
+states with a visible bonus box. However these states are
+assigned with a low value.
+
+5.4. Enviroment modeling
+
+The DQN algorithm requires speciﬁc treatment for ini-
+tial (padded with zero frames) and terminal (receive target
+value of zero) states, however it is not clear how to check if
+this treatment works well. Therefore we show t-SNE maps
+for different games with a focus on termination and initial
+states in Figure 10. We can see that all terminal states are
+mapped successfully into a singular zone, however, initial
+states are also mapped to singular zones and assigned with
+wrong value predictions. Following these observations we
+suggest to investigate different ways to model initial states,
+i.e., replicating a frame instead of feeding zeros and test it.
+
+  2 3  1 8 7 6 4 5 9 7 10 10 10  Graying the black box: Understanding DQNs
+
+6. Conclusions
+In this work we showed that the features learned by DQN
+map the state space to different sub-manifolds, in each, dif-
+ferent features are present. By analyzing the dynamics in
+these clusters and between them we were able to identify
+hierarchical structures. In particular we were able to iden-
+tify options with deﬁned initial and termination rules. State
+aggregation gives the agent the ability to learn speciﬁc poli-
+cies for the different regions, thus giving an explanation to
+the success of DRL agents. The ability to understand the hi-
+erarchical structure of the policy can help in distilling it into
+a simpler architecture (Rusu et al., 2015; Parisotto et al.,
+2015) and may help to design better algorithms. One pos-
+sibility is to learn a classiﬁer from states to clusters based
+on the t-SNE map, and then learn a different control rule
+at each. Another option is to allocate learning resources to
+clusters with inferior performance, for example by priori-
+tized sampling (Schaul et al., 2015).
+Similar to Neuro-Science, where reverse engineering meth-
+ods like fMRI reveal structure in brain activity, we demon-
+strated how to describe the agent’s policy with simple logic
+rules by processing the network’s neural activity. We be-
+lieve that interpretation of policies learned by DRL agents
+is of particular importance by itself. First, it can help in the
+debugging process by giving the designer qualitative under-
+standing of the learned policies. Second, there is a growing
+interest in applying DRL solutions to real-world problem
+such as autonomous driving and medicine. We believe that
+before we can reach that goal we will have to gain greater
+conﬁdence on what the agent is learning. Lastly, under-
+standing what is learned by DRL agents, can help design-
+ers develop better algorithms by suggesting solutions that
+address policy downsides.
+To conclude, when a deep network is not performing well
+it is hard to understand the cause and even harder to ﬁnd
+ways to improve it. Particularly in DRL, we lack the tools
+needed to analyze what an agent has learned and therefore
+left with black box testing. In this paper we showed how
+to gray the black box: understand better why DQNs work
+well in practice, and suggested a methodology to interpret
+the learned policies.
+
+Acknowledgement
+This research was supported in part by the European Com-
+munitys Seventh Framework Programme (FP7/2007-2013)
+under grant agreement 306638 (SUPREL) and the Intel
+Collaborative Research Institute for Computational Intel-
+ligence (ICRI-CI).
+
+Figure 10. Terminal and initial states. Top: All terminal states
+are mapped into a singular zone(red). Bottom: Initial states are
+mapped into singular zones (pointed by colored arrows from the
+terminal zone) above the 3d t-SNE dynamics representation.
+
+5.5. Score pixels
+
+Some Atari2600 games include multiple repetitions of the
+same game. Once the agent ﬁnished the ﬁrst screen it is
+presented with another one, distinguished only by the score
+that was accumulated in the ﬁrst screen. Therefore, an
+agent might encounter problems with generalizing to the
+new screen if it over-ﬁts the score pixels. In breakout, for
+example, the current state of the art architectures achieves a
+game score of around 450 points while the maximal avail-
+able points are 896 suggesting that the agent is somehow
+not learning to generalize for the new level. We investi-
+gated the effect that score pixels has on the network pre-
+dictions. Figure 11 shows the saliency maps of different
+games supporting our claim that DQN is basing its esti-
+mates using these pixels. We suggest to further investigate
+this, for example we suggest to train an agent that does not
+receive those pixels as input.
+
+Figure 11. Saliency maps of score pixels. The input state is pre-
+sented in gray scale while the value input gradients are displayed
+above it in red.
+
+Graying the black box: Understanding DQNs
+
+References
+Bellemare, Marc G, Naddaf, Yavar, Veness, Joel, and
+Bowling, Michael. The arcade learning environment: An
+evaluation platform for general agents. arXiv preprint
+arXiv:1207.4708, 2012.
+
+Bellemare, Marc G, Ostrovski, Georg, Guez, Arthur,
+Thomas, Philip S, and Munos, R´emi.
+Increasing the
+action gap: New operators for reinforcement learning.
+arXiv preprint arXiv:1512.04860, 2015.
+
+Dayan, Peter and Hinton, Geoffrey E. Feudal reinforce-
+ment learning. pp. 271–271. Morgan Kaufmann Pub-
+lishers, 1993.
+
+Dean, Thomas and Lin, Shieu-Hong. Decomposition tech-
+niques for planning in stochastic domains. Citeseer,
+1995.
+
+Dietterich, Thomas G. Hierarchical reinforcement learning
+with the MAXQ value function decomposition. J. Artif.
+Intell. Res.(JAIR), 13:227–303, 2000.
+
+Engel, Yaakov and Mannor, Shie. Learning embedded
+maps of markov processes. In in Proceedings of ICML
+2001. Citeseer, 2001.
+
+Erhan, Dumitru, Bengio, Yoshua, Courville, Aaron, and
+Vincent, Pascal. Visualizing higher-layer features of a
+deep network. Dept. IRO, Universit´e de Montr´eal, Tech.
+Rep, 4323, 2009.
+
+Gordon, Geoffrey J. Stable function approximation in dy-
+
+namic programming. 1995.
+
+Hauskrecht, Milos, Meuleau, Nicolas, Kaelbling,
+Leslie Pack, Dean, Thomas, and Boutilier, Craig.
+Hierarchical solution of Markov decision processes
+using macro-actions. In Proceedings of the Fourteenth
+conference on Uncertainty in artiﬁcial intelligence, pp.
+220–229. Morgan Kaufmann Publishers Inc., 1998.
+
+Levine, Sergey, Finn, Chelsea, Darrell, Trevor, and Abbeel,
+Pieter. End-to-end training of deep visuomotor policies.
+arXiv preprint arXiv:1504.00702, 2015.
+
+Lin, Long-Ji. Reinforcement learning for robots using neu-
+ral networks. Technical report, DTIC Document, 1993.
+
+Lunga, Dalton, Prasad, Santasriya, Crawford, Melba M,
+and Ersoy, Ozan. Manifold-learning-based feature ex-
+traction for classiﬁcation of hyperspectral data: a review
+of advances in manifold learning. Signal Processing
+Magazine, IEEE, 31(1):55–66, 2014.
+
+Mannor, Shie, Menache, Ishai, Hoze, Amit, and Klein, Uri.
+Dynamic abstraction in reinforcement learning via clus-
+In Proceedings of the twenty-ﬁrst international
+tering.
+conference on Machine learning, pp. 71. ACM, 2004.
+
+Menache, Ishai, Mannor, Shie, and Shimkin, Nahum.
+Q-cutdynamic discovery of sub-goals in reinforcement
+learning. In Machine Learning: ECML 2002, pp. 295–
+306. Springer, 2002.
+
+Mnih, Volodymyr, Kavukcuoglu, Koray, Silver, David,
+Graves, Alex, Antonoglou, Ioannis, Wierstra, Daan, and
+Riedmiller, Martin. Playing atari with deep reinforce-
+ment learning. arXiv preprint arXiv:1312.5602, 2013.
+
+Mnih, Volodymyr, Kavukcuoglu, Koray, Silver, David,
+Rusu, Andrei A, Veness, Joel, Bellemare, Marc G,
+Graves, Alex, Riedmiller, Martin, Fidjeland, Andreas K,
+Ostrovski, Georg, et al. Human-level control through
+deep reinforcement learning. Nature, 518(7540):529–
+533, 2015.
+
+Nair, Arun, Srinivasan, Praveen, Blackwell, Sam, Alci-
+cek, Cagdas, Fearon, Rory, De Maria, Alessandro, Pan-
+neershelvam, Vedavyas, Suleyman, Mustafa, Beattie,
+Charles, Petersen, Stig, et al. Massively parallel meth-
+arXiv preprint
+ods for deep reinforcement learning.
+arXiv:1507.04296, 2015.
+
+Nguyen, Anh, Yosinski, Jason, and Clune, Jeff. Deep
+neural networks are easily fooled: High conﬁdence
+predictions for unrecognizable images. arXiv preprint
+arXiv:1412.1897, 2014.
+
+Parisotto, Emilio, Ba, Jimmy Lei, and Salakhutdinov, Rus-
+lan. Actor-mimic: Deep multitask and transfer reinforce-
+ment learning, 2015.
+
+Parr, Ronald.
+
+Flexible decomposition algorithms for
+weakly coupled Markov decision problems. In Proceed-
+ings of the Fourteenth conference on Uncertainty in arti-
+ﬁcial intelligence, pp. 422–430. Morgan Kaufmann Pub-
+lishers Inc., 1998.
+
+Quiroga, R Quian, Reddy, Leila, Kreiman, Gabriel, Koch,
+Christof, and Fried, Itzhak. Invariant visual representa-
+tion by single neurons in the human brain. Nature, 435
+(7045):1102–1107, 2005.
+
+Ramachandran, P. and Varoquaux, G. Mayavi: 3D Visu-
+alization of Scientiﬁc Data. Computing in Science &
+Engineering, 13(2):40–51, 2011. ISSN 1521-9615.
+
+Mann, Timothy A, Mannor, Shie, and Precup, Doina. Ap-
+proximate value iteration with temporally extended ac-
+tions. Journal of Artiﬁcial Intelligence Research, 53(1):
+375–438, 2015.
+
+Riedmiller, Martin. Neural ﬁtted Q iteration–ﬁrst experi-
+ences with a data efﬁcient neural reinforcement learning
+method. In Machine Learning: ECML 2005, pp. 317–
+328. Springer, 2005.
+
+Graying the black box: Understanding DQNs
+
+Van der Maaten, Laurens and Hinton, Geoffrey. Visual-
+izing data using t-SNE. Journal of Machine Learning
+Research, 9(2579-2605):85, 2008.
+
+Van Hasselt, Hado, Guez, Arthur, and Silver, David. Deep
+reinforcement learning with double q-learning. arXiv
+preprint arXiv:1509.06461, 2015.
+
+Wang, Ziyu, de Freitas, Nando, and Lanctot, Marc. Dueling
+network architectures for deep reinforcement learning.
+arXiv preprint arXiv:1511.06581, 2015.
+
+Yosinski, Jason, Clune, Jeff, Bengio, Yoshua, and Lipson,
+Hod. How transferable are features in deep neural net-
+works? In Advances in Neural Information Processing
+Systems, pp. 3320–3328, 2014.
+
+Zeiler, Matthew D and Fergus, Rob. Visualizing and under-
+standing convolutional networks. In Computer Vision–
+ECCV 2014, pp. 818–833. Springer, 2014.
+
+Rusu, Andrei A., Colmenarejo, Sergio Gomez, Gulcehre,
+Caglar, Desjardins, Guillaume, Kirkpatrick, James, Pas-
+canu, Razvan, Mnih, Volodymyr, Kavukcuoglu, Koray,
+and Hadsell, Raia. Policy distillation, 2015.
+
+Schaul, Tom, Quan, John, Antonoglou, Ioannis, and Sil-
+ver, David. Prioritized experience replay. arXiv preprint
+arXiv:1511.05952, 2015.
+
+Simonyan, Karen and Zisserman, Andrew. Very deep con-
+volutional networks for large-scale image recognition.
+arXiv preprint arXiv:1409.1556, 2014.
+
+S¸ims¸ek,
+
+¨Ozg¨ur, Wolfe, Alicia P, and Barto, Andrew G.
+Identifying useful subgoals in reinforcement learning by
+local graph partitioning. In Proceedings of the 22nd in-
+ternational conference on Machine learning, pp. 816–
+823. ACM, 2005.
+
+Singh, Satinder P, Jaakkola, Tommi, and Jordan, Michael I.
+Reinforcement learning with soft state aggregation. Ad-
+vances in neural information processing systems, pp.
+361–368, 1995.
+
+Stolle, Martin. Automated discovery of options in re-
+inforcement learning. PhD thesis, McGill University,
+2004.
+
+Sutton, Richard S, Precup, Doina, and Singh, Satinder. Be-
+tween MDPs and semi-MDPs: A framework for tempo-
+ral abstraction in reinforcement learning. Artiﬁcial intel-
+ligence, 112(1):181–211, 1999.
+
+Szegedy, Christian, Zaremba, Wojciech, Sutskever, Ilya,
+Bruna, Joan, Erhan, Dumitru, Goodfellow, Ian, and Fer-
+gus, Rob. Intriguing properties of neural networks. arXiv
+preprint arXiv:1312.6199, 2013.
+
+Tenenbaum, Joshua B, De Silva, Vin, and Langford,
+John C. A global geometric framework for nonlinear di-
+mensionality reduction. Science, 290(5500):2319–2323,
+2000.
+
+Tesauro, Gerald. Temporal difference learning and TD-
+Gammon. Communications of the ACM, 38(3):58–68,
+1995.
+
+Thrun, Sebastian. Learning metric-topological maps for
+indoor mobile robot navigation. Artiﬁcial Intelligence,
+99(1):21–71, 1998.
+
+Tsitsiklis, John N and Van Roy, Benjamin. An analysis of
+temporal-difference learning with function approxima-
+tion. Automatic Control, IEEE Transactions on, 42(5):
+674–690, 1997.
+
+Van Der Maaten, Laurens. Accelerating t-SNE using tree-
+based algorithms. The Journal of Machine Learning Re-
+search, 15(1):3221–3245, 2014.
+
+

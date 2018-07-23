@@ -1,0 +1,1150 @@
+A Box-Constrained Approach for Hard Permutation Problems
+
+Cong Han Lim
+Stephen J. Wright
+Department of Computer Sciences, University of Wisconsin-Madison, Madison, WI 53706, USA
+
+CONGHAN@CS.WISC.EDU
+SWRIGHT@CS.WISC.EDU
+
+Abstract
+
+We describe the use of sorting networks to form
+relaxations of problems involving permutations
+of n objects. This approach is an alternative to re-
+laxations based on the Birkhoff polytope (the set
+of n × n doubly stochastic matrices), providing
+a more compact formulation in which the only
+constraints are box constraints. Using this ap-
+proach, we form a variant of the relaxation of the
+quadratic assignment problem recently studied in
+Vogelstein et al. (2015), and show that the contin-
+uation method applied to this formulation can be
+quite effective. We develop a coordinate descent
+algorithm that achieves a per-cycle complexity
+of O(n2 log2 n). We compare this method with
+Fast Approximate QAP (FAQ) algorithm intro-
+duced in Vogelstein et al. (2015), which uses a
+conditional-gradient method whose per-iteration
+complexity is O(n3). We demonstrate that for
+most problems in QAPLIB and for a class of syn-
+thetic QAP problems, the sorting-network for-
+mulation returns solutions that are competitive
+with the FAQ algorithm, often in signiﬁcantly
+less computing time.
+
+1. Introduction
+A permutation problem has the form
+
+¯f (π)
+
+min
+π∈P n
+
+(1)
+
+where P n is the set of all permutations of n objects. Lin-
+ear and quadratic assignment problems (LAP and QAP, re-
+spectively) can be formulated as permutation problems, as
+can seriation problems (Fogel et al., 2013). Many NP-hard
+problems are special cases of QAP. It is useful to formu-
+late these problems equivalently in terms of permutation
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+matrices Π ∈ PMn (PMn is the set of n × n permuta-
+tion matrices). For example, the graph matching problem
+can be expressed as minΠ∈PMn (cid:107)A − ΠBΠ(cid:62)(cid:107)2
+F where A
+and B are the adjacency matrices of graphs on n vertices.
+The Birkhoff polytope Bn — the convex hull of the set of
+permutation matrices — is frequently used to formulate a
+continuous (but not necessarily convex) relaxation of such
+problems, which takes the following form:
+
+min
+P∈Bn
+
+f (P ).
+
+(2)
+
+The conventional way to implement such formulations is
+to represent the set Bn explicitly via n2 variables (the com-
+ponents of P ), 2n linear constraints, and n2 nonnegativity
+bounds, as follows:
+
+Bn = {P ∈ Rn×n | P 1 = 1, P (cid:62)1 = 1, P ≥ 0},
+
+(3)
+where 1 = (1, 1, . . . , 1)(cid:62) ∈ Rn. Some algorithms based
+on this representation rely on a projection step to remain
+within the feasible region; the expense of this step can
+be ameliorated by the use of an approximate projection
+technique such as Sinkhorn-Knopp balancing (Sinkhorn &
+Knopp, 1967). The constraints can also be incorporated
+directly within a general optimization framework, such as
+an active-set or interior-point method. A conditional gradi-
+ent (Frank-Wolfe) framework can also be used (Vogelstein
+et al., 2015; Zaslavskiy et al., 2009), at a cost of O(n3) op-
+erations per iteration. It has been noted that maintaining
+feasibility of the iterates with respect to these constraints is
+typically the bottleneck in these methods.
+In this paper, we follow Lim & Wright (2014) in using a
+sorting network to replace the permutation matrix. A sort-
+ing network is a mechanism for sorting n objects by means
+of a composition of pairwise comparators, where each
+comparator sorts a single pair of inputs. Sorting networks
+for n numbers can in principle be composed of O(n log n)
+comparators; practical networks contain O(n log2 n) com-
+parators. Each comparator can be parametrized by a single
+scalar x, which takes on the value 1 if it is necessary to
+switch the two inputs to put them in the correct order, and
+0 otherwise. By relaxing the feasible set for each parame-
+ter x from the binary set {0, 1} to the interval [0, 1], we can
+
+Box-Constrained Approach for Hard Permutation Problems
+
+parametrize a practical sorting network in terms of m vari-
+ables (where m = O(n log2 n)) over the box [0, 1]m. We
+can design a sorting network to effect any permutation of n
+objects by making appropriate choices of the parameters x
+from the binary set {0, 1}m. We note too that any choice of
+parameters from the box [0, 1]m yields a matrix in Bn. In
+fact, the set of matrices traced out by choosing the sorting
+network parameters from the box [0, 1]m is a manifold ly-
+ing within Bn that contains all permutation matrices. Thus,
+the sorting network yields a relaxation of Problem (1).
+A regularization term (cid:107)x− (1/2)1(cid:107)2
+2 can be included in the
+sorting-network relaxation, whose function is to nudge so-
+lutions toward vertices of the feasible box [0, 1]m, and thus
+closer to a permutation. By scaling this term with a regular-
+ization parameter µ, and gradually altering this parameter
+from a positive value to a negative one, the problem can
+be transformed from a convex problem to a coordinatewise
+strongly concave problem whose global minimizer coin-
+cides with the minimum of the original problem. Estimates
+of Lipschitz constants for the objective provide informa-
+tion about appropriate choices for the parameter. A con-
+tinuation method can track the solution as this parameter is
+decreased. (We note that negative values of regularization
+parameters are slightly atypical, but the use of the terminol-
+ogy “regularization” is still appropriate as this term serves
+to force the solution toward a more useful value — a value
+at or near a vertex of the feasible box.)
+The sorting-network relaxation is nonconvex in general.
+However, when the objective f is nonconvex, (as in the
+graph matching problem, for example), the Birkhoff poly-
+tope relaxation is nonconvex also, even though the feasible
+set Bn is polyhedral. We note too that any solution of a re-
+laxed problem must be converted via heuristics into an esti-
+mate of the solution of the original problem (1). This addi-
+tional consideration makes it difﬁcult to predict the relative
+performance of different relaxation methods. The compact,
+nonlinear relaxations based on sorting-networks may thus
+be viable alternatives to the simpler but higher-dimensional
+relaxation resulting from the Birkhoff polytope.
+We demonstrate an application of the sorting-network re-
+laxation is to the classic quadratic assignment problem
+(QAP). Our point of comparison is with the nonconvex re-
+laxed quadratic assignment problem formulation from Vo-
+gelstein et al. (2015), which uses the Birkhoff polytope and
+uses conditional gradient approach to solve the resulting
+indeﬁnite quadratic program. We demonstrate an efﬁcient
+technique for computing components of the gradient with
+respect to the sorting-network parameters, with the purpose
+of using these partial gradients in a cyclic coordinate de-
+scent framework. These techniques allow us to perform a
+full cycle of coordinate descent in complexity O(nm) (that
+is, O(n2 log2 n) for practical sorting networks).
+
+We demonstrate empirically that using this continuation-
+based method with the fast cyclic coordinate subroutine can
+converge to a local minimum signiﬁcantly faster than the
+Frank-Wolfe method-based Fast Approximate QAP (FAQ)
+from (Vogelstein et al., 2015).
+In particular, we demon-
+strate on synthetic QAP instances that even with multiple
+heuristics, the run time of cyclic coordinate descent can
+be many times faster than FAQ. For quadratic assignment
+problems from QAPLIB (Burkard et al., 1997) and some
+other synthetic QAP problems, the cyclic coordinate de-
+scent method frequently returns an objective value close to
+FAQ, with the exception of two problem classes.
+It is not our main goal to devise another metaheuristic
+for QAP, of which there are already a wide variety (see
+Burkard et al. (2012); Loiola et al. (2007) for recent sur-
+veys). Rather, we wish to use this important problem class
+to demonstrate the effectiveness of sorting-network relax-
+ations for solving certain hard permutation problems.
+
+Outline. We introduce sorting networks in Section 2, de-
+scribe the mapping φ that is the basis of the relaxation,
+and show how the derivatives of φ can be computed efﬁ-
+ciently. Section 3 describes the continuation strategy for
+tracking the solution as a function of the regularization pa-
+rameter. Section 4 describes the QAP and the approach
+used to solve it in Vogelstein et al. (2015). We also give
+details of the cyclic coordinate descent algorithm for solv-
+ing the sorting-network relaxation. Further implementation
+details are given in Section 5 and computational results are
+described in Section 6. The supplementary material con-
+tains omitted proofs and details on the experiments.
+
+Related Work. The use of sorting networks in optimiza-
+tion problems involving continuous objectives and permu-
+tations as the variables draws on the compact extended
+formulation of the permutahedron (Goemans, 2015). The
+extended formulation relies on a “mixing” constraint at
+each comparator, with parameters to describe the amount
+of mixing that occurs. Sorting-network relaxations were
+employed in the seriation problem (which has a convex ob-
+jective) in Lim & Wright (2014), but the technique of that
+paper applies only to permutations of vectors. The current
+paper answers in the afﬁrmative a question raised in Lim &
+Wright (2014), about whether sorting-network relaxations
+can be devised for more general problems involving opti-
+mization over permutations.
+The use of continuation methods for nonconvex problems
+is popular within the computer vision and machine learning
+communities, and it has recently been applied to the QAP.
+The approaches for QAP use the Birkhoff polytope and
+the fact that the minimum of a concave objective function
+over any polytope is attained at extreme points. Zaslavskiy
+et al. (2009) derive convex and concave relaxations over the
+
+Box-Constrained Approach for Hard Permutation Problems
+
+Birkhoff polytope for the graph matching problem, which
+can be used as a proxy for the QAP. They then solve a
+series of problems over a convex combination of the two
+problems. Xia (2010) solves a sequence of (cid:96)2-regularized
+problems over the Birkhoff polytope where regularization
+terms −µ(cid:107)P(cid:107)2
+F are added to the objective (2), for different
+positive values of µ.
+
+2. A Box-Constrained Framework based on
+
+Sorting Networks
+
+a
+
+is
+
+that
+
+deﬁnes
+
+network
+
+comparators C
+
+on n elements
+
+of m pairwise
+
+A sorting
+se-
+quence
+=
+{(α1, β1), (α2, β2), . . . , (αm, βm)}
+the
+following sorting algorithm for a sequence of n elements:
+At the kth round, compare the αkth and βkth item in
+the sequence (where αk and βk are both integers in
+the range 1, 2, . . . , n, with αk < βk) and switch the
+position of the elements if and only if the βkth element
+is smaller. The AKS sorting network (Ajtai et al., 1983)
+has size m = O(n log n), and is the most compact
+option for extremely large n. Practical sorting networks
+with simple recursive constructions such as the bitonic
+sorter or odd-even mergesort (Batcher, 1968) have size
+m = O(n log2 n).
+Sorting networks are frequently
+depicted as a series of wires and comparators; Figure 1
+illustrates a small bitonic network.
+
+composed
+
+A bitonic
+of
+
+vari-
+Figure 1.
+comparators
+sequence
+ables
+{(1, 2), (3, 4), (1, 4), (2, 3), (1, 2), (3, 4)}.
+numbers
+on the wires illustrate the sorting process for the input sequence
+(4, 3, 1, 2).
+
+sorting
+the
+
+network
+
+The
+
+on
+
+of
+
+4
+
+With each comparator (αk, βk) in the sorting network we
+can associate a variable xk ∈ [0, 1] that deﬁnes how the
+outputs from the comparator are deﬁned as a mixture of the
+inputs. Using this notation, we can represent this compara-
+tor as an elementary matrix M k(xk), whose (i, j) element
+is deﬁned as follows:
+
+M k
+
+ij(xk) :=
+
+1
+xk
+(1 − xk)
+0
+
+i = j, i (cid:54)= αk, βk,
+i = j, i, j ∈ {αk, βk},
+i (cid:54)= j, i, j ∈ {αk, βk},
+otherwise.
+
+(4)
+
+
+
+Here, we have M k(1) = I (corresponding to “no swap” of
+the αk and βk elements) whereas M k(0) is the permuta-
+tion matrix that “swaps” elements αk and βk. The matrix
+M k(xk) is invertible if and only if xk (cid:54)= 0.5. Given any
+n × n matrix Y , it takes only O(n) operations to update
+Y to (M k(xk))−1Y (if xk (cid:54)= 0.5) or M k(xk)Y , since we
+only have to update two rows in each case.
+The derivative of M k with respect to its argument is a rank-
+one matrix vk(vk)(cid:62), where
+
+1
+
+−1
+0
+
+vk
+i =
+
+i = αk,
+i = βk,
+otherwise.
+
+(5)
+
+The following function φ : Rm → Rn×n deﬁnes the com-
+position of the transformations M k(xk) across the full net-
+work:
+
+φ(x) := M m(xm)M m−1(xm−1) . . . M 1(x1),
+
+The image {φ(x) | x ∈ [0, 1]m} includes all permutation
+matrices, since the sorting network allows us to pick a bi-
+nary x to represent any permutation. The image is in gen-
+eral a strict subset of the Birkhoff polytope: It is easy to ver-
+ify that φ(x)1 = 1 and φ(x)(cid:62)1 = 1 for any x ∈ [0, 1]m,
+and it is also clear that φ(x) ≥ 0.
+The following property of the mapping φ will be useful.
+Lemma 2.1. (cid:107)φ(x) − φ(y)(cid:107)F ≤ 2(cid:107)x − y(cid:107)1.
+We can use the mapping φ to replace the argument P in
+the formulation (2). After adding a regularization term
+µ ∈ R, we obtain the following sorting-network-based for-
+mulation:
+
+g(x; µ) = f (φ(x)) + µ(cid:107)x − (1/2)1(cid:107)2
+2.
+
+(6)
+
+min
+
+x∈[0,1]m
+
+The regularization term µ allows us to develop a continua-
+tion-based approach in later sections, which works by grad-
+ually decreasing µ to transform (6) from convex to concave.
+If f has gradients with Lipschitz constant Lf , we can de-
+rive Lipschitz constants for the gradient of the composed
+function f (φ) by applying Lemma 2.1.
+
+|∇f (φ(x)) − ∇f (φ(y))| ≤Lf(cid:107)φ(x) − φ(y)(cid:107)F
+
+(7)
+(8)
+
+≤2Lf(cid:107)x − y(cid:107)1
+√
+mLf(cid:107)x − y(cid:107)2.
+≤2
+mLf or µ < −√
+√
+Inequality (8) ensures that if µ >
+mLf ,
+then Problem (6) is strongly convex or strongly concave re-
+spectively. Inequality (7) shows that |µ| > Lf sufﬁces for
+coordinatewise convexity or concavity, that is, the function
+restricted to a single coordinate for any coordinate is con-
+vex or concave. Coordinatewise concavity guarantees that
+the global solutions for Problems (1) and (6) coincide.
+
+Box-Constrained Approach for Hard Permutation Problems
+
+Proposition 2.2. Suppose the objective g(x; µ) in Problem
+(6) is coordinatewise strongly concave. Then any point ˆx
+that is coordinatewise minimal leads to a permutation ma-
+trix φ(ˆx). Any φ(x∗) corresponding to a global minimum
+x∗ is a solution to the original Problem (1).
+
+3. A Continuation-Based Algorithm for
+
+Obtaining a Permutation.
+
+The continuation method, sometimes also known as grad-
+uated nonconvexity or the homotopy method, is a well-
+known technique used to solve difﬁcult problems. Instead
+of tackling the target problem directly, the method solves
+a series of subproblems, using the approximate solution of
+each subproblem to initialize the next one.
+In our case,
+the continuation method begins from a convex problem and
+gradually transforms it to a problem equivalent to the orig-
+inal hard nonconvex problem, the intuition being that the
+sequence of solutions gradually follows a path to a good
+solution for the original problem.
+To deﬁne a continuation-based algorithm, we need to de-
+termine the sequence of subproblems and the method for
+solving each subproblem. In this paper, we use cyclic coor-
+dinate descent with exact minimization to solve each sub-
+problem. We terminate the cyclic coordinate descent when
+the objective value fails to meet a sufﬁcient decrease cri-
+teria. The subproblems in our formulation depend on the
+regularization term µ. We know from Proposition 2.2 that
+once µ < −Lf , the problem is coordinatewise strongly
+concave, so that cyclic coordinate descent ﬁnds a binary
+vector x. If we choose to further decrease µ once we have
+found a binary x, the new solution would not move.
+Proposition 3.1. Suppose g(·; µ)
+is coordinatewise
+strongly concave. Then cyclic coordinate descent with ex-
+act minimization reaches a binary x in ﬁnitely many steps.
+Proposition 3.2. Suppose binary vector x is coordinate-
+wise minimal for g(x; µ0). For any µ < µ0, x is still a
+coordinatewise minimum for g(x; µ).
+
+The proof of Proposition 3.2 follows directly from symme-
+try of the regularization term around 0.5. Note that any co-
+ordinatewise minimal point is also a stationary point, hence
+no ﬁrst-order method will ﬁnd a new point.
+By considering both Propositions 3.1 and 3.2, we know that
+we should not decrease µ beyond −Lf more than once.
+This gives us a lower bound for µ. Proposition 3.2 also
+provides an early termination criteria for the algorithm.
+Remaining issues are to determine the starting value of µ,
+and how to update µ between subproblems. For continu-
+ation methods, it is typical to set the initial µ to make the
+problem easy (that is, convex or strongly convex), but em-
+pirically we have observed that it good computational re-
+
+sults can be obtained by using 0 as the initial value of µ,
+and decreasing it by a constant value between each sub-
+problem. The approach is speciﬁed in Algorithm 1.
+
+Algorithm 1 Continuation Algorithm for (12)
+
+Input: g : [0, 1]m → R, x ∈ Rm, µ, c, µmin < −Lf −c,
+dec, bin
+repeat
+
+repeat
+
+x(cid:48) ← x
+x ← one cycle of coordinate descent on x(cid:48)
+
+until g(x(cid:48); µ) − g(x; µ) < dec
+if µ > µmin then
+
+µ ← µ − c
+
+else
+
+break
+
+end if
+
+until (cid:107)x − round(x)(cid:107)2 < bin
+return round(x)
+
+4. A Box-Constrained Relaxation of the QAP
+
+and Fast Cyclic Coordinate Descent
+
+The classic quadratic assignment problem (QAP), as for-
+mulated by Koopmans and Beckmann, can be written as
+follows:
+
+n(cid:88)
+
+n(cid:88)
+
+i=1
+
+j=1
+
+min
+Π∈P n
+
+aijbπiπj =(cid:10)A, ΠBΠ(cid:62)(cid:11) .
+
+(9)
+
+This problem is NP-hard and can be used to model prob-
+lems such as facility location, graph partitioning, the trav-
+eling salesman problem, and many other combinatorial op-
+timization problems. There is a wealth of research on this
+topic, and we refer the reader to some of the comprehensive
+surveys available (Loiola et al., 2007; Pardalos & Wolkow-
+icz, 1994).
+In this paper, we focus on a particular continuous relaxation
+to the problem studied by Vogelstein et al. (2015), who de-
+ﬁne the following relaxation over the Birkhoff polytope:
+
+(cid:10)A, P BP (cid:62)(cid:11) = (cid:104)AP, P B(cid:105) .
+
+(10)
+
+min
+P∈Bn
+
+This formulation is referred to in Vogelstein et al. (2015)
+as the indeﬁnite relaxed QAP formulation. Its nonconvex
+quadratic objective makes ﬁnding the global minimum an
+intractable task, in general. Vogelstein et al. (2015) intro-
+duce a Frank-Wolfe-based fast approximate QAP (FAQ) al-
+gorithm for ﬁnding local minima, in which each iteration
+requires solution of a linear assignment problem, an O(n3)
+operation. The Hessian of the objective is given by the sum
+of Kronecker produts B ⊗ A + A(cid:62) ⊗ B(cid:62), so the Lipschitz
+
+Box-Constrained Approach for Hard Permutation Problems
+
+constant associated with the gradients is given by
+
+LrQAP = max(cid:8){|λmin
+
+B |}(cid:9)
+
+A |,|λmax
+
+A |} · {|λmin
+
+B |,|λmax
+
+(11)
+where · denotes the elementwise product of the sets and
+are the smallest and largest eigenvalues of
+and λmax
+λmin
+U
+U respectively.
+The sorting-network formulation corresponding to (10) is
+
+U
+
+(cid:104)Aφ(x), φ(x)B(cid:105) + µ(cid:107)x − (1/2)1(cid:107)2
+2.
+
+(12)
+
+min
+
+x∈[0,1]m
+
+This formulation has a multiquadratic objective function:
+The exponent for each variable in each term is at most 2. To
+our knowledge, box-constrained multiquadratic program-
+ming has not been studied in the literature. From equations
+(7) and (11) we know that setting |µ| > LrQAP makes this
+formulation coordinatewise strongly convex or concave.
+Evaluating the objective function takes O(nm) time for
+this problem, because each of the m multiplications by ma-
+trices M k(xk), k = 1, 2, . . . , m required to form Aφ(x)
+and φ(x)B takes O(n) operations, while the inner product
+in (12) requires O(n2). Computing the derivative with re-
+spect to an arbitrary coordinate can take up to O(nm) oper-
+ations. However, as we describe below, the form of the ob-
+jective function can be exploited to compute one complete
+cycle of the cyclic coordinate descent method in O(nm)
+time. (In the supplementary material, we show how this
+structure also allows us to evaluate a full gradient in O(nm)
+operations, and the Hessian matrix in O(m2) operations.)
+
+A fast implementation of the cyclic coordinate descent
+method for (12). The cyclic coordinate descent method
+(sometimes known as the Gauss-Seidel method) performs
+the following update to the kth coordinate on the ith cycle:
+
+k ← argmin
+xi+1
+ξ∈[0,1]
+
+g(xi+1
+
+1
+
+, . . . , xi+1
+
+k−1, ξ, xi
+
+k+1, . . . , xi
+
+m; µ).
+
+There are a few reasons to adopt a cyclic coordinate de-
+scent approach for our problem over other ﬁrst-order meth-
+ods. First, the multiquadratic form of the objective (12)
+means that the function is simply a quadratic along each
+coordinate. Once we obtain the coefﬁcients that deﬁne the
+quadratic, we can efﬁciently ﬁnd the exact minimizer. Sec-
+ond, the form of the function φ allows us to determine the
+coefﬁcients of the quadratic incrementally and efﬁciently.
+Recalling the deﬁnition (4), we can express the objective of
+(6) (when µ = 0) as follows:
+
+(cid:10)AM m(xm) . . . M 1(x1), M m(xm) . . . M 1(x1)B(cid:11)
+
+(For notational convenience, we omit the argument from
+the M k(xk) terms when xk can be inferred.) We will com-
+pute the coefﬁcients of the quadratic form along each co-
+ordinate from the ﬁrst and second derivatives. Using (5),
+
+we write the gradient with respect to xk as the sum of the
+following two terms:
+
+(cid:10)AM m . . . M k+1vk(vk)(cid:62)M k−1 . . . M 1, φ(x)B(cid:11) ,
+(cid:10)Aφ(x), M m . . . M k+1vk(vk)(cid:62)M k−1 . . . M 1B(cid:11) ,
+2 ·(cid:10)(vk)(cid:62)M k+1 . . . M mAM m . . . M k+1vk,
+(vk)(cid:62)M k−1 . . . M 1BM 1 . . . M k−1vk(cid:11) .
+
+while the second derivative with respect to xk is
+
+(13)
+(14)
+
+(15)
+
+We now demonstrate how to compute the coordinatewise
+ﬁrst and second derivatives incrementally, coordinate by
+coordinate. Consider (13) (the analysis for (14) is similar).
+After rearranging, and using such properties of the inner
+product as (cid:104)AB, C(cid:105) = (cid:104)A, CB(cid:62)(cid:105), this term equals
+
+(cid:10)M k+1 . . . M mAM m . . . M k+1vk,
+M k(xk)M k−1 . . . M 1BM 1 . . . M k−1vk(cid:11) ,
+
+(16)
+
+which by deﬁning
+
+Sk := M k+1M k+2 . . . M mAM m . . . M k+2M k+1
+T k := M k−1M k−2 . . . M 1BM 1 . . . M k−2M k−1,
+
+can be written as
+
+(cid:104)Skvk, M k(xk)T kvk(cid:105).
+
+(17)
+
+After updating xk to x(cid:48)
+k) in the
+deﬁnition of T k+1, we can write the analogue of (17) for
+the next coordinate k + 1 as follows:
+
+k and using M k := M k(x(cid:48)
+
+(cid:10)Sk+1vk+1, M k+1(xk+1)T k+1vk+1(cid:11)
+
+(18)
+
+(cid:54)= 0.5.
+
+Suppose xk+1
+To compute (18) af-
+ter computing (16), we need to compute Sk+1 =
+(M k+1)−1Sk(M k+1)−1 and T k+1 = M kT kM k (both
+O(n) operations), perform several other O(n) matrix-
+and ﬁnally form an inner prod-
+vector operations,
+uct (also O(n)). Note that
+the initial value S0 =
+M 1M 2 . . . M mAM m . . . M 2M 1 requires O(nm) opera-
+tions to compute, a similar cost to the subsequent sweep
+through the coordinates.
+If xk+1 = 0.5, we can no longer apply the above pro-
+cedure since the matrix M k+1 is not invertible. We can
+circumvent this issue by storing explicitly the columns of
+AM m . . . M k+1 that differ from AM m . . . M k. In prac-
+tice, we would also store the columns instead of computing
+the inverse when xk+1 is very close to 0.5 to avoid numer-
+ical issues. Similar procedures to those just described can
+be used to compute the second term (14) and the Hessian
+(15). We summarize the approach in Algorithm 2, and the
+iteration complexity is described in the following result.
+
+Box-Constrained Approach for Hard Permutation Problems
+
+Algorithm 2 A cycle of cyclic coordinate descent for (12)
+Input: comparison coefﬁcients x, matrices A, B ∈
+Rn×n and regularization coefﬁcient µ
+S ← A
+for i = m to 1 do
+S ← M iSM i
+
+// S = φ(x)(cid:62)Aφ(x) at the end of the loop
+
+end for
+T ← B
+for i = 1 to m do
+
+S ← (M i)−1S(M i)−1
+
+a ← 2 ·(cid:10)(vi)(cid:62)Svi, (vi)(cid:62)T vi(cid:11)
+b ←(cid:10)Svi, M iT vi(cid:11) +(cid:10)(vi)(cid:62)S, (vi)(cid:62)T M i(cid:11)
+2 ay2 + (b − axi)y(cid:12)(cid:12) y ∈ [0, 1](cid:9)
+(cid:8) 1
+
+a ← a + µ, b ← b + µ(x − 0.5)
+xi ← arg miny
+M i ← M i(xi)
+T ← M iT M i
+
+end for
+
+Theorem 4.1. Each cycle of the cyclic coordinate descent
+method can be performed in O(nm) time. The amount
+of additional memory used is O(n2 + nd), where d =
+|{i | xi = 0.5}|.
+In general there is no convergence guarantee for cyclic co-
+ordinate descent with exact minimization for nonconvex
+problems — Powell (1973) provides a well-known example
+in R3 where all the limit points of the iterates of cyclic co-
+ordinate descent are not stationary points. Nonetheless, we
+chose to use this over variants with guarantees like random
+coordinate descent (Patrascu & Necoara, 2014), or cyclic
+coordinate descent with a proximal term (Grippo & Scian-
+drone, 2000) due to the better empirical performance.
+
+5. Additional Implementation Details
+We supplement the basic approach of Algorithm 2 with var-
+ious other features and heuristics.
+
+Choice of sorting network. As with Lim & Wright
+(2014), we ﬁnd that using bitonic sorting networks
+(Batcher, 1968) in our experiments gives us good empir-
+ical performance. These sorting networks have a size of
+O(n log2 n) and can be constructed using a simple recur-
+sive algorithm in O(n log2 n) time.
+In addition, having additional comparators in a sorting net-
+work may allow us to make additional swaps that improve
+the objective value. We have found in our experiments
+that randomly adding comparators can signiﬁcantly im-
+prove performance. We choose index pairs (αk, βk), k =
+1, 2, . . . , m(cid:48) at random from {1, 2, . . . , n} × {1, 2, . . . , n}
+and append these pairs to the list of comparators deﬁned
+by the bitonic network. There is a trade-off in performance
+improvement and running time when adding comparators.
+
+We found that setting the number m(cid:48) of new comparators
+to m works well in practice.
+
+Multiple restarts. The nonconvexity of formulations (9)
+and (12) means that both methods often terminate at sta-
+tionary points which could be far from the global optimum.
+To improve the quality of the local solutions that are iden-
+tiﬁed, we restart the methods multiple times with different
+starting points. (Vogelstein et al. (2015) employ this tech-
+nique, with good results.) We can also permute the rows
+and columns of A differently for each restart of the algo-
+rithm, since the behavior of the function φ(x) is not invari-
+ant to such rearrangements.
+
+Finding a permutation that is locally optimal (up to a
+single swap) using coordinate descent. The following
+method ensures that the permutation φ(x) computed by our
+method is at least as good as all permutations that differ
+from φ(x) by at most one swap. After obtaining a per-
+mutation, instead of directly terminating the continuation
+algorithm, we rearrange the rows and columns of A and B
+according to this permutation. We then deﬁne a sorting net-
+work in which the list of comparators consists of every pair
+of elements from {1, 2, . . . , n}, and set x = 1. We then
+resume the continuation algorithm using this new sorting
+network. If the cyclic coordinate descent algorithm results
+in no change to the initial value x = 1, we know that no
+single swap could have improved the objective, so we can
+terminate safely. Otherwise, we repeat this process.
+Using this ‘full’ sorting network of size O(n2) may be
+slow, and we can cap the number of iterations with this net-
+work to ease the computational burden. Alternatively, we
+can generate a smaller random sorting network by choos-
+ing m(cid:48) index pairs at random (m(cid:48) controls the trade-off be-
+tween local optimality and runtime) and forming a compo-
+sition of the comparators deﬁned by these pairs. (The re-
+sulting list of comparators is not strictly speaking a sorting
+network, since it is not guaranteed to sort all inputs.)
+
+6. Numerical Results
+Vogelstein et al. (2015) demonstrate that FAQ outperforms
+other approximate QAP methods, so we focus on compar-
+ing our continuation-based approach against the FAQ al-
+gorithm on quadratic assignment problems from the liter-
+ature. We report on both the objective values attained and
+the running time.
+
+experiments were
+
+run
+limited to a single thread.
+
+Setup. The
+LAB 8.4,
+FAQ algorithm, we
+mentation provided by Vogelstein et al.
+github.com/jovo/FastApproximateQAP,
+
+in MAT-
+the
+the MATLAB imple-
+(2015) at
+and
+
+used
+
+For
+
+Box-Constrained Approach for Hard Permutation Problems
+
+used the default stopping criteria provided there. Since
+the runtime for FAQ algorithm is sometimes long, and it
+often does not make much progress after a certain point,
+we capped the number of Frank-Wolfe iterations at 10 or
+30. (We denote these two variants by FAQ10 and FAQ30,
+respectively.) The FAQ codes did not converge within their
+limits of 10 and 30 iterations, but the objective did not
+improve signiﬁcantly beyond 30 iterations.
+Heuristics or other local search methods that were devel-
+oped for QAP can improve the performance of these algo-
+rithms, but a detailed analysis of how to compose heuris-
+tics is beyond the scope of this paper.
+In this paper we
+only consider a simple greedy pairwise swap heuristic.
+In this approach, we iterate through all possible pairwise
+swaps until we ﬁnd a swap that improves the objective,
+then perform that swap.
+In the main paper we consider
+FAQ10+G/FAQ30+G, which applies the following greedy
+pairwise swap heuristic up to 30 times after FAQ10/FAQ30
+terminates.
+We implemented the continuation method with the
+fast cyclic coordinate descent algorithm in MATLAB.
+(A straightforward translation of the code into MAT-
+LAB/MEX gives us a signiﬁcant speed-up, but we keep the
+code in pure MATLAB for a fairer timing comparison with
+the MATLAB implementation of FAQ.)
+We consider multiple variants of coordinate descent with
+√
+different features/heuristics applied, and collectively refer
+n in
+to them as CD. We set dec = 0.1% and bin = 0.1
+Algorithm 1. The features we consider are continuation
+(C), sorting network heuristic for local optimality (RS and
+FS, for random and full sorting network, respectively), and
+the greedy swap heuristic from above (G). For simplicity,
+we focus primarily in the main paper on CD+C+RS: Co-
+ordinate descent with continuation and random sorting net-
+works of size O(n log2 n). We decrease µ by LrQAP/10
+between subproblems (see (11) for the deﬁnition of LrQAP),
+and terminate after solving the problem for two successive
+values of µ less than −LrQAP. In each run, we let the al-
+gorithm apply the new sorting network heuristic up to 3
+times. The use of random sorting networks instead of full-
+sized sorting networks (with O(n2) comparators) provides
+an objective value that is very slightly worse, with signiﬁ-
+cantly better scaling with n.
+
+compare them to the global optimal or best known solution
+in the literature. We compute the optimality gap, the dif-
+ference between the objective value obtained and the best
+known solution normalized by the best known solution. We
+also compare the difference in average running time.
+In the main paper, we focus on comparing CD+C+RS with
+FAQ10, FAQ30, and FAQ30+G, as summarized in Table 1.
+We also brieﬂy discuss FAQ10+G and other variants of CD.
+We focus ﬁrst on the objective values obtained. Overall, for
+a majority of the instances the objective values obtained
+by CD and the FAQ methods are within a few percent of
+each other. CD+C+RS is better than FAQ10 for 12 fami-
+lies, FAQ30 for 6 families, and FAQ30+G for one family.
+The performance of FAQ improves signiﬁcantly when the
+maximum number of iterations is increased from 10 to 30,
+and again when the greedy swap heuristic is applied. In par-
+ticular, while CD+C+RS signiﬁcantly outperforms FAQ10
+and FAQ30 on chr, els, the greedy swap heuristic al-
+lows FAQ30+G to attain a performance close to or bet-
+ter than CD+C+RS. We note that CD+C+RS outperforms
+FAQ10+G for 5 families. Except for lipa b and ste,
+CD+C+RS always provides a gap that is close to or better
+than the other methods.
+For the running time, CD+C+RS generally does much bet-
+ter. Besides beating FAQ10 on a majority of instances
+and FAQ30/FAQ30+G for all instances, CD+C+RS is never
+worse by more than a few times, whereas FAQ10 and
+FAQ30 can be more than 100 times slower (see the bur and
+els problems). FAQ10 is approximately three times faster
+than FAQ30, and the time difference between FAQ10 and
+FAQ10+G is roughly the same as the difference between
+FAQ30 and FAQ30+G.
+We brieﬂy describe a few observations of the other CD vari-
+ants. Using the full sorting network compared to a random
+O(n log2 n) network in the heuristic leads to a slightly bet-
+ter objective value in terms of objective value without sig-
+niﬁcantly affecting overall running times. (At small n the
+choice of new sorting networks has little or negligible ef-
+fect on running time.) Applying the greedy swap heuristic
+to CD makes a much smaller difference if the new sort-
+ing network heuristic is used. Applying the greedy swap
+heuristic is often much more time-consuming than apply-
+ing the new sorting network heuristic for these instances.
+
+QAPLIB Problems. We compare the objective values
+and timings achieved by FAQ and CD on problems from
+QAPLIB (Burkard et al., 1997), the canonical library of
+QAP problems, which has 137 problems with sizes vary-
+ing from n = 10 to n = 256. Each method was run 100
+times, and we compare the objective values corresponding
+to the best result and the median. We take the best or me-
+dian solution obtained out of 100 runs for each method and
+
+Synthetic QAP Problems. To understand better how the
+running times and objective values scale with problem size,
+we turn to the QAP generators described in Taillard (1995).
+These problems have A matrices are Euclidean distance
+matrices and B matrices are randomly generated with many
+zero elements. (Further details appear in the supplementary
+material.) For n = 300, 400, . . . , 1000, we generated one
+instance each of size n and ran each algorithm 10 times
+
+Box-Constrained Approach for Hard Permutation Problems
+
+Table 1. Performance of CD+C+RS, FAQ10, FAQ30 and FAQ+G on QAPLIB instances, aggregated by family of instances. For each
+family, we take the average optimality gap and the average ratio of the timing of each method to CD+C+RS. The highlighted cells
+indicates cases where CD+C+RS outperforms that entry.
+
+In Figure 2 we compare CD+C+RS,
+on each instance.
+FAQ10+G, and FAQ30+G in terms of the average run time
+and the gap between the average objective value obtained
+and the best objective value out of all runs of FAQ30+G.
+
+Figure 2. Comparison of CD+C+RS, FAQ10+G, and FAQ30+G
+for synthetic QAP instances.
+
+For the objective values, FAQ10+G performs worst, fol-
+lowed by CD+C+RS, with FAQ30+G best. The CD+C+RS
+
+algorithm is much faster, by a factor of about 20 over
+FAQ10+G and about 60 over FAQ30+G. Using a full sort-
+ing network heuristic has worse scaling effects in terms of
+the run time. CD+C+FS and CD+FS scale at a rate that is
+approximately O(n3), which is the complexity of one cycle
+of coordinate descent on a O(n2) sorting network, while
+the other methods scale similarly at a rate that is closer to
+O(n2).
+
+7. Conclusion
+We have introduced a novel, compact relaxation for hard
+permutation problems that reduces the constraints to sim-
+ple box constraints. These constraints are signiﬁcantly eas-
+ier to enforce than those encountered in the Birkhoff poly-
+tope relaxation. By incorporating a regularization term, we
+can gradually alter the problem to a coordinatewise con-
+cave problem, where the global minimizer coincides with
+the original problem.
+Using the QAP as an example, we show that the structure
+of the resulting parametrization can be leveraged to derive
+fast cyclic coordinate descent algorithms. Our algorithm
+takes only O(n) time per coordinate or O(n2 log2 n) per
+cycle, which has better per-iteration complexity than ex-
+isting methods over the Birkhoff polytope. We develop a
+continuation-based method for ﬁnding a permutation using
+the new parametrization. Empirical results show that for
+many problems from QAPLIB, this algorithm can ﬁnd so-
+lutions of quality comparable with the approach of Vogel-
+stein et al. (2015), and signiﬁcantly faster. A natural goal
+would be extend this relaxation to other hard permutation
+problems of interest.
+
+TypeNumnCD+C+RSFAQ10FAQ30FAQ30+GCD+C+RSFAQ10FAQ30FAQ30+GFAQ10FAQ30FAQ30+GBUR826.12.08.06.04.78.27.19.08724.041895.261897.04CHR1412--256.8418.729.325.9039.9277.5057.7633.91.911.992.38ELS1194.2125.8922.964.5627.6077.6067.3919.15394.71956.55957.50ESC2016--128.08.73.05.002.029.825.342.36.371.061.24HAD512--20.00.39.15.05.393.77.77.371.023.093.39KRA330--321.752.46.06.005.137.285.204.622.679.039.42LIPA A820--90.951.791.02.661.502.231.761.35.281.802.50LIPA B820--907.92.00.00.0019.0315.074.934.902.231.601.98NUG1512--30.43.62.03.033.465.042.351.851.293.723.98ROU312--20.221.58.49.484.678.454.683.74.742.192.39SCR312--20.003.942.66.247.0419.3615.248.16.882.462.75SKO1342--1001.03.94.34.282.182.181.231.152.015.296.57STE3363.632.751.10.5314.7713.378.787.802.256.136.65TAI2810--2561.302.901.531.085.509.236.014.7117.9466.3367.48THO330--1501.541.37.38.353.623.392.041.882.476.958.23WIL250,100.48.54.13.091.201.39.61.512.386.478.35Average Percent Optimality GapAverage Timing RatioBest of 100 RunsMedian of 100 Runs(compared with CD+C+FS)Box-Constrained Approach for Hard Permutation Problems
+
+8. Acknowledgements
+We thank the anonymous referees for feedback that im-
+proved the paper and its presentation. This project was sup-
+ported by NSF Awards DMS-1216318 and IIS-1447449,
+Award EM02076 from Exxon Mobil Corp., ONR Award
+N00014-13-1-0129, AFOSR Award FA9550-13-1-0138,
+and Subcontract 3F-30222 from Argonne National Labo-
+ratory.
+
+References
+Ajtai, M., Koml´os, J., and Szemer´edi, E. An O(n log n)
+sorting network. In Proceedings of the Fifteenth Annual
+ACM Symposium on Theory of Computing (STOC ’83),
+pp. 1–9, New York, New York, USA, December 1983.
+ACM Press. ISBN 0897910990. doi: 10.1145/800061.
+808726.
+
+Anstreicher, Kurt M. and Brixius, Nathan W. A new bound
+for the quadratic assignment problem based on convex
+quadratic programming. Mathematical Programming,
+89(3):341–357, February 2001. ISSN 0025-5610. doi:
+10.1007/PL00011402.
+
+Batcher, K. E. Sorting networks and their applications. In
+AFIPS ’68 (Spring): Proceedings of the Spring Joint
+Computer Conference, pp. 307–314, New York, New
+York, USA, April 1968. ACM Press. doi: 10.1145/
+1468075.1468121.
+
+Burkard, R., Dell’Amico, M., and Martello, S. Assignment
+Problems. Society for Industrial and Applied Mathemat-
+ics, 2012. doi: 10.1137/1.9781611972238.
+
+Burkard, Rainer E., Karisch, Stefan E., and Rendl,
+Franz. QAPLIB A Quadratic Assignment Problem
+Journal of Global Optimization, 10(4):391–
+Library.
+403, June 1997.
+ISSN 0925-5001. doi: 10.1023/A:
+1008293323270.
+
+Fogel, Fajwel, Jenatton, Rodolphe, Bach, Francis, and
+D’Aspremont, Alexandre. Convex Relaxations for Per-
+mutation Problems. In Advances in Neural Information
+Processing Systems, pp. 1016–1024, 2013.
+
+Goemans, Michel. Smallest compact formulation for the
+permutahedron. Mathematical Programming, Series B,
+153(1):5–11, 2015.
+
+Gold, S. and Rangarajan, A. A graduated assignment al-
+gorithm for graph matching. IEEE Transactions on Pat-
+tern Analysis and Machine Intelligence, 18(4):377–388,
+April 1996. ISSN 01628828. doi: 10.1109/34.491619.
+
+Grippo, L. and Sciandrone, M. On the convergence of
+the block nonlinear Gauss-Seidel method under con-
+vex constraints. Operations Research Letters, 26(3):
+
+127–136, April 2000. ISSN 01676377. doi: 10.1016/
+S0167-6377(99)00074-7.
+
+Lim, Cong Han and Wright, Stephen. Beyond the Birkhoff
+Polytope: Convex Relaxations for Vector Permutation
+Problems. In Advances in Neural Information Process-
+ing Systems, pp. 2168–2176, 2014.
+
+Liu, Zhi-Yong, Qiao, Hong, and Xu, Lei. An Extended
+Path Following Algorithm for Graph Matching Problem.
+IEEE Transactions on Pattern Analysis and Machine In-
+telligence, 34(7):1451–1456, January 2012. ISSN 1939-
+3539. doi: 10.1109/TPAMI.2012.45.
+
+Loiola, Eliane Maria, de Abreu, Nair Maria Maia,
+Boaventura-Netto, Paulo Oswaldo, Hahn, Peter, and
+Querido, Tania. A survey for the quadratic assign-
+ment problem. European Journal of Operational Re-
+search, 176(2):657 – 690, 2007. ISSN 0377-2217. doi:
+http://dx.doi.org/10.1016/j.ejor.2005.09.032.
+
+Pardalos, P.M. and Wolkowicz, H. Quadratic Assignment
+and Related Problems: DIMACS Workshop, May 20-
+21, 1993. DIMACS Series in Discrete Mathematics and
+Theoretical Computer Science. American Mathematical
+Society, 1994. ISBN 9780821870624.
+
+Patrascu, Andrei and Necoara, Ion. Efﬁcient random coor-
+dinate descent algorithms for large-scale structured non-
+convex optimization. Journal of Global Optimization,
+61(1):19–46, February 2014.
+ISSN 0925-5001. doi:
+10.1007/s10898-014-0151-9.
+
+Powell, M. J. D. On search directions for minimization
+algorithms. Mathematical Programming, 4(1):193–201,
+dec 1973. ISSN 0025-5610. doi: 10.1007/BF01584660.
+
+Schellewald, Christian, Roth, Stefan,
+
+and Schnrr,
+Christoph. Evaluation of convex optimization techniques
+for the weighted graph-matching problem in computer
+vision.
+In Radig, Bernd and Florczyk, Stefan (eds.),
+Pattern Recognition, volume 2191 of Lecture Notes in
+Computer Science, pp. 361–368. Springer Berlin Hei-
+delberg, 2001. ISBN 978-3-540-42596-0. doi: 10.1007/
+3-540-45404-7 48.
+
+Sinkhorn, Richard and Knopp, Paul. Concerning nonneg-
+ative matrices and doubly stochastic matrices. Paciﬁc
+Journal of Mathematics, 21(2):343–348, 1967.
+
+Taillard, ´Eric D. Comparison of iterative searches for the
+quadratic assignment problem. Location Science, 3(2):
+87–105, August 1995. ISSN 09668349. doi: 10.1016/
+0966-8349(95)00008-6.
+
+Umeyama, S.
+
+An eigendecomposition approach to
+weighted graph matching problems. IEEE Transactions
+on Pattern Analysis and Machine Intelligence, 10(5):
+695–703, 1988. ISSN 01628828. doi: 10.1109/34.6778.
+
+Box-Constrained Approach for Hard Permutation Problems
+
+Vogelstein, Joshua T., Conroy, John M., Lyzinski, Vince,
+Podrazik, Louis J., Kratzer, Steven G., Harley, Eric T.,
+Fishkind, Donniell E., Vogelstein, R. Jacob, and Priebe,
+Carey E. Fast approximate quadratic programming for
+graph matching. PloS one, 10(4), January 2015. ISSN
+1932-6203. doi: 10.1371/journal.pone.0121002.
+
+Xia, Yong. An efﬁcient continuation method for quadratic
+assignment problems. Computers & Operations Re-
+search, 37(6):1027–1032, jun 2010.
+ISSN 03050548.
+doi: 10.1016/j.cor.2009.09.002.
+
+Zaslavskiy, Mikhail, Bach, Francis, and Vert,
+
+Jean-
+Philippe. A path following algorithm for the graph
+matching problem. IEEE Transactions on Pattern Anal-
+ysis and Machine Intelligence, 31(12):2227–42, Decem-
+ber 2009. ISSN 1939-3539. doi: 10.1109/TPAMI.2008.
+245.
+
+

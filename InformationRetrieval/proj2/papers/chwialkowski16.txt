@@ -1,0 +1,1161 @@
+A Kernel Test of Goodness of Fit
+
+Kacper Chwialkowski∗
+Heiko Strathmann∗
+Arthur Gretton
+Gatsby Unit, University College London, United Kingdom
+
+KACPER.CHWIALKOWSKI@GMAIL.COM
+HEIKO.STRATHMANN@GMAIL.COM
+ARTHUR.GRETTON@GMAIL.COM
+
+Abstract
+
+We propose a nonparametric statistical test for
+goodness-of-ﬁt: given a set of samples, the test
+determines how likely it is that these were gen-
+erated from a target density function. The meas-
+ure of goodness-of-ﬁt is a divergence constructed
+via Stein’s method using functions from a Repro-
+ducing Kernel Hilbert Space. Our test statistic
+is based on an empirical estimate of this diver-
+gence, taking the form of a V-statistic in terms
+of the log gradients of the target density and the
+kernel. We derive a statistical test, both for i.i.d.
+and non-i.i.d. samples, where we estimate the
+null distribution quantiles using a wild bootstrap
+procedure. We apply our test to quantifying con-
+vergence of approximate Markov Chain Monte
+Carlo methods, statistical model criticism, and
+evaluating quality of ﬁt vs model complexity in
+nonparametric density estimation.1
+
+1. Introduction
+Statistical tests of goodness-of-ﬁt are a fundamental tool in
+statistical analysis, dating back to the test of Kolmogorov
+and Smirnov (Kolmogorov, 1933; Smirnov, 1948). Given
+i=1 with distribution Zi ∼ q, our in-
+a set of samples {Zi}n
+terest is in whether q matches some reference or target dis-
+tribution p, which we assume to be only known up to the
+normalisation constant. Recently, in the multivariate set-
+ting, Gorham & Mackey (2015) proposed an elegant meas-
+ure of sample quality with respect to a target. This measure
+is a maximum discrepancy between empirical sample ex-
+pectations and target expectations over a large class of test
+functions, constructed so as to have zero expectation over
+the target distribution by use of a Stein operator. This op-
+erator depends only on the derivative of the log q: thus, the
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+approach can be applied very generally, as it does not re-
+quire closed-form integrals over the target distribution (or
+numerical approximations of such integrals). By contrast,
+many earlier discrepancy measures require integrals with
+respect to the target (see below for a review). This is prob-
+lematic if the intention is to perform benchmarks for as-
+sessing Markov Chain Monte Carlo, since these integrals
+will certainly not be known to the practitioner.
+A challenge in applying the approach of Gorham &
+Mackey is the complexity of the function class used, which
+results from applying the Stein operator to the W 2,∞ So-
+bolev space. Thus, their sample quality measure requires
+solving a linear program that arises from a complicated
+construction of graph Stein discrepancies and geometric
+spanners. Their metric furthermore requires access to non-
+trivial lower bounds that, despite being provided for log-
+concave densities, are a largely open problem otherwise, in
+particular for multivariate cases.
+An important application of a goodness-of-ﬁt measure is in
+statistical testing, where it is desired to determine whether
+the empirical discrepancy measure is large enough to reject
+the null hypothesis (that the sample arises from the target
+distribution). One approach is to establish the asymptotic
+behaviour of the test statistic, and to set a test threshold at
+a large quantile of the asymptotic distribution. The asymp-
+totic behaviour of the W 2,∞-Sobolev Stein discrepancies
+remains a challenging open problem, due to the complex-
+ity of the function class used. It is not clear how one would
+compute p-values for this statistic, or determine when the
+goodness of ﬁt test would allow us to accept the null hypo-
+thesis (at the user-speciﬁed test level).
+The key contribution of this work is to deﬁne a statistical
+test of goodness-of-ﬁt, based on a Stein discrepancy com-
+puted in a Reproducing Kernel Hilbert Space (RKHS). To
+construct our test statistic, we use a function class deﬁned
+by applying the Stein operator to a chosen space of RKHS
+functions, as proposed by (Oates et al., 2015).1 Our meas-
+
+1Oates et al. addressed the problem variance reduction in
+
+Monte Carlo integration, using the Stein operator to avoid bias.
+
+A Kernel Test of Goodness of Fit
+
+ure of goodness of ﬁt is the largest discrepancy over this
+space of functions between empirical sample expectations
+and target expectations (the latter being zero, due to the
+effect of the Stein operator). The approach is a natural ex-
+tension to goodness-of-ﬁt testing of the earlier two-sample
+tests (Gretton et al., 2012) and independence tests (Gretton
+et al., 2007) based on the maximum mean discrepancy,
+which is an integral probability metric. As with these
+earlier tests, our statistic is a simple V-statistic, and can be
+computed in closed form and in quadratic time; moreover,
+it is an unbiased estimate of the corresponding popula-
+tion discrepancy. As with all Stein-based discrepancies,
+only the gradient of the log-density of the target density is
+needed; we do not require integrals with respect to the tar-
+get density – including the normalisation constant. Given
+that our test statistic is a V-statistic, we may make use of the
+extensive literature on asymptotics of V-statistics to formu-
+late a hypothesis test (Serﬂing, 1980; Leucht & Neumann,
+2013). We are able to provide statistical tests for both un-
+correlated and correlated samples, where the latter is essen-
+tial if the test is to be used in assessing the quality of output
+of an MCMC procedure. An identical test was obtained
+simultaneously in independent work by Liu et al. (2016),
+for uncorrelated samples.
+Several alternative approaches exist in the statistics literat-
+ure to goodness-of-ﬁt testing. A ﬁrst strategy is to partition
+the space, and to conduct the test on a histogram estim-
+ate of the distribution (Barron, 1989; Beirlant et al., 1994;
+Györﬁ & van der Meulen, 1990; Györﬁ & Vajda, 2002).
+Such space partitioning approaches can have attractive the-
+oretical properties (e.g. distribution-free test thresholds)
+and work well in low dimensions, however they are much
+less powerful than alternatives once the dimensionality in-
+creases (Gretton & Gyorﬁ, 2010). A second popular ap-
+proach has been to use the smoothed L2 distance between
+the empirical characteristic function of the sample, and the
+characteristic function of the target density. This dates back
+to the test of Gaussianity of Baringhaus & Henze (1988),
+who used a squared exponential smoothing function (see
+Eq. 2.1 in their paper). For this choice of smoothing
+function, their statistic is identical to the maximum mean
+discrepancy (MMD) with the squared exponential kernel,
+which can be shown using the Bochner representation of
+the kernel (compare with Sriperumbudur et al. 2010, Corol-
+lary 4). It is essential in this case that the target distribution
+be Gaussian, since the convolution with the kernel (or in the
+Fourier domain, the smoothing function) must be available
+in closed form. An L2 distance between Parzen window es-
+timates can also be used (Bowman & Foster, 1993), giving
+the same expression again, although the optimal choice of
+bandwidth for consistent Parzen window estimates may not
+be a good choice for testing (Anderson et al., 1994). A dif-
+ferent smoothing scheme in the frequency domain results
+
+in an energy distance statistic (this likewise being an MMD
+with a particular choice of kernel; see Sejdinovic et al.,
+2013), which can be used in a test of normality (Székely
+& Rizzo, 2005). The key point is that the required integ-
+rals are again computable in closed form for the Gaussian,
+although the reasoning may be extended to certain other
+families of interest, e.g. (Rizzo, 2009). The requirement
+of computing closed-form integrals with respect to the test
+distribution severely restricts this testing strategy. Finally,
+a problem related to goodness-of-ﬁt testing is that of model
+criticism (Lloyd & Ghahramani, 2015).
+In this setting,
+samples generated from a ﬁtted model are compared via the
+maximum mean discrepancy with samples used to train the
+model, such that a small MMD indicates a good ﬁt. There
+are two limitation to the method: ﬁrst, it requires samples
+from the model (which might not be easy if this requires a
+complex MCMC sampler); second, the choice of number
+of samples from the model is not obvious, since too few
+samples cause a loss in test power, and too many are com-
+putationally wasteful. Neither issue arises in our test, since
+we do not require model samples.
+In our experiments, a particular focus is on applying our
+goodness-of-ﬁt test to certify the output of approximate
+Markov Chain Monte Carlo (MCMC) samplers (Korat-
+tikara et al., 2014; Welling & Teh, 2011; Bardenet et al.,
+2014). These methods use modiﬁcations to Markov trans-
+ition kernels that improve mixing speed at the cost of
+worsening the asymptotic bias. The bias-variance trade-off
+can usually be tuned with parameters of the sampling al-
+gorithms. It is therefore important to test whether for a par-
+ticular parameter setting and run-time, the samples are of
+the desired quality. This question cannot be answered with
+classical MCMC convergence statistics, such as the widely
+used potential scale reduction factor (R-factor) (Gelman &
+Rubin, 1992) or the effective sample size, since these as-
+sume that the Markov chain reaches its equilibrium distri-
+bution. By contrast, our test exactly quantiﬁes the asymp-
+totic bias of approximate MCMC.
+Code
+tps://github.com/karlnapf/kernel_goodness_of_ﬁt.
+
+found
+
+ht-
+
+can
+
+be
+
+at
+
+Paper outline We begin our presentation in the sec-
+tion 2 with a high-level construction of the RKHS-based
+Stein discrepancy and associated statistical test. In Section
+3, we provide additional details and prove the main res-
+ults. Section 4 contains experimental illustrations on syn-
+thetic examples, statistical model criticism, bias-variance
+trade-offs in approximate MCMC, and convergence in non-
+parametric density estimation.
+
+A Kernel Test of Goodness of Fit
+
+2. Test Deﬁnition: Statistic and Threshold
+We begin with a high-level construction of our divergence
+discrepancy and the statistical test. While this section aims
+to communicate the main ideas, we provide details and
+proofs in Section 3.
+
+2.1. Stein Operator in RKHS
+
+Our goal is to write the maximum discrepancy between tar-
+get distribution p and observed sample distribution q in a
+RKHS. Denote by F the RKHS of real-valued functions
+on Rd with reproducing kernel k, and by F d the prod-
+(cid:80)d
+uct RKHS consisting of elements f := (f1, . . . , fd) with
+fi ∈ F, and with a standard inner product (cid:104)f, g(cid:105)F d =
+i=1 (cid:104)fi, gi(cid:105)F . We further assume that all measures con-
+sidered in this paper supported on an open set, equal to zero
+on the boarder and strictly positive (so logarithms are well
+deﬁned). Similarly to Stein (1972); Gorham & Mackey
+(2015); Oates et al. (2015), we begin by deﬁning a Stein
+operator T acting on f ∈ F d
+
+(cid:18) ∂ log p(x)
+
+d(cid:88)
+
+i=1
+
+∂xi
+
+Tpf :=
+
+(cid:19)
+
+fi(x) +
+
+∂fi(x)
+
+∂xi
+
+d(cid:88)
+
+Suppose a random variable Z is distributed according to
+a measure2 q and X is distributed according to the target
+measure p. As we will see, the operator can be expressed
+by deﬁning a function that depends on gradients of the log-
+density and the kernel,
+
+ξp(x,·) := [∇ log p(x)k(x,·) + ∇k(x,·)] ,
+
+(1)
+
+whose inner product with f gives exactly the expected
+value of the Stein operator
+
+ETpf (Z) = (cid:104)f, Eξp(Z)(cid:105)F d =
+
+(cid:104)fi, Eξp,i(Z)(cid:105)F ,
+
+i=1
+
+For X from the target measure, we have E(Tpf )(X) = 0,
+which can be seen using integration by parts, c.f. Lemma
+5.1 in the supplement. We can now deﬁne a Stein discrep-
+ancy and express it in the RKHS,
+
+Sp(Z) := sup
+(cid:107)f(cid:107)<1
+
+E(Tpf )(Z) − E(Tpf )(X)
+E(Tpf )(Z)
+(cid:104)f, Eξp(Z)(cid:105)F d
+
+= sup
+(cid:107)f(cid:107)<1
+= sup
+(cid:107)f(cid:107)<1
+= (cid:107)Eξp(Z)(cid:107)F d ,
+
+This makes it clear why E(Tpf )(X) = 0 is a desirable
+property: we can compute Sp(Z) by computing (cid:107)Eξp(Z)(cid:107),
+2Throughout the article, all occurrences of Z, e.g. Z(cid:48), Zi, Z♥,
+
+are understood to be distributed according to q.
+
+.
+
+then Sp(Z) = 0 if and only if p = q.
+
+without the need to access X in the form of samples from
+p. To sate our ﬁrst result we deﬁne
+
+hp(x, y) := ∇ log p(x)(cid:62)∇ log p(y)k(x, y)
+
++ ∇ log p(y)(cid:62)∇xk(x, y)
++ ∇ log p(x)(cid:62)∇yk(x, y)
++ (cid:104)∇xk(x,·),∇yk(·, y)(cid:105)F d ,
+
+If Ehp(Z, Z) < ∞,
+
+where the last term can be written as a sum(cid:80)d{i=1} ∂k(x,y)
+
+.
+∂xi∂yi
+The following theorem gives a simple closed form expres-
+sion for (cid:107)Eξp(Z)(cid:107)F d.
+Theorem 2.1.
+(cid:107)Eξp(Z)(cid:107)F d = Ehp(Z, Z(cid:48)).
+The second main result, states that the discrepancy Sp(Z)
+can be used to distinguish two distributions.
+Theorem 2.2. Let q, p be probability measures and Z ∼ q.
+If the kernel k is cc-universal (Carmeli et al., 2010, Deﬁ-
+
+nition 4.1), Ehq(Z, Z) < ∞ and E(cid:107)∇(cid:16)
+
+(cid:17)(cid:107)2 < ∞
+
+then Sp(Z)2 =
+
+log p(Z)
+q(Z)
+
+Section 3.1 contains proofs. We now proceed with con-
+structing an estimator for S(Z)2, and outline its asymptotic
+properties.
+
+2.2. Wild Bootstrap Testing
+
+It is straightforward to estimate the squared Stein discrep-
+ancy S(Z)2 from samples {Zi}n
+i=1: a quadratic time es-
+timator is a V-Statistic, and takes the form
+
+n(cid:88)
+
+i,j=1
+
+Vn =
+
+1
+n2
+
+h(Zi, Zj).
+
+impacting test signiﬁcance.
+
+The asymptotic null distribution of the normalised V-
+Statistic nVn, however, has no computable closed form.
+Furthermore, care has to be taken when the Zi exhibit
+correlation structure, as the null distribution signiﬁcantly
+changes,
+The wild boot-
+strap technique (Shao, 2010; Leucht & Neumann, 2013;
+Fromont et al., 2012) addresses both problems. First, it
+allows to simulate from the null distribution to compute
+test thresholds. Second, it accounts for correlation struc-
+ture in the Zi by mimicking it with an auxiliary random
+process: a Markov chain taking values in {−1, 1}, starting
+from W1,n = 1,
+
+Wt,n = 1(Ut > an)Wt−1,n − 1(Ut < an)Wt−1,n,
+
+where the Ut are uniform i.i.d. random variables and an
+is the probability of Wt,n changing sign (for i.i.d. data we
+may set an = 0.5). This leads to a bootstrapped V-statistic
+
+n(cid:88)
+
+i,j=1
+
+Bn =
+
+1
+n2
+
+Wi,nWj,nh(Zi,Zj).
+
+Proposition 3.2 establishes that, under the null hypothesis,
+nBn is a good approximation of nVn, so it is possible to
+approximate quantiles of the null distribution by sampling
+from it. Under the alternative, however, Vn dominates Bn
+– resulting in almost sure rejection of the null hypothesis.
+We propose the following test procedure for testing the null
+hypothesis that the Zi are distributed according to the target
+distribution p.
+
+• Calculate the test statistic Vn.
+• Obtain wild bootstrap samples {Bn}D
+
+the 1 − α empirical quantile of these samples.
+
+i=1 and estimate
+
+• If Vn exceeds the quantile, reject.
+
+3. Proofs of the Main Results
+We now prove the claims made in the previous Section.
+
+3.1. Stein Operator in RKHS
+
+We show in Lemma 5.1 in the Appendix that the expected
+value of the Stein operator is zero on the target measure.
+Proof of Theorem 2.1. ξ(x,·) is an element of the repro-
+ducing kernel Hilbert space F d – by Steinwart & Christ-
+mann (2008, Lemma 4.34) ∇k(x,·) ∈ F, and ∂ log p(x)
+is
+just a scalar. We ﬁrst show that h(x, y) = (cid:104)ξ(x,·), ξ(y,·)(cid:105).
+Using notation
+
+∂xi
+
+(cid:18) ∂k(x,·)
+(cid:18) ∂k(·, y)
+
+∂x1
+
+∂y1
+
+,··· ,
+
+,··· ,
+
+∂k(x,·)
+∂xd
+∂k(·, y)
+∂yd
+
+(cid:19)
+(cid:19)
+
+,
+
+∇xk(x,·) =
+
+∇yk(·, y) =
+
+A Kernel Test of Goodness of Fit
+
+We relate expected value of the Stein operator to the inner
+product of f and the expected value of ξ(Z),
+
+ETpf (Z) = (cid:104)f, Eξp(Z)(cid:105)F d =
+
+(cid:104)fi, Eξp,i(Z)(cid:105)F .
+
+(2)
+
+d(cid:88)
+
+i=1
+
+We check the claim for all dimensions
+
+fi, E
+
+(cid:28)
+(cid:104)fi, Eξi(Z)(cid:105)F
+=
+
+(cid:20) ∂ log p(Z)
+(cid:28)
+(cid:20) ∂ log p(Z)
+
+∂ log p(Z)
+
+∂xi
+
+∂xi
+
+= E
+
+= E
+
+fi,
+
+∂xi
+
+fi(Z) +
+
+k(Z,·) +
+
+k(Z,·) +
+
+(cid:21)(cid:29)
+(cid:29)
+
+F
+
+∂k(Z,·)
+
+∂xi
+∂k(Z,·)
+
+(cid:21)
+
+∂xi
+∂fi(Z,·)
+
+F
+
+.
+
+∂xi
+
+The second equality follows from the fact that a linear oper-
+ator (cid:104)fi,·(cid:105)F can be interchanged with the Bochner integral,
+and the fact that ξ is Bochner integrable. Using deﬁnition
+of S(Z), Lemma (5.1) and Equation (2) we have
+E(Tpf )(Z) − E(Tpf )(X)
+E(Tpf )(Z)
+(cid:104)f, Eξp(Z)(cid:105)F d
+
+Sp(Z) := sup
+(cid:107)f(cid:107)<1
+
+= sup
+(cid:107)f(cid:107)<1
+= sup
+(cid:107)f(cid:107)<1
+= (cid:107)Eξp(Z)(cid:107)F d
+
+We now calculate closed form formula for Sp(Z)2
+
+Sp(Z)2 = (cid:104)Eξp(Z), Eξp(Z)(cid:105)F d = E(cid:104)ξp(Z), Eξp(Z)(cid:105)F d
+
+= E(cid:104)ξp(Z), ξp(Z(cid:48))(cid:105)F d = Ehp(Z, Z(cid:48)).
+
+we calculate
+
+(cid:104)ξp(x,·), ξp(y,·)(cid:105) = ∇ log p(x)(cid:62)∇ log p(x)k(x, y)
+
++ ∇ log p(x)∇xk(x, y)
++ ∇ log p(x)(cid:62)∇yk(x, y)
++ (cid:104)∇xk(x,·),∇yk(·, y)(cid:105)F d .
+
+Next we show that ξ(x,·) is Bochner integrable (see (Stein-
+wart & Christmann, 2008, Deﬁnition A.5.20))
+
+E(cid:107)ξp(Z)(cid:107)F d ≤ E(cid:107)ξp(Z)(cid:107)2F d = Ehp(Z, Z) < ∞.
+
+Next, we prove that the discrepancy S discriminates differ-
+ent probability measures.
+
+Proof of Theorem 2.2. If p = q then Sp(Z) is 0 by Lemma
+(5.1). Suppose p (cid:54)= q, but Sp(Z) = 0.
+If Sp(Z) = 0
+then, by Theorem 2.1, Eξp(Z) = 0. In the following we
+substitute log p(Z) = log q(Y ) + [log p(Z) − log q(Y )],
+
+Eξp(Z)
+= E (∇ log p(Z)k(Z,·) + ∇k(Z,·))
+= Eξq(Z) + E (∇[log p(Z) − log q(Y )]k(Z,·))
+= E (∇[log p(Z) − log q(Y )]k(Z,·))
+
+A Kernel Test of Goodness of Fit
+
+(cid:17)
+
+g(y) = ∇(cid:16)
+
+We have used Theorem 2.1 and Lemma (5.1) to see that
+Eξq(Z) = 0, since (cid:107)Eξq(Z)(cid:107)2 = Sq(Z) = 0.
+We recognise that the expected value of ∇(log p(Z) −
+log q(Z))k(Z,·) is the mean embedding of a function
+with respect to the measure q. By
+the assumptions function g is square integrable, therefore,
+since the kernel k is cc-universal, by Carmeli et al. (2010,
+Theorem 4.4 c) its embedding is zero if and only if g = 0.
+This implies that
+
+log p(y)
+q(y)
+
+∇ log
+
+p(y)
+q(y)
+
+= (0,··· , 0).
+
+A constant vector ﬁeld of derivatives can only be generated
+by a constant function, so log p(y)
+q(y) = C, for some C, which
+implies that p(y) = eCq(y). Since p and q both integrate
+to one, C = 0 and so p = q – a contradiction.
+
+3.2. Wild Bootstrap Testing
+
+The two concepts required to derive the distribution of the
+test statistic are: τ-mixing (Dedecker et al., 2007; Leucht
+& Neumann, 2013), and V-statistics Serﬂing (1980).
+τ-mixing is a notion of dependence within the observa-
+tions, weak enough for most practical applications. Triv-
+ially, i.i.d. observations are τ-mixing. As for Markov
+chains, whose convergence we study in the experiments,
+the property of geometric ergodicity implies τ-mixing
+(given that the stationary distribution has a ﬁnite moment
+of some order: see 6 for more discussion. For further de-
+tails on τ-mixing, see Dedecker & Prieur (2005); Dedecker
+et al. (2007). For this work we will assume a technical con-
+
+dition(cid:80)∞
+
+t=1 t2(cid:112)τ (t) ≤ ∞.
+
+A direct application of Theorem 2.1 (Leucht, 2012) char-
+acterizes the limiting behavior of nVn for τ-mixing pro-
+cesses,
+Proposition 3.1.
+If h is Lipschitz continuous and
+Eh(Z, Z) < ∞ then, under the null hypothesis nVn, con-
+verges weakly to some distribution.
+
+The proof, which is a simple veriﬁcation of the assump-
+tions, can be found in the Appendix. Although a formula
+for a limit distribution of Vn can be derived explicitly (The-
+orem 2.1 (Leucht, 2012)), we do not provide it here. To
+our knowledge there are no methods of obtaining quan-
+tiles of a limit of Vn in closed form. The common solu-
+tion is to estimate quantiles by a resampling method, as
+described in Section 2. The validity of this resampling
+method is guaranteed by the following proposition (which
+follows from Theorem 2.1 (Leucht, 2012) and modiﬁcation
+of the Lemma 5 Chwialkowski et al. (2014) ) , proved in the
+supplement.
+
+Figure 1. Large autocovariance, unsuitable bootstrap. The param-
+eter an is too large and the bootstrapped V-statistics Bn are, on
+average, too low. Therefore it is very likely that Vn > Bn and the
+test is too conservative.
+
+Let
+
+3.2.
+
+f (Z1,n,··· , Zt,n)
+
+Proposition
+=
+supx |P (nBn > x|Z1,n,··· , Zt,n) − P (nVn > x)|
+be a difference between quantiles. If h is Lipschitz contin-
+uous and Eh(Z, Z)2 < ∞ then, under the null hypothesis,
+f (X1,n,··· , Xt,n) converges to zero in probability; under
+the alternative hypothesis, Bn converges to zero, while Vn
+converges to a positive constant.
+
+As a consequence, if the null hypothesis is true, we can ap-
+proximate any quantile; while under the alternative hypo-
+thesis, all quantiles of Bn collapse to zero while P (Vn >
+0) → 1. We discuss speciﬁc case of testing MCMC con-
+vergence in the Appendix.
+
+4. Experiments
+We provide a number of experimental applications for our
+test. We begin with a simple check to establish correct
+test calibration on non-i.i.d. data, followed by a demon-
+stration of statistical model criticism for Gaussian Process
+(GP) regression. We then apply the proposed test to quan-
+tify bias-variance trade-offs in MCMC, and demonstrate
+how to use the test to verify whether MCMC samples are
+drawn from the desired stationary distribution. In the ﬁ-
+nal experiment, we move away from the MCMC setting,
+and use the test to evaluate the convergence of a non-
+parametric density estimator. Code can be found at ht-
+tps://github.com/karlnapf/kernel_goodness_of_ﬁt.
+
+STUDENT’S T VS NORMAL
+
+In our ﬁrst task, we modify experiment 4.1 from Gorham
+& Mackey 2015. The null hypothesis is that the observed
+samples come from a standard normal distribution. We
+study the power of the test against samples from a Stu-
+dent’s t distribution. We expect to observe low p-values
+
+1.05.010.0infdegreesoffreedom0.00.20.40.60.81.0pvaluesA Kernel Test of Goodness of Fit
+
+Figure 2. Large autocovariance, suitable bootstrap. The parame-
+ter anis chosen suitably, but due to a large autocorrelation withing
+the samples, the power of the test is small (effective sample size
+is small).
+
+Figure 3. Thinned sample, suitable bootstrap. Most of the auto-
+correlation within the sample is canceled by thinning. To guaran-
+tee that the remaining autocorrelation is handled properly, the ﬂip
+probability is set at 0.1.
+
+when testing against a Student’s t distribution with few de-
+grees of freedom. We considered 1, 5, 10 or ∞ degrees of
+freedom, where ∞ is equivalent to sampling from a stan-
+dard normal distribution. For a ﬁxed number of degrees of
+freedom we drew 1400 samples and calculated the p-value.
+This procedure was repeated one hundred times, and the
+bar plots of p-values are shown in Figures 1,2,3.
+The twist on the original experiment 4.1 by Gorham &
+Mackey 2015 is that in our case, the draws from the Stu-
+dent’s t distribution were given temporal correlation. The
+samples were generated using a Metropolis–Hastings al-
+gorithm, with a Gaussian random walk (variance equal to
+0.5). We emphasize the need for an appropriate choice of
+the wild bootstrap process parameter, an, which indicates
+the probability of a sign ﬂip. In Figure 1 we plot p-values
+for an being set to 0.5. Such a high value of an is suitable
+for iid observations, but results in p-values that are too con-
+servative for temporally correlated observations. In Figure
+2, an = 0.02, which gives a well calibrated distribution of
+the p-values under the null hypothesis (see box plot for an
+inﬁnite number degrees of freedom), however the power of
+the test is reduced. Indeed, p-values for ﬁve degrees of free-
+dom are already large. The solution that we recommend is
+a mixture of thinning and adjusting an, as presented in the
+Figure 3. We have thinned the observations by a factor of
+20 and set an = 0.1, thus preserving both good statisti-
+cal power and correct calibration of p-values under the null
+hypothesis. In a general, we recommend to thin a chain so
+that Cor(Xt, Xt−1) < 0.5, set an = 0.1/k, and run test
+with at least max(500k, d100) data points, where k < 10,
+and d is data dimensionality3.
+
+3We recommend men should drink no more than 68 units of
+alcohol per week, no more than 34 units in any given day, and
+have at least 1 alcohol-free day.
+
+Dim.
+
+n=500
+B&H n=1000
+n=500
+Stein
+n=1000
+
+2
+1
+1
+1
+1
+
+5
+1
+1
+1
+1
+
+10
+1
+1
+
+0.86
+
+1
+
+15
+0.86
+
+1
+
+0.39
+0.77
+
+20
+0.29
+0.87
+0.05
+0.25
+
+25
+0.24
+0.62
+0.05
+0.05
+
+Table 1. Power vs Sample size for test by (Baringhaus & Henze,
+1988) and Stein based test.
+
+HIGHER DIMENSION AND OTHER ONE SAMPLE TEST.
+
+In this experiment we make comparison with the test pro-
+posed by (Baringhaus & Henze, 1988), which is basically
+MMD test for normality i.e. the null hypothesis is that Z
+is d-dimensional standard normal random variable. Sample
+size was set to 500/1000, a_n=0.5. In this experiment we
+study power of the test and we generate Z using the follow-
+ing procedure:
+
+Z ∼ N (0, Id); Y ∼ U [0, 1]; Z0+ = Y ;
+
+we modify only the ﬁrst dimension. Table 1 shows power
+as a function of the sample size. Indeed, for high dimen-
+sions, if the expectation of the kernel exists in closed form,
+an MMD-type test like (Baringhaus & Henze, 1988) is a
+better choice.
+
+STATISTICAL MODEL CRITICISM ON GAUSSIAN
+PROCESSES
+
+We next apply our test to the problem of statistical model
+criticism for GP regression. Our presentation and approach
+are similar to the non i.i.d. case of Lloyd & Ghahramani
+(Section 6 2015). We use the solar dataset, consisting
+of a 1D regression problem with N = 402 pairs (X, y).
+We ﬁt Ntrain = 361 data using a GP with a squared expo-
+nential kernel and a Gaussian noise model, and perform
+standard maximum likelihood II on the hyperparameters
+
+1.05.010.0infdegreesoffreedom0.00.20.40.60.81.0pvalues1.05.010.0infdegreesoffreedom0.00.20.40.60.81.0pvaluesA Kernel Test of Goodness of Fit
+
+Figure 4. Fitted GP and data used to ﬁt (blue) and to apply test
+(red).
+
+(length-scale, overall scale, noise-variance). We then apply
+our test to the remaining Ntest = 41 data. The test attempts
+to falsify the null hypothesis that the solar dataset was
+generated from the plug-in predictive distribution (condi-
+tioned on training data and predicted position) of the GP.
+Lloyd & Ghahramani refer to this setup as non i.i.d., since
+the predictive distribution is a different univariate Gaussian
+for every predicted point. Our particular Ntrain, Ntest were
+chosen to make sure the GP ﬁt has stabilised, i.e. adding
+more data did not cause further model reﬁnement.
+Figure 4 shows training and testing data, and the ﬁtted GP.
+Clearly, the Gaussian noise model is a poor ﬁt for this par-
+ticular dataset, e.g. around X = −1. Figure 5 shows the
+distribution over D = 10000 bootstrapped V-statistics Bn
+with n = Ntest. The test statistic lies in an upper quantile
+of the bootstrapped null distribution, indicating (correctly)
+that it is unlikely the test points were generated by the ﬁtted
+GP model, even for the low number of test data observed,
+Ntest = 41.
+In a second experiment, we compare against Lloyd &
+Ghahramani: we compute the MMD statistic between test
+data (Xtest, ytest) and (Xtest, yrep), where yrep are samples
+from the ﬁtted GP. The null distribution is sampled from
+10000 times via repeatedly sampling new ˜yrep from the GP
+plug-in predictive posterior, and comparing (Xtest, ˜yrep) to
+(Xtest, yrep). Averaged over 100 repetitions of randomly
+partitioning (X, y) for training and testing, our goodness
+of ﬁt test produces a p-value that is statistically not signiﬁc-
+antly different from the MMD method (p ≈ 0.1, note that
+this result is subject to Ntrain, Ntest). We emphasize, how-
+ever, that Lloyd & Ghahramani’s test requires to sample
+from the ﬁtted model (here 10000 null samples were re-
+quired in order to achieve stable p-values). Our test does
+not sample from the GP at all and completely side-steps
+this highly costly approach.
+
+Figure 5. Bootstrapped Bn distribution with the test statistic Vn
+marked.
+
+Figure 6. Distribution of p-values as a function of  for austerity
+MCMC.
+
+APPROXIMATE MCMC ALGORITHM
+
+We show how to quantify bias-variance trade-offs in an
+approximate MCMC algorithm – austerity MCMC (Korat-
+tikara et al., 2013). For the purpose of illustration we use a
+simple generative model from Gorham & Mackey (2015);
+Welling & Teh (2011),
+
+θ1 ∼ N (0, 10); θ2 ∼ N (0, 1)
+Xi ∼ 1
+2
+
+N (θ1, 4) +
+
+1
+2
+
+N (θ2, 4).
+
+Austerity MCMC is a Monte Carlo procedure designed
+to reduce the number of likelihood evaluation in the ac-
+ceptance step of the Metropolis-Hastings algorithm. The
+crux of method is to look at only a subset of the data, and
+make an acceptance/rejection decision based on this sub-
+set. The probability of making a wrong decision is propor-
+tional to a parameter  ∈ [0, 1] . This parameter inﬂuences
+the time complexity of Austerity MCMC: when  is larger,
+i.e., when there is a greater tolerance for error, the expected
+computational cost is lower. We simulated {Xi}1≤i≤400
+points from the model with θ1 = 0 and θ2 = 1. In this set-
+ting there were two modes in the posterior distribution: one
+
+−2.0−1.5−1.0−0.50.00.51.01.52.0X−2−101234y050100150200250300Vn0.0000.0050.0100.0150.0200.0250.030FrequencyVntestBootstrappedBn0.0010.040.080.130.17epsilon0.00.10.20.30.40.50.60.70.80.9pvaluesA Kernel Test of Goodness of Fit
+
+Figure 7. Average number of likelihood evaluations a function of
+ for austerity MCMC (the y-axis is in millions of evaluations).
+
+Figure 9. Approximate density estimation: P-values for an in-
+creasing number of random features m.
+
+features (Strathmann et al., 2015). Our implementation of
+the model assumes the log density to take the form f (x),
+where f lies in an RKHS induced by a Gaussian kernel
+with bandwidth 1. We ﬁt the model using N observations
+drawn from a standard Gaussian, and performed our quad-
+ratic time test on a separate evaluation dataset of ﬁxed size,
+Ntest = 500. Our goal was to identify N sufﬁciently large
+that the goodness of ﬁt test did not reject the null hypo-
+thesis (i.e., the model had learned the density sufﬁciently
+well, bearning in mind that it is guaranteed to converge for
+sufﬁciently large N). Figure 8 shows how the distribution
+of p-values evolves as a function of N; this distribution is
+uniform for N = 5000, but at N = 500, the null hypothesis
+would very rarely be rejected.
+We next consider the random fourier feature approximation
+to this model, where the log pdf, f, is approximated using
+a ﬁnite dictionary of random Fourier features (Rahimi &
+Recht, 2007). The natural question when using this ap-
+proximation is: “How many random features do it I need?”
+Using the same test power Ntest = 500 as above, and a large
+number of available samples N = 5 · 104, Figure 9 shows
+the distributions of p-values for an increasing number of
+random features m. From about m = 50, the null hypo-
+thesis would rarely be rejected, given a reasonable choice
+of test level. Note, however, that the p-values do not have
+a uniform distribution, even for a large number of random
+features. This subtle effect is caused by over-smoothing
+due to the regularisation approach taken in (Strathmann
+et al., 2015, KMC ﬁnite), which would not otherwise have
+been detected.
+
+Figure 8. Density estimation: P-values for an increasing number
+of data N for the non-parametric model.
+
+at (0, 1) and the other at (1,−1). We ran the Austerity al-
+gorithm with  varying over the range [0.001, 0.2]. For each
+ we calculated an individual thinning factor, such that cor-
+relation between consecutive samples from the chains was
+smaller than 0.5 (greater  generally required more thin-
+ning). For each  we tested the hypothesis that {θi}1≤i≤500
+were drawn from the true stationary posterior, using our
+goodness of ﬁt test. We generated 100 p-values for each
+ , as shown in Figure 6. It is seems that  = 0.4 yields
+a good approximation of the true stationary distribution,
+while being parsimonious in terms of likelihood evalua-
+tions, as shown in Figure 7.
+
+CONVERGENCE IN NON-PARAMETRIC DENSITY
+ESTIMATION
+
+In our ﬁnal experiment, we apply our goodness of ﬁt test
+to measuring quality-of-ﬁt in nonparametric density estim-
+ation. We evaluate two density models: the inﬁnite dimen-
+sional exponential family (Sriperumbudur et al., 2014), and
+a recent approximation to this model using random Fourier
+
+0.000.050.100.150.20epsilon0.51.01.52.02.53.0likelihoodevaluations50100500100020005000N0.00.20.40.60.81.0p-value510501005001000m0.00.20.40.60.81.0p-valueA Kernel Test of Goodness of Fit
+
+References
+Anderson, N., Hall, P., and Titterington, D. Two-sample
+test statistics for measuring discrepancies between two
+multivariate probability density functions using kernel-
+based density estimates. Journal of Multivariate Ana-
+lysis, 50:41–54, 1994.
+
+Bardenet, R., Doucet, A., and Holmes, C. Towards scaling
+up Markov Chain Monte Carlo: an adaptive subsampling
+approach. In ICML, pp. 405–413, 2014.
+
+Baringhaus, L. and Henze, N. A consistent test for mul-
+tivariate normality based on the empirical characteristic
+function. Metrika, 35:339–348, 1988.
+
+Barron, A. R. Uniformly powerful goodness of ﬁt tests.
+
+The Annals of Statistics, 17:107–124, 1989.
+
+Beirlant, J., Györﬁ, L., and Lugosi, G. On the asymptotic
+normality of the l1- and l2-errors in histogram density
+estimation. Canadian Journal of Statistics, 22:309–318,
+1994.
+
+Bowman, A.W. and Foster, P.J. Adaptive smoothing and
+density based tests of multivariate normality. J. Amer.
+Statist. Assoc, 88:529–537, 1993.
+
+Bradley, R. et al. Basic properties of strong mixing con-
+ditions. a survey and some open questions. Probability
+surveys, 2(107-44):37, 2005.
+
+Carmeli, Claudio, De Vito, Ernesto, Toigo, Alessandro, and
+Umanitá, Veronica. Vector valued reproducing kernel
+hilbert spaces and universality. Analysis and Applica-
+tions, 8(01):19–61, 2010.
+
+Chwialkowski, Kacper, Ramdas, Aaditya, Sejdinovic,
+Dino, and Gretton, Arthur.
+Fast two-sample testing
+with analytic representations of probability measures. In
+NIPS, pp. 1972–1980, 2015.
+
+Chwialkowski, Kacper P, Sejdinovic, Dino, and Gretton,
+Arthur. A wild bootstrap for degenerate kernel tests. In
+Advances in neural information processing systems, pp.
+3608–3616, 2014.
+
+Dedecker, J., Doukhan, P., Lang, G., Louhichi, S., and
+Prieur, C. Weak dependence: with examples and applic-
+ations, volume 190. Springer, 2007.
+
+Dedecker, Jérôme and Prieur, Clémentine. New depend-
+ence coefﬁcients. examples and applications to statistics.
+Probability Theory and Related Fields, 132(2):203–236,
+2005.
+
+Fromont, M., Laurent, B, Lerasle, M, and Reynaud-Bouret,
+P. Kernels based tests with non-asymptotic bootstrap ap-
+proaches for two-sample problems. In COLT, pp. 23.1–
+23.22, 2012.
+
+Gelman, A. and Rubin, D.B. Inference from iterative sim-
+ulation using multiple sequences. Statistical science, pp.
+457–472, 1992.
+
+Gorham, J. and Mackey, L. Measuring sample quality with
+
+stein’s method. In NIPS, pp. 226–234, 2015.
+
+Gretton, A. and Gyorﬁ, L. Consistent nonparametric tests
+Journal of Machine Learning Re-
+
+of independence.
+search, 11:1391–1423, 2010.
+
+Gretton, A., Fukumizu, K., Teo, C, Song, L., Schölkopf, B.,
+and Smola, A. A kernel statistical test of independence.
+In NIPS, volume 20, pp. 585–592, 2007.
+
+Gretton, A., Borgwardt, K.M., Rasch, M.J., Schölkopf, B.,
+and Smola, A. A kernel two-sample test. J. Mach. Learn.
+Res., 13:723–773, 2012.
+
+Györﬁ, L. and Vajda, I. Asymptotic distributions for good-
+ness of ﬁt statistics in a sequence of multinomial models.
+Statistics and Probability Letters, 56:57–67, 2002.
+
+Györﬁ, L. and van der Meulen, E. C. A consistent goodness
+of ﬁt test based on the total variation distance. In Rous-
+sas, G. (ed.), Nonparametric Functional Estimation and
+Related Topics, pp. 631–645. Kluwer, Dordrecht, 1990.
+
+Kolmogorov, A. Sulla determinazione empirica di una
+legge di distribuzione. G. Ist. Ital. Attuari, 4:83–91,
+1933.
+
+Korattikara, A., Chen, Y., and Welling, M. Austerity in
+MCMC Land: Cutting the Metropolis-Hastings Budget.
+In ICML, pp. 181–189, 2014.
+
+Korattikara, Anoop, Chen, Yutian, and Welling, Max. Aus-
+terity in mcmc land: Cutting the metropolis-hastings
+budget. arXiv preprint arXiv:1304.5299, 2013.
+
+Leucht, A. Degenerate U- and V-statistics under weak de-
+pendence: Asymptotic theory and bootstrap consistency.
+Bernoulli, 18(2):552–585, 2012.
+
+Leucht, A. and Neumann, M.H. Dependent wild boot-
+Journal of
+strap for degenerate U- and V-statistics.
+Multivariate Analysis, 117:257–280, 2013.
+ISSN
+0047-259X. doi: 10.1016/j.jmva.2013.03.003. URL
+http://www.sciencedirect.com/science/
+article/pii/S0047259X13000304.
+
+Liu, Q., Lee, J., and Jordan, M. I. A kernelized stein dis-
+crepancy for goodness-of-ﬁt tests and model evaluation.
+Technical report, ArXiv, 2016.
+
+Lloyd, James R and Ghahramani, Zoubin. Statistical model
+In NIPS, pp.
+
+criticism using kernel two sample tests.
+829–837, 2015.
+
+A Kernel Test of Goodness of Fit
+
+Oates, C., Girolami, M., and Chopin, N. Control func-
+tionals for monte carlo integration. Technical Report
+arXiv:1410.2392v4, ArXiv, 2015.
+
+Rahimi, A. and Recht, B. Random features for large-scale
+
+kernel machines. In NIPS, pp. 1177–1184, 2007.
+
+Rizzo, M. L. New goodness-of-ﬁt tests for pareto distri-
+butions. ASTIN Bulletin: Journal of the International
+Association of Actuaries, 39(2):691–715, 2009.
+
+Sejdinovic, D., Sriperumbudur, B., Gretton, A., and Fuku-
+mizu, K. Equivalence of distance-based and RKHS-
+based statistics in hypothesis testing. 41(5):2263–2291,
+2013.
+
+Serﬂing, R. Approximation Theorems of Mathematical
+
+Statistics. Wiley, New York, 1980.
+
+Shao, X. The dependent wild bootstrap. J. Amer. Statist.
+
+Assoc., 105(489):218–235, 2010.
+
+Smirnov, N. Table for estimating the goodness of ﬁt of em-
+pirical distributions. Annals of Mathematical Statistics,
+19:279–281, 1948.
+
+Sriperumbudur, B., Gretton, A., Fukumizu, K., Lanckriet,
+G., and Schölkopf, B. Hilbert space embeddings and
+metrics on probability measures. J. Mach. Learn. Res.,
+11:1517–1561, 2010.
+
+Sriperumbudur, B., Fukumizu, K., Kumar, R., Gretton,
+A., and Hyvärinen, A. Density Estimation in Inﬁn-
+ite Dimensional Exponential Families. arXiv preprint
+arXiv:1312.3516, 2014.
+
+Stein, Charles. A bound for the error in the normal ap-
+proximation to the distribution of a sum of depend-
+In Proceedings of the Sixth
+ent random variables.
+Berkeley Symposium on Mathematical Statistics and
+Probability, Volume 2: Probability Theory, pp. 583–
+602, Berkeley, Calif., 1972. University of Califor-
+nia Press. URL http://projecteuclid.org/
+euclid.bsmsp/1200514239.
+
+Steinwart, I. and Christmann, A. Support vector machines.
+Information Science and Statistics. Springer, New York,
+2008. ISBN 978-0-387-77241-7.
+
+Strathmann, H., Sejdinovic, D., Livingstone, S., Szabo, Z.,
+and Gretton, A. Gradient-free Hamiltonian Monte Carlo
+In NIPS,
+with Efﬁcient Kernel Exponential Families.
+2015.
+
+Székely, G. J. and Rizzo, M. L. A new test for multivariate
+normality. J. Multivariate Analysis, 93(1):58–80, 2005.
+
+Welling, M. and Teh, Y.W.
+
+Bayesian Learning via
+Stochastic Gradient Langevin Dynamics. In ICML, pp.
+681–688, 2011.
+
+

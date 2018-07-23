@@ -1,0 +1,1462 @@
+Primal-Dual Rates and Certiﬁcates
+
+Celestine D¨unner
+IBM Research, Z¨urich, Switzerland
+Simone Forte
+ETH Z¨urich, Switzerland
+Martin Tak´aˇc
+Lehigh University, USA
+Martin Jaggi
+ETH Z¨urich, Switzerland
+
+Abstract
+
+We propose an algorithm-independent frame-
+work to equip existing optimization methods
+with primal-dual certiﬁcates. Such certiﬁcates
+and corresponding rate of convergence guaran-
+tees are important for practitioners to diagnose
+progress, in particular in machine learning appli-
+cations.
+We obtain new primal-dual convergence rates,
+e.g., for the Lasso as well as many L1, Elas-
+tic Net, group Lasso and TV-regularized prob-
+lems. The theory applies to any norm-regularized
+generalized linear model. Our approach pro-
+vides efﬁciently computable duality gaps which
+are globally deﬁned, without modifying the orig-
+inal problems in the region of interest.
+
+1. Introduction
+The massive growth of available data has moved data anal-
+ysis and machine learning to center stage in many indus-
+trial as well as scientiﬁc ﬁelds, ranging from web and sen-
+sor data to astronomy, health science, and countless other
+applications. With the increasing size of datasets, machine
+learning methods are limited by the scalability of the under-
+lying optimization algorithms to train these models, which
+has spurred signiﬁcant research interest in recent years.
+However, practitioners face a signiﬁcant problem arising
+with the larger model complexity in large-scale machine
+learning and in particular deep-learning methods - it is in-
+creasingly hard to diagnose if the optimization algorithm
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+CDU@ZURICH.IBM.COM
+
+FORTESIMONE90@GMAIL.COM
+
+TAKAC.MT@GMAIL.COM
+
+JAGGIM@INF.ETHZ.CH
+
+used for training works well or not. With the optimization
+algorithms also becoming more complex (e.g., in a dis-
+tributed setting), it can often be very hard to pin down if
+bad performance of a predictive model either comes from
+slow optimization, or from poor modeling choices. In this
+light, easily veriﬁable guarantees for the quality of an op-
+timization algorithm are very useful — note that the op-
+timum solution of the problem is unknown in most cases.
+For convex optimization problems, a primal-dual gap can
+serve as such a certiﬁcate. If available, the gap also serves
+as a useful stopping criterion for the optimizer.
+So far, the majority of popular optimization algorithms for
+learning applications comes without a notion of primal-
+dual gap. In this paper, we aim to change this for a relevant
+class of machine learning problems. We propose a primal-
+dual framework which is algorithm-independent, and al-
+lows to equip existing algorithms with additional primal-
+dual certiﬁcates as an add-on.
+Our approach is motivated by the recent analysis of SDCA
+(Shalev-Shwartz & Zhang, 2013). We extend their set-
+ting to the signiﬁcantly larger class of convex optimization
+problems of the form
+
+min
+α∈Rn
+
+f (Aα) + g(α)
+
+for a given matrix A ∈ Rd×n, f being smooth, and g be-
+ing a general convex function. This problem class includes
+the most prominent regression and classiﬁcation methods
+as well as generalized linear models. We will formalize the
+setting in more details in Section 3, and highlight the as-
+sociated dual problem, which has the same structure. An
+overview over some popular examples that can be formu-
+lated in this setting either as primal or dual problem is given
+in Table 1.
+Contributions. The main contributions in this work can be
+summarized as follows:
+
+Primal-Dual Rates and Certiﬁcates
+
+• Our new primal-dual
+
+framework is algorithm-
+independent, that is it allows users to equip existing
+algorithms with primal-dual certiﬁcates and conver-
+gence rates.
+
+• We introduce a new Lipschitzing trick allowing du-
+ality gaps (and thus accuracy certiﬁcates) which are
+globally deﬁned, for a large class of convex problems
+which did not have this property so far. Our approach
+does not modify the original problems in the region of
+interest. In contrast to existing methods adding a small
+strongly-convex (L2) term as, e.g., in (Shalev-Shwartz
+& Zhang, 2014; Zhang & Lin, 2015), our approach
+leaves both the algorithms and the optima unaffected.
+• Compared with the well-known duality setting of
+SDCA (Shalev-Shwartz & Zhang, 2013; 2014) which
+is restricted to strongly convex regularizers and ﬁnite
+sum optimization problems, our framework encom-
+passes a signiﬁcantly larger class of problems. We ob-
+tain new primal-dual convergence rates, e.g., for the
+Lasso as well as many L1, Elastic Net, group Lasso
+and TV-regularized problems. The theory applies to
+any norm-regularized generalized linear model.
+
+• Existing primal-dual guarantees for the class of ERM
+problems with Lipschitz loss from (Shalev-Shwartz &
+Zhang, 2013) (e.g., SVM) are valid only for an “av-
+erage” iteration. We show that the same rate of con-
+vergence can be achieved, e.g., for accelerated SDCA,
+but without the necessity of computing an average it-
+erate.
+
+• Our primal-dual theory captures a more precise notion
+of data-dependency compared with existing results
+(which relied on per-coordinate information only). To
+be precise, our shown convergence rate for the gen-
+eral algorithms is dependent on the spectral norm of
+the data, see also (Tak´aˇc et al., 2013; 2015).
+
+2. Related Work
+Linearized ADMM solvers. For the problem structure
+of our interest here, one of the most natural algorithms is
+the splitting method known as the Chambolle-Pock algo-
+rithm (also known as Primal-Dual Hybrid Gradient, Arrow-
+Hurwicz method, or linearized ADMM) (Chambolle &
+Pock, 2010). While this algorithm can give rise to a duality
+gap, it is signiﬁcantly less general compared to our frame-
+work. In each iteration, it requires a complete solution of
+the proximal operators of both f and g, which can be com-
+putationally expensive. Its convergence rate is sensitive to
+the used step-size (Goldstein et al., 2015). Our framework
+is not algorithm-speciﬁc, and holds for arbitrary iterate se-
+quences. More recently, the SPDC method (Zhang & Lin,
+2015) was proposed as a coordinate-wise variant of (Cham-
+bolle & Pock, 2010), but only for strongly convex g.
+
+Stochastic coordinate solvers. Coordinate descent/ascent
+methods have become state-of-the-art for many machine
+learning problems (Hsieh et al., 2008; Friedman et al.,
+2010). In recent years, theoretical convergence rate guar-
+antees have been developed for the primal-only setting,
+e.g., by (Nesterov, 2012; Richt´arik & Tak´aˇc, 2014), as
+well as more recently also for primal-dual guarantees, see,
+e.g., (Lacoste-Julien et al., 2013; Shalev-Shwartz & Zhang,
+2013; 2014). The inﬂuential Stochastic1 Dual Coordi-
+nate Ascent (SDCA) framework (Shalev-Shwartz & Zhang,
+2013) was motivated by the L2-regularized SVM, where
+coordinate descent is very efﬁcient on the dual SVM for-
+mulation, with every iteration only requiring access to a
+single datapoint (i.e. a column of the matrix A in our
+setup).
+In contrast to primal stochastic gradient descent
+(SGD) methods, the SDCA algorithm family is often pre-
+ferred as it is free of learning-rate parameters, and has a
+fast linear (geometric) convergence rate. SDCA and recent
+extensions (Tak´aˇc et al., 2013; Shalev-Shwartz & Zhang,
+2014; Qu et al., 2014; Shalev-Shwartz, 2015; Zhang & Lin,
+2015) require g to be strongly convex.
+Under the weaker assumption of weak strong convexity
+(Necoara, 2015), a linear rate for the primal-dual conver-
+gence of SDCA was recently shown by (Ma et al., 2015b).
+In the Lasso literature, a similar trend in terms of solvers
+has been observed recently, but with the roles of primal and
+dual problems reversed. For those problems, coordinate
+descent algorithms on the primal formulation have become
+the state-of-the-art, as in GLMNET (Friedman et al., 2010)
+and extensions (Shalev-Shwartz & Tewari, 2011; Yuan
+et al., 2012; 2010). Despite the prototypes of both problem
+types—SVM for the L2-regularized case and Lasso for the
+L1-regularized case—being closely related (Jaggi, 2014),
+we are not aware of existing primal-dual guarantees for co-
+ordinate descent on unmodiﬁed L1-regularized problems.
+Comparison to smoothing techniques. Existing tech-
+niques for bringing L1-regularized and related problems
+into a primal-dual setting compatible with SDCA do rely
+on the classical Nesterov-smoothing approach - By adding
+a small amount of L2 to the part g, the objective be-
+comes strongly convex; see, e.g., (Nesterov, 2005; 2012;
+Tran-Dinh & Cevher, 2014; Richt´arik & Tak´aˇc, 2014;
+Shalev-Shwartz & Zhang, 2014). However, the appropriate
+strength of smoothing is difﬁcult to tune. It will depend on
+the accuracy level, and will inﬂuence the chosen algorithm,
+as it will change the iterates, the resulting convergence rate
+as well as the tightness of the resulting duality gaps. The
+line of work of Tran-Dinh & Cevher (2014; 2015) provides
+duality gaps for smoothed problems and rates for proxi-
+mally tractable objectives (Tran-Dinh & Cevher, 2015) and
+
+1Here ’stochastic’ refers to randomized selection of the active
+
+coordinate.
+
+Primal-Dual Rates and Certiﬁcates
+
+Table 1. Primal-dual convergence rates of general algorithms applied to (A), for some machine learning and signal processing problems
+which are examples of our optimization problem formulations (A) and (B). Note that several can be mapped to either (A) or (B). λ > 0
+is a regularization parameter speciﬁed by the user. We will discuss the most prominent examples in more detail in Sections 5.2 and 6.
+Convergence
+Thm 6, Cor 10
+Thm 2,8, Cor 11
+Thm 2,8, Cor 11
+
+(B) f∗= λ(cid:0) η
+
+(A) f = (cid:96)(Aα)
+(A) f = (cid:96)(Aα)
+
+2 + (1−η)(cid:107)α(cid:107)1
+
+Regularizer L1
+
+Elastic Net
+
+Problem
+
+2 + (1−η)(cid:107)w(cid:107)1
+
+f /f∗
+
+g/g∗
+
+(cid:1)
+
+L2
+
+2(cid:107)w(cid:107)2
+(A) f = (cid:96)(Aα)
+2(cid:107)w(cid:107)2
+(B) f∗ = λ
+Fused Lasso (A) f = (cid:96)(Aα)
+Group Lasso (A) f = (cid:96)(Aα)
+2(cid:107)Aα(cid:107)2
+
+(A) f = λ
+
+2
+
+2
+
+SVM (hinge loss)
+
+Loss (cid:96) Logistic Regression (cid:96)LR(z) := 1
+m
+(cid:96)LS(z) := 1
+
+Least Squares
+
+(cid:80)m
+j=1 log(1+exp(−yjzj))
+2(cid:107)z − b(cid:107)2
+
+2
+
+k (cid:107)αGk(cid:107)2, {Gk} part. of {1..n}
+i −yiαi s.t. yiαi ∈ [0, 1]
+
+for z = Aα or z = −A(cid:62)w
+for z = Aα or z = −A(cid:62)w
+
+2(cid:107)α(cid:107)2
+
+g = λ(cid:107)α(cid:107)1
+
+g = λ(cid:0) η
+(cid:1) g∗ = (cid:96)(−A(cid:62)w)
+g = λ(cid:80)
+g =(cid:80)
+
+2(cid:107)α(cid:107)2
+g = λ
+g∗ = (cid:96)(−A(cid:62)w)
+g = λ(cid:107)M α(cid:107)1
+
+2
+
+Thm 2,8
+Thm 2,8
+Thm 6
+Thm 6
+Thm 4,9
+
+also objectives with efﬁcient Fenchel-type operator (Yurt-
+sever et al., 2015). In contrast, our approach preserves all
+solutions of the original L1-optimization — it leaves the it-
+erate sequences of existing algorithms unchanged, which is
+desirable in practice, and allows the reusability of existing
+solvers. We do not assume proximal or Fenchel tractability.
+Distributed algorithms. For L1-problems exceeding the
+memory capacity of a single computer, a communication-
+efﬁcient distributed scheme leveraging this Lipschitzing
+trick is presented in (Smith et al., 2015; Forte, 2015).
+3. Setup and Primal-Dual Structure
+In this paper, we consider optimization problems of the fol-
+lowing primal-dual structure. As we will see, the relation-
+ship between primal and dual objectives has many beneﬁts,
+including computation of the duality gap, which allows us
+to have certiﬁcates for the approximation quality.
+We consider the following pair of optimization problems,
+which are dual2 to each other:
+
+(cid:104) D(α) := f (Aα) + g(α)
+(cid:104) P(w) := f∗(w) + g∗(−A(cid:62)w)
+
+(A)
+
+(B)
+
+(cid:105)
+(cid:105)
+
+,
+
+.
+
+min
+α∈Rn
+
+min
+w∈Rd
+
+The two problems are associated to a given data matrix
+A ∈ Rd×n, and the functions f : Rd → R and g : Rn → R
+are allowed to be arbitrary closed convex functions. Here
+α ∈ Rn and w ∈ Rd are the respective variable vectors.
+The relation of (A) and (B) is called Fenchel-Rockafellar
+Duality where the functions f∗, g∗ in formulation (B) are
+deﬁned as the convex conjugates3 of their corresponding
+counterparts f, g in (A). The two main powerful features of
+this general duality structure are ﬁrst that it includes many
+more machine learning methods than more traditional du-
+
+2For a self-contained derivation see Appendix C.
+3The conjugate is deﬁned as h∗(v) := supu∈Rd v(cid:62)u− h(u).
+
+ality notions, and secondly that the two problems are fully
+symmetric, when changing respective roles of f and g. In
+typical machine learning problems, the two parts typically
+play the roles of a data-ﬁt (or loss) term as well as a regu-
+larization term. As we will see later, those two roles can be
+swapped, depending on the application.
+Optimality Conditions. The ﬁrst-order optimality condi-
+tions for our pair of vectors w ∈ Rd, α ∈ Rn in prob-
+lems (A) and (B) are given as
+
+(1a)
+(1b)
+
+−A(cid:62)w ∈ ∂g(α) ,
+
+w ∈ ∂f (Aα) ,
+Aα ∈ ∂f∗(w) ,
+
+(2a)
+α ∈ ∂g∗(−A(cid:62)w) (2b)
+see, e.g.
+(Bauschke & Combettes, 2011, Proposition
+19.18). The stated optimality conditions are equivalent
+to α, w being a saddle-point of the Lagrangian, which is
+given as L(α, w) = f∗(w) − (cid:104)Aα, w(cid:105) − g(α) if α ∈
+dom(g) and w ∈ dom(f∗).
+Duality Gap. From the deﬁnition of the dual problems in
+terms of the convex conjugates, we always have P(w) ≥
+P(w(cid:63)) ≥ −D(α(cid:63)) ≥ −D(α), giving rise to the deﬁnition
+of the general duality gap G(w, α) := P(w) − (−D(α)).
+For differentiable f, the duality gap can be used more con-
+veniently: Given α ∈ Rn s.t. Aα ∈ dom(f ) in the context
+of (A), a corresponding variable vector w ∈ Rd for prob-
+lem (B) is given by the ﬁrst-order optimality condition (1a)
+as
+
+w = w(α) := ∇f (Aα) .
+
+(3)
+Under strong duality, we have P(w(cid:63)) = −D(α(cid:63)) and
+w(α(cid:63)) = w(cid:63), where α(cid:63) is an optimal solution of (A).
+This implies that the suboptimality P(w(α)) − P(w(cid:63)) is
+always bounded above by the simpler duality gap function
+G(α):=P(w(α))−(−D(α))≥ P(w(α)) − P(w(cid:63)) (4)
+which hence acts as a certiﬁcate of the approximation qual-
+ity of the variable vector α.
+
+Primal-Dual Rates and Certiﬁcates
+
+4. Primal-Dual Guarantees for Any
+
+Algorithm Solving (A)
+
+In this section we state an important lemma, which will
+later allow us to transform a suboptimality guarantee of
+any algorithm into a duality gap guarantee, for optimiza-
+tion problems of the form speciﬁed in the previous section.
+Lemma 1. Consider an optimization problem of
+the
+form (A). Let f be 1/β-smooth w.r.t. a norm (cid:107).(cid:107)f and let g
+be µ-strongly convex with convexity parameter µ ≥ 0 w.r.t.
+a norm (cid:107).(cid:107)g. The general convex case µ = 0 is explicitly
+allowed, but only if g has bounded support.
+Then, for any α ∈ dom(D) and any s ∈ [0, 1], it holds that
+D(α) − D(α(cid:63)) ≥ sG(α)
+(5)
+β(cid:107)A(u − α)(cid:107)2
+
+(cid:0) µ(1−s)
+
+(cid:107)u − α(cid:107)2
+
+g − 1
+
++ s2
+2
+
+f
+
+s
+
+where G(α) is the gap function deﬁned in (4) and
+
+u ∈ ∂g∗(−A(cid:62)w(α)).
+
+(6)
+
+We note that the improvement bound here bears similarity
+to the proof of (Bach, 2015, Prop 4.2) for the case of an ex-
+tended Frank-Wolfe algorithm. In contrast, our result here
+is algorithm-independent, and leads to tighter results due to
+the more careful choice of u, as we’ll see in the following.
+
+4.1. Linear Convergence Rates
+
+In this section we assume that we are using an arbitrary
+optimization algorithm applied to problem (A).
+It is as-
+sumed that the algorithm produces a sequence of (possi-
+bly random) iterates {α(t)}∞
+t=0 such that there exists C ∈
+(0, 1], D ≥ 0 such that
+
+E[D(α(t)) − D(α(cid:63))] ≤ (1 − C)t D.
+next
+
+theorems, we
+
+(cid:0) maxα(cid:54)=0 (cid:107)Aα(cid:107)f /(cid:107)α(cid:107)g
+
+(cid:1)2,
+
+two
+
+i.e.,
+
+the
+
+deﬁne σ
+
+:=
+the squared spectral
+
+(7)
+
+In
+
+norm of the matrix A in the Euclidean norm case.
+
+4.1.1. CASE I. STRONGLY CONVEX g
+
+Let us assume g is µ-strongly convex (µ > 0) (equivalently,
+its conjugate g∗ has Lipschitz continuous gradient with a
+constant 1/µ). The following theorem provides a linear
+convergence guarantee for any algorithm with given linear
+convergence rate for the suboptimality D(α) − D(α(cid:63)).
+Theorem 2. Assume the function f is 1/β-smooth w.r.t. a
+norm (cid:107).(cid:107)f and g is µ-strongly convex w.r.t. a norm (cid:107).(cid:107)g.
+Suppose we are using a linearly convergent algorithm as
+speciﬁed in (7). Then, for any
+t ≥ T := 1
+it holds that E[G(α(t))] ≤ .
+From (7) we can obtain that after 1
+
+ iterations, we
+
+C log D
+
+β +µ)
+µ
+
+C log
+
+(8)
+
+D( σ
+
+would have a point α(t) such that E[D(α(t))−D(α(cid:63))] ≤ .
+Hence, comparing with (8) only few more iterations are
+needed to get the guarantees for the duality gap. The
+rate (7) is achieved by most of the ﬁrst order algorithms,
+including proximal gradient descent (Nesterov, 2013) or
+SDCA (Richt´arik & Tak´aˇc, 2014) with C ∼ µ or accel-
+erated SDCA (Lin et al., 2014) with C ∼ √
+4.1.2. CASE II. GENERAL CONVEX g (OF BOUNDED
+
+µ.
+
+SUPPORT)
+
+In this section we will assume that g∗ is Lipschitz (in con-
+trast to smooth as in Theorem 2) and show that the linear
+convergence rate is preserved.
+Theorem 3. Assume that the function f is 1/β-smooth
+w.r.t. a norm (cid:107).(cid:107), g∗ is L-Lipschitz continuous w.r.t the
+dual norm (cid:107).(cid:107)∗, and we are using a linearly convergent al-
+gorithm (7). Then, for any
+
+(cid:1),
+
+t ≥ T := 1
+
+C log 2D max{1,2σL2/β}
+
+
+
+it holds that E[G(α(t))] ≤ .
+
+(9)
+
+In (Wang & Lin, 2014), it was proven that feasible descent
+methods when applied to the dual of an SVM do improve
+the objective geometrically as in (7). Later, (Ma et al.,
+2015b) extended this to stochastic coordinate feasible de-
+scent algorithms (including SDCA). Using our new Theo-
+rem 3, we can therefore extend their results to linear con-
+vergence for the duality gap for the SVM application.
+
+4.2. Sub-Linear Convergence Rates
+
+In this case we will focus only on general L-Lipschitz con-
+tinuous functions g∗ (if g is strongly convex, then many
+existing algorithms are available and converge with a lin-
+ear rate).
+We will assume that we are applying some (possi-
+bly randomized) algorithm on optimization problem (A)
+which produces a sequence (of possibly random) iterates
+{α(t)}∞
+
+t=0 such that
+
+(10)
+
+E[D(α(t)) − D(α(cid:63))] ≤ C
+
+D(t) ,
+
+where D(t) is a function wich has usually a linear or
+quadratic growth (i.e. D(t) ∼ O(t) or D(t) ∼ O(t2)).
+The following theorem will allow to equip existing algo-
+rithms with sub-linear convergence in suboptimality, as
+speciﬁed in (10), with duality gap convergence guarantees.
+Theorem 4. Assume the function f is 1/β-smooth w.r.t. the
+norm (cid:107).(cid:107), g∗ is L-Lipschitz continuous, w.r.t. the dual norm
+(cid:107).(cid:107)∗, and we are using a sub-linearly convergent algorithm
+as quantiﬁed by (10). Then, for any t ≥ 0 such that
+
+D(t) ≥ max{ 2Cβ
+
+β2 },
+σL2 , 2CσL2
+
+it holds that E[G(α(t))] ≤ .
+
+(11)
+
+Primal-Dual Rates and Certiﬁcates
+
+Let us comment on Theorem 4 stated above. If D(t) ∼
+O(t) then this shows a rate of O(−2). We note two impor-
+tant facts:
+
+g(α)
+
+g∗(u)
+
+()∗−→
+
+1. The guarantee holds for the duality gap of the iterate
+
+α(t) and not for some averaged solution.
+
+2. For the SVM case, this rate is consistent with the result
+of (Hush et al., 2006). Our result is much more gen-
+eral as it holds for any L-Lipschitz continuous convex
+function g∗ and any β-strongly convex f∗.
+
+Let us make one more important remark.
+In (Shalev-
+Shwartz & Zhang, 2013) the authors showed that SDCA
+(when applied on L-Lipschitz continuous g∗) has D(t) ∼
+O(t) and they also showed that an averaged solution (over
+few last iterates) needs only O(−1) iterations to have dual-
+ity gap ≤ . However, as a direct consequence of our The-
+orem 4 we can show, e.g., that FISTA (Beck & Teboulle,
+2009) (aka. accelerated gradient descent algorithm) or AP-
+PROX (Fercoq & Richt´arik, 2015)4 (a.k.a. accelerated co-
+ordinate descent algorithm) will need O(−1) iterations to
+produce an iterate α such that G(α) ≤ . Indeed, e.g., for
+APPROX, the function D(t) = ((t−1)τ +2n)2 (where τ is
+the size of a mini-batch) and C is a constant which depends
+(cid:113) 2Cσ
+on α(0) and α(cid:63) and τ. Hence, to obtain an iterate α(t) such
+that E[G(α(t))] ≤  it is sufﬁcient to choose τ ≥ 1 such
+β } is satisﬁed.
+that t
+
+(cid:113) 2Cβ
+
+τ + max{ 1
+
+(11)≥ 1 − 2n
+
+σL2 , L
+
+τ
+
+τ
+
+5. Extending Duality to Non-Lipschitz
+
+Functions
+
+5.1. Lipschitzing Trick
+
+In this section we present a trick that allows to general-
+ize our results of the previous section from Lipschitz func-
+tions g∗ to non-Lipschitz functions. The approach we pro-
+pose, which we call the Lipschitzing trick, will make a con-
+vex function Lipschitz on the entire domain Rd, by modify-
+ing its conjugate dual to have bounded support. Formally,
+the modiﬁcation is as follows: Let B ⊂ Rd be some closed,
+bounded convex set. We modify g : Rn → R by restricting
+its support to the set B, i.e.
+
+(cid:40)
+
+¯g(α) :=
+
+if α ∈ B
+g(α)
++∞ otherwise
+
+.
+
+(12)
+
+By deﬁnition,
+this function has bounded support, and
+hence, by Lemma 5, its conjugate function ¯g∗ is Lipschitz
+continuous.
+Motivation. We will apply this trick to the part g of op-
+timization problems of the form (A) (such that g∗ will be-
+come Lipschitz). We want that this modiﬁcation to have no
+impact on the outcome of any optimization algorithm run-
+
+4APPROX requires g being separable.
+
+−B
+
+α
+
+B
+
+u
+
+Figure 1. Illustration Lipschitzing trick for the scalar function
+g(α) = | · | with B = {x : |x| ≤ B}.
+ning on (A). Instead, this trick should only affect conver-
+gence theory in that it allows us to present a strong primal-
+dual rate. In the following, we will discuss how this can
+indeed be achieved by imposing only very weak assump-
+tions on the original problem (A).
+The modiﬁcation is based on the following duality of Lips-
+chitzness and bounded support, as given in Lemma 5 below,
+which is a generalization of (Rockafellar, 1997, Corollary
+13.3.3). We need the following deﬁnition:
+Deﬁnition 1 (B-Bounded Support). A function g : Rd →
+R has B-bounded support
+if its effective domain is
+bounded by B w.r.t. a norm (cid:107).(cid:107), i.e.,
+
+g(u) < +∞ ⇒ (cid:107)u(cid:107) ≤ B .
+
+(13)
+Lemma 5 (Duality between Lipschitzness and L-Bounded
+Support). Given a proper convex function g, it holds that g
+has L-bounded support w.r.t. the norm (cid:107).(cid:107) if and only if g∗
+is L-Lipschitz w.r.t. the dual norm (cid:107).(cid:107)∗.
+The following Theorem 6 generalizes our previous conver-
+gence results, which were restricted to Lipschitz g∗.
+Theorem 6. For an arbitrary optimization algorithm run-
+ning on problem (A), let α(t) denote its iterate sequence.
+Assume there is some closed convex set B containing all
+these iterates. Then, the same optimization algorithm run
+on the modiﬁed problem — given by Lipschitzing of g∗ us-
+ing B — would produce exactly the same iterate sequence.
+Furthermore, Theorem 3 as well as Theorem 4 give primal-
+dual convergence guarantees for this algorithm (for L such
+that B is L-bounded).
+Corollary 7. Assume the objective of optimization prob-
+lem (A) has bounded level sets. For α(t) being the iterate
+sequence of a monotone optimization algorithm on prob-
+lem (A) we denote δt := D(α(t)) and let Bt be the δt-level
+set of D. Write Bt > 0 for a value such that Bt is Bt-
+the norm (cid:107).(cid:107). Then, at any state t of the
+bounded w.r.t.
+algorithm, the set Bt contains all future iterates and Theo-
+rem 6 applies for L := Bt.
+5.2. Norm-Regularized Problems
+
+We now focus on some applications. First, we demonstrate
+how the Lipschitzing trick can be applied to ﬁnd primal-
+dual convergence rates for problems regularized by an ar-
+bitrary norm. We discuss in particular the Lasso problem
+
+Primal-Dual Rates and Certiﬁcates
+
+and show how the suboptimality bound can be evaluated
+in practice. In a second part, we discuss the Elastic Net
+regularizer and show how it ﬁts into our framework.
+We consider a special structure of problem (A), namely
+
+f (Aα) + λ(cid:107)α(cid:107) .
+
+min
+α∈Rn
+
+(14)
+
+where f is some convex non-negative smooth loss function
+regularized by any norm (cid:107).(cid:107). We choose B to be the (cid:107).(cid:107)-
+norm ball of radius B, such that (cid:107)α(cid:107) < B for every iterate.
+The size, B, of this ball can be controled by the amount
+of regularization λ. Using the Lipschitzing trick with this
+B, the convergence guarantees of Theorem 6 apply to the
+general class of norm regularized problems.
+Note that for any monotone algorithm (initialized at 0) ap-
+plied to (14) we have (cid:107)α(cid:107) ≤ 1
+λ f (0) for every iterate.
+Furthermore, at every iterate α we can bound (cid:107)α+(cid:107) ≤
+λ (f (Aα) + λ(cid:107)α(cid:107)) for every future iterate α+. Hence,
+1
+2 for least
+B := 1
+squares loss and B := m
+λ log(2) for logistic regression loss.
+Duality Gap. For any problem of the form (14) we can
+now determine the duality gap. We apply the Lipschitzing
+trick to g(α) := λ(cid:107)α(cid:107) as in (12), then the convex conju-
+gate of ¯g is
+¯g∗(u) =
+
+(cid:40)0
+α:α∈Bu(cid:62)α − λ(cid:107)α(cid:107)
+
+λ f (0) is a safe choice, e.g. B := 1
+
+(cid:107)u(cid:107)∗ ≤ λ
+else
+
+2λ(cid:107)b(cid:107)2
+
+(15)
+
+where (cid:107).(cid:107)∗ denotes the dual norm of (cid:107).(cid:107). Hence, using the
+primal-dual mapping w(α) := ∇f (Aα) we can write the
+duality gap of the modiﬁed problem as
+
+¯G(α) = (cid:104)w(α), Aα(cid:105) + λ(cid:107)α(cid:107) + ¯g∗(−A(cid:62)w(α))
+
+(16)
+Note that the computation of the modiﬁed duality gap
+¯G(α) is not harder than the computation of the original
+gap G(α) - it requires one pass over the data, assuming the
+choice of a suitable set B in (15). Furthermore, note that
+in contrast to the unmodiﬁed duality gap G(α), which is
+
+only deﬁned on the set(cid:8)α : (cid:107)A(cid:62)w(α)(cid:107)∗ ≤ λ(cid:9), our new
+
+gap ¯G(α) is deﬁned on the entire space Rd.
+As an alternative, (Mairal, 2010, Sec. 1.4.1 and App. D.2)
+has deﬁned a different duality gap by shrinking the dual w
+variable until it becomes feasible in (cid:107)A(cid:62)w(cid:107)∗ ≤ λ.
+
+max
+
+.
+
+5.2.1. L1-REGULARIZED PROBLEMS
+The results from the previous section can be ported to the
+important special case of L1-regularization:
+f (Aα) + λ(cid:107)α(cid:107)1 .
+
+(17)
+We choose B to be the L1-norm ball of radius B and then
+apply the Lipschitzing trick with B to the regularization
+term in (17). An illustration of this modiﬁcation as well as
+the impact on its dual are illustrated in Figure 1. Hence, our
+
+min
+α∈Rn
+
+theory (Theorem 6) gives primal-dual convergence guaran-
+tees for any algorithm applied to the Lasso problem (17).
+Furthermore, if the algorithm is monotone (initialized at
+α := 0) we know that B is 1
+Duality Gap. The duality gap (16) for the modiﬁed Lasso
+problem can be computed at every iterate α as
+
+¯G(α) = (cid:104)w, Aα(cid:105) + B(cid:2)(cid:107)A(cid:62)w(cid:107)∞ − λ(cid:3)
+
+λ f (0)-bounded.
+
++ + λ(cid:107)α(cid:107)1 (18)
+
+for w = w(α). For the derivation, see Appendix I.1.
+
+5.2.2. GROUP LASSO, FUSED LASSO AND TV-NORM
+
+Our algorithm-independent, primal-dual convergence guar-
+antees and certiﬁcates presented so far are not restricted to
+Lp-regularized problems, but do in fact directly apply to
+many more general structured regularizers, some of them
+shown in see Table 1. This includes group Lasso (L1/L2)
+and other norms inducing structured sparsity (Bach et al.,
+2012), as well as other penalties such as e.g.
+the fused
+Lasso g(α) := λ(cid:107)M α(cid:107)1. The total variation denoising
+problem is obtained for suitable choice of the matrix M.
+
+5.2.3. ELASTIC NET REGULARIZED PROBLEMS
+
+(cid:17)
+
+(cid:16) η
+
+2
+
+The second application we will discuss is Elastic Net regu-
+larization
+
+min
+α∈Rn
+
+(cid:96)(Aα) + λ
+
+(cid:107)α(cid:107)2
+
+2 + (1 − η)(cid:107)α(cid:107)1
+
+,
+
+(19)
+
+for ﬁxed trade-off parameter η ∈ (0, 1].
+Our framework allows two different ways to solve prob-
+lem (19): Either mapping it to formulation (A) (for (cid:96)=f
+smooth) as in row 2 of Table 1, or to (B) (for general (cid:96)) as
+in row 3 of Table 1. In both scenarios, Theorem 2 gives
+us a fast linear convergence guarantee for the duality gap,
+if (cid:96) is smooth. The other theorems apply accordingly for
+general (cid:96) when the problem is mapped to (B).
+Whether the choice of a dual or primal optimizer will be
+more beneﬁcial in practice depends on the case, and will
+be discussed in more detail for coordinate descent methods
+in Section 6.
+Duality Gap. For the Elastic Net problem (19) mapped
+to (A), we can compute the duality gap (4) as follows:
+
+G(α) = (cid:104)w, Aα(cid:105) + 1
+
+2ηλ
+
++ λ(cid:0) η
+
+2(cid:107)α(cid:107)2
+
+2 + (1 − η)(cid:107)α(cid:107)1
+
+n(cid:88)
+
+i=1
+
+(cid:2)(cid:12)(cid:12)A(cid:62)
+:i w(cid:12)(cid:12) − (1 − η)λ(cid:3)2
+(cid:1)
+
++
+
+with w = w(α) = ∇(cid:96)(Aα), see Appendix I.2.
+Remark 1. As η → 0 we approach the pure L1-case and
+this gap blows up as G(α) → ∞. Comparing this to (18),
+we see that the Lipschitzing trick allows to get certiﬁcates
+even in cases where the duality gap of the unmodiﬁed prob-
+lem is inﬁnity.
+
+Primal-Dual Rates and Certiﬁcates
+
+T ≥(cid:16)
+T0 ≥(cid:16)
+
+(cid:17)
+
+(cid:17)
+
+(cid:18)(cid:104)
+(cid:18)(cid:104)
+
+(cid:19)
+
+(cid:105) (0)
+
+D
+
+
+(cid:105)
+
+(cid:19)
+
+n + nR2
+µβ
+
+log
+
+n + nR2
+µβ
+
+(0)
+D
+
+(T−T0)
+
+(SA)
+(SB)
+
+where (0)
+
+D is the initial suboptimality in D(α).
+
+6. Coordinate Descent Algorithms
+We now focus on a very important class of algorithms, that
+is coordinate descent methods.
+In this section, we show
+how our theory implies much more general primal-dual
+convergence guarantees for coordinate descent algorithms.
+Partially Separable Problems. A widely used subclass of
+(cid:80)n
+optimization problems arises when one part of the objective
+becomes separable. Formally, this is expressed as g(α) =
+i=1 gi(αi) for univariate functions gi : R → R for i ∈
+as g∗(y) = (cid:80)
+[n]. Nicely in this case, the conjugate of g also separates
+i (yi). Therefore, the two optimization
+
+i g∗
+
+problems (A) and (B) write as
+
+D(α) := f (Aα) +(cid:80)
+P(w) := f∗(w) +(cid:80)
+
+i gi(αi)
+i (−A (cid:62)
+i g∗
+
+:i w) ,
+where A:i ∈ Rd denotes the i-th column of A.
+
+The Algorithm. We consider the coordinate descent al-
+gorithm described in Algorithm 1. Initialize α(0) = 0 and
+then, at each iteration, sample and update a random coordi-
+nate i ∈ [n] of the parameter vector α to iteratively mini-
+mize (SA). Finally, after T iterations output ¯α, the average
+vector over the latest T − T0 iterates. The parameter T0 is
+some positive number smaller than T .
+Algorithm 1 Coordinate Descent on D(α)
+1: Input: Data matrix A.
+
+Starting point α(0) := 0 ∈ Rn, w(0) = w(α(0)).
+
+Pick i ∈ [n] randomly
+Find ∆αi minimizing D(α(t−1) + ei∆αi)
+
+2: for t = 1, 2, . . . T do
+3:
+4:
+5: α(t) ← α(t−1) + ∆αiei
+6: w(t) ← w(α(t))
+7: end for
+8: Let ¯α = 1
+
+(cid:80)T−1
+
+α(t)
+
+T−T0
+
+t=T0
+
+As we will show in the following section, coordinate de-
+scent on D(α) is not only an efﬁcient optimizer of the ob-
+jective D(α), but also provably reduces the duality gap.
+Therefore, the same algorithm will simultaneously opti-
+mize the dual objective P(w).
+
+6.1. Primal-Dual Analysis for Coordinate Descent
+
+We ﬁrst show linear primal-dual convergence rate of Al-
+gorithm 1 applied to (SA) for strongly convex gi. Later,
+we will generalize this result to also apply to the setting
+of general Lipschitz gi. This generalization together with
+the Lipschitzing trick will allow us to derive primal-dual
+convergence guarantees of coordinate descent for a much
+broader class of problems, including the Lasso problem.
+For the following theorems we assume that the columns of
+
+the data matrix A are scaled such that (cid:107)A:i(cid:107) ≤ R for all
+i ∈ [n] and (cid:107)Aj:(cid:107) ≤ P for all j ∈ [d], for some norm (cid:107).(cid:107).
+Theorem 8. Consider Algorithm 1 applied to (SA). As-
+sume f is a 1/β-smooth function w.r.t. the norm (cid:107).(cid:107). Then,
+if gi is µ-strongly convex for all i, it sufﬁces to have a total
+number of iterations of
+
+n + nR2
+µβ
+
+log
+
+n + nR2
+µβ
+
+to get E[G(α(T ))] ≤ . Moreover, to obtain an expected
+duality gap of E[G( ¯α)] ≤  it sufﬁces to have T > T0 with
+
+Theorem 8 allows us to upper bound the duality gap, and
+hence the suboptimality, for every iterate α(T ), as well as
+the average ¯α returned by Algorithm 1. In the following we
+generalize this result to apply to L-Lipschitz functions gi.
+Theorem 9. Consider Algorithm 1 applied to (SA). As-
+sume f is a 1/β-smooth function w.r.t. the norm (cid:107).(cid:107). Then,
+if g∗
+i is L-Lipschitz for all i, it sufﬁces to have a total num-
+ber of iterations of
+
+T ≥ max
+
+0, n log (0)
+D β
+
+2L2R2n
+
++ n + 20n2L2R2
+
+β
+
+to get E[G( ¯α)] ≤ . Moreover, when t ≥ T0 with
+
+(cid:26)
+
+(cid:26)
+
+(cid:27)
+
+(cid:27)
+
+T0 = max
+
+0, n log (0)
+D β
+
+2L2R2n
+
++ 16n2L2R2
+
+β
+
+D is the initial suboptimality.
+
+we have the suboptimality bound of E[D(α(t))−D(α(cid:63))] ≤
+/2, where (0)
+Remark 2. Theorem 9 shows that for Lipschitz g∗
+i , Algo-
+rithm 1 has O(−1) convergence in the suboptimality and
+O(−1) convergence in G( ¯α). Comparing this result to
+Theorem 4 which suggests O(−2) convergence in G(α)
+for O(−1) convergent algorithms, we see that averaging
+the parameter vector crucially improves convergence in the
+case of non-smooth f.
+Remark 3. Note that our Algorithm 1 recovers the widely
+used SDCA setting (Shalev-Shwartz & Zhang, 2013) as a
+special case, when we choose f∗ := λ
+2 in (SB). Fur-
+thermore, their convergence results for SDCA are consis-
+tent with our results and can be recovered as a special case
+of our analysis. See Corollaries 16, 18, 19 in Appendix J.
+
+2(cid:107).(cid:107)2
+
+6.2. Application to L1 and Elastic Net Regularized
+
+Problems
+
+We now apply Algorithm 1 to the L1-regularized problems,
+as well as Elastic Net regularized problems. We state im-
+proved primal-dual convergence rates which are more tai-
+lored to the coordinate-wise setting.
+
+Primal-Dual Rates and Certiﬁcates
+
+Coordinate Descent on L1-Regularized Problems.
+In
+contrast to the general analysis of L1-regularized prob-
+lems in Section 5.2.1, we can now exploit separability
+:= λ(cid:107)α(cid:107)1 and apply the Lipschitzing trick
+of g(α)
+coordinate-wise, choosing B := {α : |α| ≤ B} ⊂ R. This
+results in the following stronger convergence results:
+Corollary 10. We can use the Lipschitzing trick together
+with Theorem 9 to derive a primal-dual convergence result
+for the Lasso problem (17). We ﬁnd that the g∗
+i are B-
+Lipschitz after applying the Lipschitzing trick to every gi,
+and hence the total number of iterations needed on the
+Lasso problem to get a duality gap of E[G( ¯α)] ≤  is
+
+(cid:27)
+
+(cid:26)
+
+T ≥ max
+
+0, n log β(0)
+
+D
+
+2B2R2n
+
++ n + 20n2B2R2
+
+β
+
+Remark 4. We specify the different parameters of Corol-
+lary 10 for least squares loss as well as the logistic regres-
+sion loss (deﬁned in Table 1). Both are 1-smooth (f∗ is
+1-strongly convex) and we have β := 1. The initial subop-
+timality (0)
+2 for the former
+and by m log(2) for the latter. For B we choose 1
+
+D can be upper bounded by 1
+
+2(cid:107)b(cid:107)2
+
+λ f (0).
+
+Coordinate Descent on Elastic Net Regularized Prob-
+lems. In Section 5.2.3 we discussed how the Elastic Net
+problem in (19) can be mapped to our setup. In the ﬁrst
+scenario (row 2, Table 1) we note that the resulting prob-
+lem is partially separable and an instance of (SA).
+In the second scenario we map (19) to (B) (row 3, Table 1).
+Assuming that the loss function (cid:96) is separable, this problem
+is an instance of (SB). The convergence guarantees when
+applying Algorithm 1 on the primal or on the dual are sum-
+marized in Corollary 11.
+Corollary 11. Consider Algorithm 1 for an Elastic Net
+regularized problem (19), running on either the primal or
+the dual formulation. Then, to obtain a duality gap of
+E[G(α(T ))] ≤ , it sufﬁces to have a total of
+ληζ ] (0)
+ )
+
+ληζ ) log([n + nR2
+
+T ≥ (n + nR2
+
+D
+
+iterations for coordinate descent on the primal (19) and
+
+T ≥ (d + dP 2
+
+ληζ ) log([d + dP 2
+for coordinate descent on the dual of (19).
+
+ληζ ] (0)
+ )
+
+D
+
+According to Corollary 11, the convergence rate is com-
+parable for both scenarios. The constants however depend
+on the data matrix A – for d (cid:29) n the primal version is
+beneﬁcial, whereas for n (cid:29) d the dual version is leading.
+
+7. Numerical Experiments
+Here we illustrate the usefulness of our framework by
+showcasing it for two important applications, each one
+showing two algorithm examples for optimizing (A).
+
+Figure 2. Comparison of CD with its accelerated variant – AP-
+PROX on Lasso and SVM problems.
+
+Lasso. The top row of Figure 2 shows the primal-dual con-
+vergence of Algorithm 1 (CD) as well as the accelerated
+variant of CD (APPROX, Fercoq & Richt´arik (2015)), both
+applied to the Lasso problem (A). We have applies the Lip-
+schitzing trick as described in Section 5.1. This makes sure
+that w(α) will be always feasible for the modiﬁed dual (B),
+and hence the duality gap can be evaluated.
+SVM. It was shown in (Shalev-Shwartz & Zhang, 2013)
+that if CD (SDCA) is run on the dual SVM formulation,
+and we consider an ”average” solution (over last few iter-
+ates), then the duality gap evaluated at averaged iterates has
+a sub-linear convergence rate O(1/t). As a consequence of
+Theorem 4, we have that the APPROX algorithm (Fercoq
+& Richt´arik, 2015) will provide the same sub-linear con-
+vergence in duality gap, but holding for the iterates them-
+selves, not only for an average. On the bottom row of Fig-
+ure 2 we compare CD with its accelerated variant on two
+benchmark datasets.5 We have chosen λ = 1/n.
+
+8. Conclusions
+We have presented a general framework allowing to equip
+existing optimization algorithms with primal-dual certiﬁ-
+cates. For future research, it will be interesting to study
+more applications and algorithms ﬁtting into the studied
+problem structure, including more cases of structured spar-
+sity, and generalizations to matrix problems.
+
+Acknowledgments. We thank Francis Bach, Michael P.
+Friedlander, Ching-pei Lee, Dmytro Perekrestenko, Aa-
+ditya Ramdas, Virginia Smith and an anonymous reviewer
+for fruitful discussions.
+
+5Available from csie.ntu.edu.tw/∼cjlin/libsvmtools/datasets.
+
+10010210410610−5100105news20 LassoEpochsDuality Gap  SDCAAPPROX10010510−5100105mushrooms LassoEpochsDuality Gap  SDCAAPPROX10010110210310−810−610−410−2100news20 SVM DualEpochsDuality Gap  SDCAAPPROX10010110210310−810−610−410−2100rcv1−test SVM DualEpochsDuality Gap  SDCAAPPROXPrimal-Dual Rates and Certiﬁcates
+
+References
+Bach, Francis. Duality Between Subgradient and Conditional
+Gradient Methods. SIAM Journal on Optimization, 25(1):115–
+129, 2015.
+
+Bach, Francis, Jenatton, Rodolphe, Mairal, Julien, and Obozin-
+ski, Guillaume. Optimization with Sparsity-Inducing Penal-
+ties. Foundations and Trends in Machine Learning, 4(1):1–
+106, 2012.
+
+Bauschke, Heinz H and Combettes, Patrick L. Convex Analy-
+sis and Monotone Operator Theory in Hilbert Spaces. CMS
+Books in Mathematics. Springer, 2011.
+
+Beck, Amir and Teboulle, Marc. A fast iterative shrinkage-
+thresholding algorithm for linear inverse problems. SIAM jour-
+nal on imaging sciences, 2(1):183–202, 2009.
+
+Borwein, J M and Zhu, Q. Techniques of Variational Analysis
+and Nonlinear Optimization. Canadian Mathematical Society
+Books in Math, Springer, 2005.
+
+Boyd, Stephen P and Vandenberghe, Lieven. Convex optimiza-
+
+tion. Cambridge University Press, 2004.
+
+Chambolle, Antonin and Pock, Thomas. A First-Order Primal-
+Dual Algorithm for Convex Problems with Applications to
+Imaging. Journal of Mathematical Imaging and Vision, 40(1):
+120–145, 2010.
+
+Fercoq, Olivier and Richt´arik, Peter. Accelerated, Parallel, and
+Proximal Coordinate Descent. SIAM Journal on Optimization,
+25(4):1997–2023, 2015.
+
+Forte, Simone. Distributed Optimization for Non-Strongly Con-
+
+vex Regularizers. Master’s thesis, ETH Z¨urich, 2015.
+
+Friedman, Jerome, Hastie, Trevor, and Tibshirani, Robert. Regu-
+larization Paths for Generalized Linear Models via Coordinate
+Descent. Journal of Statistical Software, 33(1):1–22, 2010.
+
+Goldstein, Tom, Li, Min, and Yuan, Xiaoming. Adaptive Primal-
+Dual Splitting Methods for Statistical Learning and Image Pro-
+cessing. In NIPS 2015 - Advances in Neural Information Pro-
+cessing Systems 28, pp. 2080–2088, 2015.
+
+Hsieh, Cho-Jui, Chang, Kai-Wei, Lin, Chih-Jen, Keerthi,
+S Sathiya, and Sundararajan, Sellamanickam. A dual coordi-
+nate descent method for large-scale linear SVM. In ICML 2008
+- Proceedings of the 25th International Conference on Machine
+Learning, pp. 408–415, 2008.
+
+Hush, Don, Kelly, Patrick, Scovel, Clint, and Steinwart, Ingo. Qp
+algorithms with guaranteed accuracy and run time for support
+vector machines. The Journal of Machine Learning Research,
+7:733–769, 2006.
+
+Jaggi, Martin. An Equivalence between the Lasso and Sup-
+port Vector Machines. In Regularization, Optimization, Ker-
+nels, and Support Vector Machines, pp. 1–26. Chapman and
+Hall/CRC, 2014.
+
+Kakade, Sham M, Shalev-Shwartz, Shai, and Tewari, Ambuj. On
+the duality of strong convexity and strong smoothness: Learn-
+ing applications and matrix regularization. Technical report,
+Toyota Technological Institute - Chicago, USA, 2009.
+
+Lacoste-Julien, Simon and Jaggi, Martin. On the Global Linear
+Convergence of Frank-Wolfe Optimization Variants. In NIPS
+2015 - Advances in Neural Information Processing Systems 28,
+2015.
+
+Lacoste-Julien, Simon, Jaggi, Martin, Schmidt, Mark, and
+Pletscher, Patrick. Block-Coordinate Frank-Wolfe Optimiza-
+tion for Structural SVMs. In ICML 2013 - Proceedings of the
+30th International Conference on Machine Learning, 2013.
+
+Lin, Qihang, Lu, Zhaosong, and Xiao, Lin. An accelerated prox-
+imal coordinate gradient method and its application to regular-
+ized empirical risk minimization. arXiv:1407.1296, 2014.
+
+Ma, Chenxin, Smith, Virginia, Jaggi, Martin, Jordan, Michael I,
+Richt´arik, Peter, and Tak´aˇc, Martin. Adding vs. averaging in
+distributed primal-dual optimization. In ICML 2015 - 32th In-
+ternational Conference on Machine Learning, 2015a.
+
+Ma, Chenxin, Tappenden, Rachael, and Tak´aˇc, Martin. Linear
+convergence of the randomized feasible descent method un-
+der the weak strong convexity assumption. arXiv:1506.02530,
+2015b.
+
+Mairal, Julien. Sparse coding for machine learning, image pro-
+cessing and computer vision. PhD thesis, ENS Cachan, 2010.
+
+Necoara, Ion. Linear convergence of ﬁrst order methods under
+weak nondegeneracy assumptions for convex programming.
+arXiv:1504.06298, 2015.
+
+Nesterov, Yurii. Efﬁciency of coordinate descent methods on
+huge-scale optimization problems. SIAM Journal on Optimiza-
+tion, 22(2):341–362, 2012.
+
+Nesterov, Yurii. Gradient methods for minimizing compos-
+ite functions. Mathematical Programming, 140(1):125–161,
+2013.
+
+Nesterov, Yurii. Smooth minimization of non-smooth functions.
+
+Mathematical Programming, 103(1):127–152, 2005.
+
+Qu, Zheng, Richt´arik, Peter, and Zhang, Tong. Randomized Dual
+
+Coordinate Ascent with Arbitrary Sampling. arXiv, 2014.
+
+Richt´arik, Peter and Tak´aˇc, Martin. Iteration complexity of ran-
+domized block-coordinate descent methods for minimizing a
+composite function. Mathematical Programming, 144(1-2):1–
+38, 2014.
+
+Rockafellar, R Tyrrell. Convex analysis. Princeton University
+
+Press, 1997.
+
+Shalev-Shwartz, Shai. Online Learning and Online Convex Opti-
+mization. Foundations and Trends in Machine Learning, 4(2):
+107–194, 2011.
+
+Shalev-Shwartz, Shai. SDCA without duality. arXiv:1502.06177,
+
+2015.
+
+Shalev-Shwartz, Shai and Tewari, Ambuj. Stochastic Methods
+for l1-regularized Loss Minimization. JMLR, 12:1865–1892,
+2011.
+
+Shalev-Shwartz, Shai and Zhang, Tong. Stochastic Dual Co-
+ordinate Ascent Methods for Regularized Loss Minimization.
+JMLR, 14:567–599, 2013.
+
+Primal-Dual Rates and Certiﬁcates
+
+Shalev-Shwartz, Shai and Zhang, Tong. Accelerated proximal
+stochastic dual coordinate ascent for regularized loss mini-
+mization. Mathematical Programming, Series A:1–41, 2014.
+
+Smith, Virginia, Forte, Simone,
+
+I, and
+Jaggi, Martin. L1-Regularized Distributed Optimization: A
+arXiv,
+Communication-Efﬁcient Primal-Dual Framework.
+2015.
+
+Jordan, Michael
+
+Tak´aˇc, Martin, Bijral, Avleen, Richt´arik, Peter, and Srebro,
+Nathan. Mini-batch primal and dual methods for SVMs.
+In
+In ICML 2013 - 30th International Conference on Machine
+Learning, 2013.
+
+Tak´aˇc, Martin, Richt´arik, Peter, and Srebro, Nathan. Distributed
+
+mini-batch SDCA. arXiv:1507.08322, 2015.
+
+Tran-Dinh, Quoc and Cevher, Volkan. Constrained convex min-
+imization via model-based excessive gap. In NIPS 2014 - Ad-
+vances in Neural Information Processing Systems 27, 2014.
+
+Tran-Dinh, Quoc and Cevher, Volkan. Splitting the Smoothed
+Primal-Dual Gap: Optimal Alternating Direction Methods.
+arXiv, 2015.
+
+Wang, Po-Wei and Lin, Chih-Jen. Iteration complexity of feasi-
+ble descent methods for convex optimization. The Journal of
+Machine Learning Research, 15(1):1523–1548, 2014.
+
+Yuan, Guo-Xun, Chang, Kai-Wei, Hsieh, Cho-Jui, and Lin, Chih-
+Jen. A Comparison of Optimization Methods and Software for
+Large-scale L1-regularized Linear Classiﬁcation. Journal of
+Machine Learning Research, 11:3183–3234, 2010.
+
+Yuan, Guo-Xun, Ho, Chia-Hua, and Lin, Chih-Jen. An Improved
+GLMNET for L1-regularized Logistic Regression. JMLR, 13:
+1999–2030, 2012.
+
+Yurtsever, Alp, Dinh, Quoc Tran, and Cevher, Volkan. A Uni-
+versal Primal-Dual Convex Optimization Framework. In NIPS
+2015 - Advances in Neural Information Processing Systems 28,
+pp. 3132–3140, 2015.
+
+Zhang, Yuchen and Lin, Xiao. Stochastic Primal-Dual Coordi-
+nate Method for Regularized Empirical Risk Minimization. In
+ICML 2015 - Proceedings of the 32th International Conference
+on Machine Learning, pp. 353–361, 2015.
+
+

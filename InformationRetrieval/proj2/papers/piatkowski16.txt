@@ -1,0 +1,1488 @@
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+Nico Piatkowski
+Artiﬁcial Intelligence Group, TU Dortmund, Germany
+Katharina Morik
+Artiﬁcial Intelligence Group, TU Dortmund, Germany
+
+NICO.PIATKOWSKI@TU-DORTMUND.DE
+
+KATHARINA.MORIK@TU-DORTMUND.DE
+
+Abstract
+
+The partition function is fundamental for proba-
+bilistic graphical models—it is required for infer-
+ence, parameter estimation, and model selection.
+Evaluating this function corresponds to discrete
+integration, namely a weighted sum over an ex-
+ponentially large set. This task quickly becomes
+intractable as the dimensionality of the prob-
+lem increases. We propose an approximation
+scheme that, for any discrete graphical model
+whose parameter vector has bounded norm, esti-
+mates the partition function with arbitrarily small
+error. Our algorithm relies on a near minimax
+optimal polynomial approximation to the poten-
+tial function and a Clenshaw-Curtis style quadra-
+ture. Furthermore, we show that this algorithm
+can be randomized to split the computation into a
+high-complexity part and a low-complexity part,
+where the latter may be carried out on small com-
+putational devices. Experiments conﬁrm that the
+new randomized algorithm is highly accurate if
+the parameter norm is small, and is otherwise
+comparable to methods with unbounded error.
+
+1. Introduction
+Graphical models serve as the underlying framework of
+various machine learning techniques and facilitate impor-
+tant real world applications from computer vision, com-
+putational biology, signal processing and natural language
+processing, to mention just a few (Pearl, 1988; Lauritzen,
+1996; Koller & Friedman, 2009). When using these mod-
+els, a central problem is that of computing the parti-
+tion function, since it is required for computing probabil-
+ities from the model and it plays a fundamental role in
+marginal inference (Jaakkola & Jordan, 1996), maximum-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+likelihood and maximum-a-posteriori parameter estima-
+tion (Wainwright & Jordan, 2008), and model selection
+(Cover & Thomas, 2006; Gr¨unwald, 2007). Unfortu-
+nately, exact computation of the partition function is an in-
+tractable (#P-complete) problem for many graphical mod-
+els of interest, such as those involving a non-tree condi-
+tional independence structure (short: structure) or high-
+order cliques/factors. Moreover, chances to ﬁnd polyno-
+mial time algorithms for these tasks are rather low, unless P
+= NP. For some special cases, polynomial-time algorithms
+are known (Schraudolph & Kamenetsky, 2008; Goldberg &
+Jerrum, 2013). However, signiﬁcant research efforts have
+been conducted in order to derive approximations for more
+general cases.
+There are two well established general approaches to ap-
+proximate large discrete sums: variational methods and
+sampling. Methods which provide reasonable tight error
+bounds that hold for any structure are either not available
+or require to solve a series of hard combinatorial optimiza-
+tion problems (Ermon et al., 2013).
+Based on work from statistical physics, variational meth-
+ods (Wainwright & Jordan, 2008) are often very fast but
+do not provide quality guarantees. Loopy belief propaga-
+tion (LBP) (Pearl, 1988; Kschischang et al., 2001) is well
+known for computing locally consistent solutions. Never-
+theless, this procedure might not converge and if it does, the
+result is a local minimum of a surrogate objective (Bethe
+free energy). Tree-reweighted approaches (Wainwright &
+Jordan, 2008) deliver the tightest upper bound, but the ex-
+act error can not be quantiﬁed. In addition, the approxi-
+mation error depends on the structure of the corresponding
+probability density. In contrast, the worst-case error of our
+method is bounded and independent of the structure.
+Sampling based techniques are popular, but they suffer
+from similar issues because the number of samples re-
+quired to obtain a statistically reliable estimate for multi-
+dimensional random variables grows exponentially fast.
+Markov Chain Monte Carlo (MCMC) methods are asymp-
+totically accurate, but guarantees exist only for certain spe-
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+cial cases. Their performance depend crucially on the
+choice of the proposal distribution, which often must be
+domain-speciﬁc and expert-designed (Girolami & Calder-
+head, 2011).
+Importance sampling methods (Liu et al.,
+2015) try to correct for biased proposal distributions, but
+their error is hard to quantify as well.
+In contrast to existing approaches, our method is based
+on a numerical approximation technique, which is called
+quadrature. It allows us to derive a scalable approximation
+procedure for partition functions, that is applicable to any
+structure, and delivers guarantees on the approximation er-
+ror. Surprisingly, quadrature based approximations do not
+appear in the machine learning literature. The technically
+most related article is a recent method to compute the log-
+determinant of large matrices (Han et al., 2015), based on
+Chebyshev polynomials. Our main contributions can be
+summarized as follows:
+
+• We present a new deterministic algorithm called Dis-
+crete Clenshaw-Curtis Quadrature (DCCQ). It gets a
+structure G, a parameter vector θ ∈ Rd and a polyno-
+mial degree k as inputs, and outputs ˆZk(θ) such that
+2 Z(θ) in time O(k2n2k) whenever
+|Z(θ)− ˆZk(θ)| ≤ ε
+k ∈ ω((cid:107)θ(cid:107)2 − ln ε).
+
+• Moreover, we show how to split the computation of
+our approximation into an “expensive” part, that de-
+pends on the structure G and the state space X , and
+a “cheap” part, which depends on the model param-
+eters θ.
+If the target platform has limited compu-
+tational resources (like a mobile phone or a sensor),
+the expensive computation may be carried out on a
+server. Since the expensive part is independent of the
+model parameters θ, it can be re-used for any repet-
+itive computation of the partition function—a setting
+that is typical in iterative parameter estimation pro-
+cedures. To this end, we present a randomized al-
+gorithm, called Stochastic Discrete Clenshaw-Curtis
+Quadrature (SDCCQ). It gets G, θ, k and m as inputs
+k (θ)| ≤
+k (θ) such that P[|Z(θ) − ˜Zm
+and outputs ˜Zm
+εZ(θ)] ≥ ζ in time O(k2n2k) + O(k2mmax), when-
+ever k ∈ ω((cid:107)θ(cid:107)2 − ln ε) and large enough mi.
+
+• Numerical experiments on grid structures show, that
+the new SDCCQ delivers highly accurate approxima-
+tions while not suffering from high runtimes, conver-
+gence issues or problems with mixed-type potentials,
+whenever the norm of the parameter vector is small.
+
+As opposed to existing methods, our new approach (i) al-
+lows for a user-speciﬁed trade-off in terms of runtime and
+approximation quality by a single parameter, (ii) can out-
+puts a bound of its own worst-case error, (iii) has no conver-
+gence issues, (iv) and allows us to split the computational
+complexity and re-use existing results.
+
+2. Notation and background
+In this section, the preliminaries of our new approximation
+to the partition function are explained. We provide some
+background on graphical models, followed by a short recap
+of quadrature rules and polynomial approximation.
+
+2.1. Graphical Models
+
+XU =(cid:78)
+
+Consider a multi-variate random variable X where each
+X i with 1 ≤ i ≤ n takes values xi from space Xi. The
+concatenation of all n variables yields the random variable
+X with product state space X = X1 × X2 × ··· × Xn. We
+denote assignments to single vertices v ∈ V by xv = y
+with y ∈ Xv. For any subset of variables U ⊆ V ,
+v∈U Xv is its joint state space. Moreover, for any
+{v, u, w} ⊂ V , we deﬁne vuw := {v, u, w} to simplify
+notation.
+The formalism of exponential families provides a unifying
+framework for a large variety of probability distributions.
+In particular, they cover all types of probabilistic graph-
+ical models (Lauritzen, 1996; Koller & Friedman, 2009)
+including Bayesian networks (Pearl, 1988), Markov ran-
+dom ﬁelds (Wainwright & Jordan, 2008), conditional ran-
+dom ﬁelds (Sutton & McCallum, 2011), logistic regression,
+latent Dirichlet allocation (Blei et al., 2003) and recent
+deep models (Ranganath et al., 2015). Probability densities
+which are member of an exponential family can be written
+as
+
+Pθ(x) = exp((cid:104)θ, φ(x)(cid:105) − A(θ)) =
+
+1
+
+Z(θ)
+
+ψ(x).
+
+(1)
+
+Beside its parameter vector θ ∈ Rd, Pθ consists of
+two major ingredients, namely the potential ψ(x) =
+exp((cid:104)θ, φ(x)(cid:105)) and the partition function Z(θ) =
+exp(A(θ)).
+Let us ﬁrst have a closer look at the potential. It assigns a
+positive real number to every possible instance x by map-
+ping it from X into a real vector space via a sufﬁcient statis-
+tic (or feature map) φ : X → Rd, where φ encodes the
+structure of X. We ease the notation by identifying com-
+ponents of X with vertices of a graph G = (V, E). In dis-
+crete state space models, the state of variables is encoded
+by indicator functions:
+
+φv=y(x) = 1{xv=y}
+
+φvu=yz(x) = 1{xv=y}1{xu=z}
+
+1{xv=yv}, U ⊆ V
+
+. . .
+
+φU =y(x) =
+
+(cid:89)
+
+v∈U
+
+(2)
+(3)
+
+(4)
+
+To exactly represent the probability mass of a multi-variate
+random variable X, φ(x) has to contain at least one indica-
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+dν(x),∀k ∈ N,∀j ∈ [d]k
+
+2.2. Quadrature
+
+tor per possible clique assignments for all maximal cliques1
+If C(G) is the set of
+of a structure G (Clifford, 1990).
+maximal cliques of G, then φ(x) = (φU =u(x) : ∀U ∈
+C(G),∀u ∈ XU )(cid:62).
+Sufﬁciency of φ is declared with respect to θ, i.e., knowl-
+edge about x is not required to infer θ, once φ(x) is
+known. This property is in particular useful when exponen-
+tial families have to be applied in resource constrained, au-
+tonomous, medical or self quantiﬁcation devices, because
+arbitrary large data sets may be aggregated into a ﬁnite di-
+mensional representation. In fact, only members of expo-
+nential families have this property (Pitman, 1936). We now
+identify another property of sufﬁcient statistics which will
+become crucial for ﬁnding an efﬁcient inference procedure:
+Deﬁnition 1. The sufﬁcient statistics φ : X → Rd is called
+χ-integrable if χφ : [d]k → R with
+
+(cid:90)
+
+(cid:32) k(cid:89)
+
+(cid:33)
+
+χφ(j) =
+
+φ(x)ji
+
+X
+
+i=1
+
+admits a closed-form expression, that is computable in
+polynomial time. [d]k is an abbreviation for {1, 2, . . . , d}k.
+
+In fact, if φ is composed out of indicator functions like (2),
+(3) or (4), it is χ-integrable. We will prove this statement
+in Section 4. Note, however, that our method is not re-
+stricted to binary sufﬁcient statistics or discrete state space
+models—any χ-integrable φ sufﬁces.
+The partition function
+
+Z(θ) =
+
+ψ(x)dν(x)
+
+(5)
+
+(cid:90)
+
+X
+
+accumulates the potential of every possible instance and en-
+sures normalization of Pθ. It is deﬁned w.r.t. a reference
+measure ν. For continuous (discrete) state spaces, ν is the
+Lebesgue (counting) measure. If the graph G contains no
+loops, i.e., is tree-structured, Z(θ) can be evaluated exactly
+in polynomial time. The same holds for planar Ising mod-
+els (Schraudolph & Kamenetsky, 2008).
+If no special property of the underlying structure can be
+exploited, evaluating Z(θ) is hard—in fact, #P-complete
+(Valiant, 1979; Bulatov & Grohe, 2004). The junction tree
+(JT) algorithm (Lauritzen & Spiegelhalter, 1988; Wain-
+wright & Jordan, 2008) can be applied to compute the ex-
+act value Z(θ) with runtime exponential in the size of the
+largest clique of the triangulation of graph G. Nevertheless,
+several approximate methods arose in the last decades. The
+Bethe approximation (Bethe, 1935; Wainwright & Jordan,
+2008), where the main underlying idea is to treat a general
+graph like a tree, is maybe the most popular, computed by
+
+1Cliques are fully connected subgraphs. A clique is maximal
+
+if it is not contained in any other clique.
+
+loopy belief propagation (Pearl, 1988; Frey, 2000; Kschis-
+chang et al., 2001). Its runtime depends on the number of
+message passing iterations until convergence. This number
+is in general unknown and the algorithm might not even
+converge. If no further assumptions are made, the Bethe ap-
+proximation delivers an estimate of unknown quality. It has
+been shown quite recently, that in case of log-supermodular
+potential functions (Ruozzi, 2012; Weller & Jebara, 2014),
+the Bethe approximation is a lower bound on the partition
+function. Also the naive mean ﬁeld (MF) technique (Weiss,
+2001; Wainwright & Jordan, 2008) is known to provide
+a lower bound on Z(θ) (Weiss, 2001). The best known
+general upper bound is based on convex combinations of
+exponential family parameters θ(T ) which correspond to
+spanning-trees T ∈ T (G) of the original graph G, known
+as tree-reweighted belief propagation (TRW) (Wainwright
+et al., 2005). An overview is provided in Table 1.
+
+(cid:90) u
+
+All of the existing approaches mentioned above are based
+on an approximation of the structure. In contrast, we pro-
+pose a numerical approximation of the integration, based
+on the general quadrature. If integrating a function is not
+tractable, one has to resort to numerical methods in order
+to approximate the deﬁnite integral. The basic idea of a
+quadrature rule is to replace the integrand f by an approx-
+imation h ≈ f that admits tractable integration. It turns out
+that choosing h = hk to be a degree-k Chebyshev poly-
+nomial approximation of f has outstanding properties like
+rapidly decreasing and individually converging coefﬁcients
+(Gautschi, 1985). The general quadrature procedure can be
+summarized as
+
+f (x)dx ≈
+
+l
+
+wif (xi)
+
+hk(x)dx =
+
+(6)
+where x ∈ R, wi are certain coefﬁcients and xi are
+certain abscissae in [l, u] (all
+to be determined) (Ma-
+son & Handscomb, 2002). Depending on the choice of
+interpolation points and different kinds of orthogonality
+properties, Chebyshev polynomial based quadrature rules
+are termed Gauss-Chebyshev quadrature, Fej´er quadra-
+ture or Clenshaw-Curtis quadrature (Clenshaw & Curtis,
+1960). We make use of discrete orthogonality properties
+and initialize our approximation at the zeros of second
+kind Chebyshev polynomials, which is a Clenshaw-Curtis
+quadrature.
+
+(cid:90) u
+
+l
+
+k(cid:88)
+
+i=0
+
+Chebyshev Polynomials.
+In order to construct a quadra-
+ture rule that is numerically well behaved, Chebyshev Poly-
+nomials Tk(x) are chosen as a basis. The fundamental re-
+currence relation is a convenient representation:
+T0(x) = 1, T1(x) = x, Tk(x) = 2xTk−1(x) − Tk−2(x).
+(7)
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+Table 1. State-of-the-art methods to compute/approximate the partition function of an undirected model with graph G = (V, E), n =
+|V |, m = |E|. MCMC-based methods are omitted. Here, I is the number of iterations until convergence. L = maxv∈V |Xv| and
+∆ = maxv∈V |Nv| are the largest vertex domain and neighborhood size, respectively. w is the tree-width of G and d is the dimension
+of the parameter space. kε is the polynomial degree (implied by ε) as speciﬁed by Theorem 5. mζ = maxi mi is the number of samples
+(implied by ζ) from the distribution (11) as speciﬁed by Theorem 7.
+Complexity
+O(Lw)
+O(InL∆)
+O(ImL2∆)
+
+Algorithm
+JT (Lauritzen & Spiegelhalter, 1988)
+MF (Weiss, 2001)
+LBP (Heskes, 2002; Yedidia et al.,
+2003)
+TRW (Wainwright et al., 2005)
+WISH (Ermon et al., 2013)
+DCCQ (Alg. 1)
+SDCCQ (Alg. 2)
+
+O(ImL2∆ + m log n)
+O(n ln(n/ζ)) × Time(MAP)
+O(k2
+O(k2
+
+ε d2kε)
+ε d2kε) + O(k2
+
+ε mζ)
+
+Quality
+Exact
+Lower bound
+Local minimum of Bethe
+free energy
+Upper bound
+(16, ζ)-approx
+ε-approx (Theorem 5)
+(ε, ζ)-approx (Theorem 7)
+
+It can be easily veriﬁed that each Tk is a polynomial of
+degree-k. The degree-k Chebyshev interpolation hk of a
+
+continuous function f is hk(x) =(cid:80)k
+
+i=0 ciTi(x) with
+
+k+1(cid:88)
+
+k + 1
+
+j=1
+
+2
+
+ci =
+
+f (xj)Ti(xj).
+
+(8)
+
+The interpolation points xj = cos jπ
+k are given by the ex-
+trema of the corresponding Chebyshev polynomial which
+are, at the same time, the zero of the Chebyshev polynomi-
+als of the second kind.
+The major distinguishing properties of Tk are (i) discrete
+orthogonality, which is required for the derivation of the
+coefﬁcients (8) and (ii) the fact that 21−kTk is the mini-
+max approximation to the 0-function on [−1, 1] (Mason &
+Handscomb, 2002). Let h ∈ H be an approximation to f
+on the domain [l, u]; h is called minimax approximation to
+f iff
+∀h(cid:48) ∈ H : (cid:107)f − h(cid:107)∞ = sup
+x∈[l,u]
+
+|f (x)−h(x)| ≤ (cid:107)f − h(cid:48)(cid:107)∞
+
+Chebyshev showed that an outstanding property of any
+minimax approximation is an oscillating error curve.
+The coefﬁcients given by (8) result in an approximation to
+the theoretically optimal (minimax) approximation (Mason
+& Handscomb, 2002) and allow for a rather fast computa-
+tion in time O(k log k) via discrete cosine transformation
+(DCT). Coefﬁcients which deliver an approximation that
+is even closer to the optimal one can be obtained by the
+Remez exchange algorithm (Fraser, 1965). Error functions
+for DCT and Remez coefﬁcients are shown in Figure 1 (i).
+Since both approaches deliver high quality approximations,
+we use DCT because of its superior efﬁciency.
+
+k(cid:88)
+
+Finally, the coefﬁcients c, which are coefﬁcients of Cheby-
+shev polynomials, can be converted to native coefﬁcients
+˜c—coefﬁcients of powers of x, say xi—by summing the
+corresponding coefﬁcients that appear in the Chebyshev
+polynomials, weighted by ci. Every Chebyshev interpo-
+lation can thus be equivalently expressed as
+
+hk(x) =
+
+˜cixi.
+
+(9)
+
+i=0
+
+Although the general quadrature is known since long, we,
+for the ﬁrst time, exploit it for approximating the partition
+function.
+
+on W , the deﬁnite integral(cid:82)
+
+3. Algorithm
+We start with the intuition behind our algorithm for approx-
+imating Z(θ) called Discrete Clenshaw-Curtis Quadra-
+ture. Indeed, we aim at approximating (5) by a quadrature
+rule (6). In contrast to (6), the integration in (5) has to be
+carried out over the n-dimensional set X . Note, however,
+that evaluating the potential at x is equivalent to comput-
+ing exp(r) for r = (cid:104)θ, φ(x)(cid:105). Integrating ψ over X is thus
+equivalent to integrating exp over W = {r ∈ R : r =
+(cid:104)θ, φ(x)(cid:105), x ∈ X}. But without any further assumption
+W exp(z)dz continues to have
+no closed-form expression. We hence take hk to be the
+Chebyshev interpolation of exp on [l, u] with l = min W
+and u = max W . Moreover, hk may be interpreted as ap-
+proximation ˆψk(x) ≈ ψ(x) over X . Computing max W is
+NP-hard, since it is equivalent to computing the maximum-
+a-posteriori assignment of the underlying graphical model.
+We may use an upper bound on max W instead: Remem-
+ber that C(G) is the number of (maximal) cliques in G.
+For binary sufﬁcient statistics (2), (3) and (4), it holds
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+i=0 ˜ci
+
+l=1 θjl
+
+j∈[d]i χφ(j)(cid:81)i
+(cid:80)
+
+Algorithm 1 DCCQ
+Input: θ ∈ Rd, k ∈ N, φ
+Output: Approximate partition function ˆZk(θ)
+1: [l, u] ← interval(θ)
+2: ˜c ← coeﬃcients(k, [l, u]) // Eq. (8)
+
+exactly one state. Therefore, max W ≤ (cid:107)θ(cid:107)2B which
+follows directly from the Cauchy-Schwarz inequality with
+
+3: ˆZk(θ) ←(cid:80)k
+that ∀x : (cid:107)φ(x)(cid:107)2 = (cid:112)|C(G)|, since each clique is in
+B =(cid:112)|C(G)|.
+(cid:90)
+(cid:90)
+(cid:90)
+k(cid:88)
+
+Now, we can approximate ψ on [l, u] by Chebyshev poly-
+nomials, and hence:
+
+hk((cid:104)θ, φ(x)(cid:105))dν(x)
+
+˜ci(cid:104)θ, φ(x)(cid:105)idν(x)
+
+ψ(x)dν(x) ≈
+
+(cid:32) i(cid:89)
+
+ˆψk(x)dν(x)
+
+(cid:88)
+
+k(cid:88)
+
+Z(θ) =
+
+(cid:33)
+
+(cid:90)
+
+i=0
+
+=
+
+X
+
+X
+
+=
+
+X
+
+X
+
+χφ(j) =: ˆZk(θ).
+
+(10)
+
+=
+
+˜ci
+
+θjl
+
+i=0
+
+j∈[d]i
+
+l=1
+
+Evaluating the last
+line has an asymptotic runtime of
+O(k2n2k) × Time(χφ) which is polynomial in the size of
+the graph. The procedure is summarized in Algorithm 1.
+We will investigate in Section 4 which k is required to
+achieve a reasonable accuracy.
+
+3.1. Complexity-decoupling via Randomization.
+O(k2n2k) is lower than the time that it takes to enumer-
+ate the full state space X , but the partition function has to
+be recomputed every time the model changes. This hap-
+pens frequently during iterative parameter learning proce-
+dures. Moreover, it is well known that the complexity of
+inference is mainly inﬂuenced by the structure (Lauritzen
+& Spiegelhalter, 1988; Wainwright & Jordan, 2008). So
+when this structure does not change, is it necessary to redo
+this costly computation during learning? It turns out that if
+we combine our Algorithm 1 with a probabilistic sampling
+scheme, it is possible to decouple the most costly compu-
+tation from the rest. Surprisingly, the costly part depends
+only on the structure while the feasible part combines it
+with the parameters. To see this, notice that the function
+χφ : [d]k → R is non-negative, hence
+
+Pφ(j | k) = Qφ(k)−1χφ(j)
+
+(11)
+
+) deﬁnes a proper probabil-
+ity mass function (pmf) on [d]k. ˆZk(θ), as given by (10),
+
+j(cid:48)∈[d]k χφ(j
+
+(cid:48)
+
+with Qφ(k) =(cid:80)
+
+k (θ)
+
+if Qφ(i) not cached then
+
+Qφ(i) ←(cid:80)
+
+Algorithm 2 SDCCQ
+Input: θ ∈ Rd, k ∈ N, m ∈ Nk, φ
+Output: Approximate partition function ˜Zm
+1: [l, u] ← interval(θ)
+2: ˜c ← coeﬃcients(k, [l, u])
+3: for i = 1 to k do
+4:
+5:
+6:
+7: ˜Zm
+8: for i = 1 to k do
+9:
+10:
+11:
+12:
+13:
+
+k (θ) ← 0
+sum ← 0
+for r = 1 to mi do
+
+sample j ∼ Pφ(J | i)
+k (θ) ← ˜Zm
+˜Zm
+
+sum ← sum +(cid:81)i
+
+k (θ) + ˜ci × Qφ(i) × 1
+
+cache Qφ(i)
+
+j∈[d]i χφ(j)
+
+l=1 θjl
+
+× sum
+
+mi
+
+may now be rewritten as follows:
+
+i=0
+
+k(cid:88)
+k(cid:88)
+k(cid:88)
+
+i=0
+
+(cid:88)
+
+˜ci
+
+j∈[d]k
+
+˜ciQφ(i)
+
+wiEJ
+
+(cid:32) i(cid:89)
+
+l=1
+
+θjl
+
+Pφ(j | i)
+
+χφ(j)
+
+(cid:88)
+(cid:34) i(cid:89)
+
+j∈[d]k
+
+(cid:35)
+θJ l | i
+
+(cid:33)
+(cid:32) i(cid:89)
+
+l=1
+
+(cid:33)
+
+θjl
+
+(12)
+
+ˆZk(θ) =
+
+=
+
+=
+
+i=0
+
+l=1
+
+l
+
+r=1
+
+(cid:105)
+
+l=1 θj(r)
+
+(cid:81)i
+
+(cid:104)(cid:81)i
+
+(cid:80)m
+l=1 θJ l | i
+= 1
+m
+
+where wi = ˜ciQφ(i) and the expectation is taken with
+respect to the random variable J with pmf Pφ(J =
+(cid:104)(cid:81)i
+j |
+i) as deﬁned in (11). The runtime has not yet
+improved compared to (10). However, notice that the
+(cid:105)
+expectation EJ
+may be approximated via
+l=1 θJ l | i
+ˆEJ
+by drawing m
+samples from Pφ(J | i). Most important, Qφ(i) will not
+change as long as the structure G does not change. This
+procedure is summarized in Algorithm 2.
+It is clear from line 4 that the Qφ(i) are only computed
+once. If they are cached, the runtime is O(k2 maxi mi).
+In Section 4 it is shown which m sufﬁce to guarantee a
+small approximation error. However, we can anticipate that
+mi (cid:28) dk. We like to stress again that the Qφ(i) will not
+change as long as the graphical structure and the state space
+X are ﬁxed, moreover the Qφ(i) need not be computed on
+the same machine. It is reasonable to assume that the Qφ(i)
+are computed on a large cluster while the inference is even-
+tually carried out on a small device with low computational
+resources or energy constraints.
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+s
+d
+n
+o
+c
+e
+S
+
+r
+o
+r
+r
+e
+n
+o
+i
+t
+a
+m
+i
+x
+o
+r
+p
+p
+A
+
+x
+
+(cid:107)θ(cid:107)2
+
+(cid:107)θ(cid:107)2
+
+Num. of CPUs
+
+Figure 1. From left to right: (i): Absolute error of degree-16 Taylor, Remez and DCT approximations of exp(x) on the interval [−5, 5].
+Only Remez and DCT have oscillating error curves. (ii): Theoretical bounds for the absolute error |Z(θ)− ˆZk(θ)| of DCCQ (Alg. 1) as
+a function of the parameter norm for a 4 × 4 Ising grid model, predicted by Lemma 3. (iii): Absolute error |Z(θ) − ˜Zm
+k (θ)| of SDCCQ
+(Alg. 2) as a function of the parameter norm for a 4× 4 Ising grid model. ∀i : mi = 104. (iv): Scalability of SDCCQ (Alg. 2). Runtime
+in seconds as a function of the number of CPU cores for different polynomial degrees. Best viewed in color.
+
+4. Analysis
+The most important prerequisite for our algorithms is χ-
+integrability of the sufﬁcient statistic.
+Lemma 2. The sufﬁcient statistics of a discrete state space
+model, constructed from binary indicator functions, (2), (3)
+and (4), is χ-integrable.
+
+Proof. The state space is discrete and thus the deﬁnition
+of χ-integrability becomes
+
+(cid:32) k(cid:89)
+
+(cid:88)
+
+(cid:33)
+
+,∀k ∈ N,∀j ∈ [d]k
+
+χφ(j) =
+
+Since φ(x)ji is binary, the product(cid:81)k
+
+x∈X
+
+φ(x)ji
+
+i=1
+
+i=1 φ(x)ji is binary
+too. The summation therefore equals the number of in-
+stances x ∈ X for which the product evaluates to 1 for an
+arbitrary but ﬁxed j. We will derive this number now: As
+described in Section 2, each index of the vector φ(x) cor-
+responds to a particular assignment of a value y to a clique
+C. Since j may be any k-dimensional vector with elements
+from {1, 2, . . . , d}, it might happen that it contains incom-
+patible indices. Two incompatible indices correspond to
+two different assignments to the same vertex, which is
+not possible. Since the summation is over all possible in-
+stances, the product can never evaluate to 1 for vectors j
+which contain incompatible indices, and hence χφ(j) = 0.
+Checking if a vector contains a pair of incompatible indices
+can be done with o(k2) comparisons. Any j that contains
+only compatible indices, corresponds to a possible assign-
+ment yU (j) to an induced subset U (j) ⊂ V of vertices.
+The product will evaluate to 1 for every instance x that
+matches this particular assignment, i.e., xU (j) = yU (j).
+Fixing the values of the vertices in U (j) results in a re-
+maining state space of size |X|/|XU (j)|, which is exactly
+the number of times that the product will evaluate to 1. This
+ﬁnally implies that iff j contains no incompatible indices,
+
+then χφ(j) = |X|/|XU (j)| and 0 otherwise. This can of
+course be computed in polynomial time and φ is thus χ-
+(cid:4)
+integrable.
+In the rest of this section, we present our main theorems
+which provide bounds on the error of Algorithms 1 and 2.
+Formally, the following error bound is known for Cheby-
+shev approximations (Xiang et al., 2010).
+Lemma 3. Suppose f is analytic in the region bounded by
+the ellipse Eρ = {z ∈ C : |z +
+z2 − 1| = ρ} with major
+and minor semi-axis lengths summing to ρ > 1, foci at
+±1, and maxz∈Eρ |f (z)| ≤ M. Let gk denote the degree-k
+interpolant of f according to Eq. (9), then for each k ≥ 0,
+
+√
+
+max
+
+z∈{−1,1}
+
+|f (z) − gk(z)| ≤
+
+4M
+
+(ρ − 1)ρk .
+
+2
+
+2 + x u−l
+
+To apply this Lemma in the sequel, we will consider the
+[l, u] → [−1, 1] and
+function f = exp ◦ γ with γ :
+(Bernstein, 1912; Mason & Hand-
+γ(x) = l+u
+scomb, 2002). Any choice of ρ > 1 would sufﬁce, but
+increasing ρ increases the imaginary axis of E, and, at the
+same time, both numerator and denominator of the error
+bound. On the other hand, for ρ = 1, Eρ collapses to the
+real line, which is not compatible with the Lemma. We set
+ρ = 1 +
+Lemma 4. Mean ﬁeld lower bound. Any mean parameter
+P(x)φ(x) yields a lower bound
+on the partition function: A(θ) ≥ (cid:104)θ, µ(cid:105) − A∗(µ), where
+A∗ is the convex conjugate of A = ln Z. (Wainwright &
+Jordan, 2008)
+It can be shown that −A∗ is equal to the Shannon entropy
+
+µ ∈ M◦ with µ = (cid:80)
+
+2 as suggested in (Xiang et al., 2010).
+
+√
+
+x
+
+H(P) = −(cid:80)
+
+P(x) ln P(x).
+
+x
+
+Theorem 5. Deterministic approximation error.
+Let
+φ be χ-integrable, ε > 0, k ≥ (ln 8 + 2 ln M −
+ln(ε(ρ − 1)))(ln ρ)−1 and ∀x : (cid:107)φ(x)(cid:107)2 ≤ B. Then, the
+
+-1x10-7-5x10-8 0 5x10-8 1x10-7-4-2 0 2 4TaylorDCTRemez 0 3000 6000 9000 12000 0 0.25 0.5 0.75 1k=2k=4k=6k=8k=10k=12 0 3000 6000 9000 12000 0 0.25 0.5 0.75 1k=2k=4k=6k=8k=10k=12 0 30 60 90 120 0 8 16 24 32k=2k=4k=8Stochastic Discrete Clenshaw-Curtis Quadrature
+
+output ˆZk(θ) of Algorithm 1 satisﬁes
+|Z(θ) − ˆZk(θ)| ≤ ε
+2
+
+|Z(θ)|.
+
+ability P(X = x) =(cid:81)
+
+Proof. The idea is to show that the lower bound from
+Lemma 4 is also an upper bound for the right-hand-side in
+Lemma 3. To see this, construct the naive mean ﬁeld vari-
+ational lower bound, based on a fully factored joint prob-
+Pv(X v) with uniform vertex
+marginals Pv(X v) = U(Xv) (here we assume that the uni-
+form distribution on Xv exists) for all v ∈ V . This implies
+for edge marginals that Pvu(X v, X u) = Pv(X v)Pu(X u).
+Plugging this into Lemma 4, we get
+
+v∈V
+
+A(θ) ≥ (cid:104)θ, µ(cid:105) + H(µ)
+
+(cid:88)
+
+≥ −(cid:107)θ(cid:107)2(cid:107)µ(cid:107)2 + H(µ)
+
+≥ −(cid:107)θ(cid:107)2B −(cid:88)
+(cid:88)
+
+> − ln M +
+
+x∈Xv
+ln|Xv|
+
+v∈V
+
+v∈V
+
+1
+|Xv| ln
+
+1
+|Xv|
+
+√
+
+since (cid:107)φ(x)(cid:107)2 ≤ B ⇒ (cid:107)µ(cid:107)2 ≤ B. Now,
+√
+let
+M = maxz∈Eρ | exp(γ(z))| = exp(γ(
+2)) = exp((l +
+2(u − l)/2) > exp((l + u)/2 + (u − l)/2) =
+u)/2 +
+exp((cid:107)θ(cid:107)2B) ≥ maxx ψ(x) be an upper bound on the po-
+tential, where we set u = (cid:107)θ(cid:107)2B as suggested in Section 3.
+By applying Lemma 3, it follows that
+
+|Z(θ) − ˆZk(θ)| = |(cid:88)
+≤(cid:88)
+
+x
+
+ψ(x) −(cid:88)
+
+x
+
+|ψ(x) − ˆψ(x)| ≤ |X|
+
+ˆψk(x)|
+
+x
+
+≤ |X| 4ε
+8M
+
+≤ ε
+2
+
+Z(θ)
+
+4M
+
+(ρ − 1)ρk
+
+(cid:4)
+
+Notice that the occurrence of (cid:107)θ(cid:107)2 is an artifact of the
+Cauchy-Schwarz inequality. One may conduct the same
+derivation based on H¨older’s inequality, which in turn
+would replace the term (cid:107)θ(cid:107)2B by (cid:107)θ(cid:107)1B(cid:48).
+Now, we analyze the error that we have to tolerate, if we
+want to apply complexity-decoupling as explained in Sec-
+(cid:80)m
+tion 3.1. Therein, additional error is introduced by ap-
+l=1 θJ l | i] with the
+,
+l=1 θj(r)
+where each j(r) is sampled from the distribution with pmf
+(11). Indeed, ˆEm is unbiased and converges to EJ. How-
+ever, we would like to quantify the amount of samples that
+is required to achieve a desired accuracy.
+
+proximating the expected value EJ [(cid:81)i
+sample mean ˆEm[(cid:81)i
+
+Theorem 6. Let X = X(J ) =(cid:81)i
+
+l=1 θJ l, where J is the
+random variable with pmf (11). Moreover, let εi > 0, ζ0 ∈
+
+l=1 θJ l | i] := 1
+
+(cid:81)i
+
+r=1
+
+m
+
+l
+
+(cid:34)
+
+E
+
+(0, 1) and m ≥ (ln ζ0)/(2(cid:107)θ(cid:107)i∞ − εi |− ln M + ln|X||),
+where M is an upper bound on the potential, then
+
+Proof. Applying a Chernoff-like argument, followed by
+the triangle inequality and Lemma 4, we have
+
+P(cid:16)(cid:12)(cid:12)(cid:12)EJ [X | i] − ˆEm [X | i]
+P(cid:16)(cid:12)(cid:12)(cid:12)ˆEm [X | i] − E [X | i]
+(cid:32)(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) m(cid:88)
+(cid:16)
+(cid:16)
+
+(cid:12)(cid:12)(cid:12) ≥ εi |Z (θ)|(cid:17) ≤ ζ0.
+(cid:12)(cid:12)(cid:12) ≥ εi |Z (θ)|(cid:17) ≤
+(cid:12)(cid:12)(cid:12)(cid:12)(cid:12) + m|E [X]| − mεi |Z (θ)|
+(cid:33)(cid:35)
+m2(cid:107)θ(cid:107)i∞ − mεi |Z (θ)|(cid:17) ≤
+(cid:16)
+2(cid:107)θ(cid:107)i∞ − εi |− ln M + ln|X||(cid:17)(cid:17)
+
+exp
+
+≤
+
+Xl
+
+l=1
+
+exp
+
+m
+
+exp
+
+= ζ0
+(cid:4)
+Theorem 7. Stochastic approximation error. Let the pre-
+let ζ ∈
+conditions of Theorem 5 hold. Furthermore,
+k )/(2(cid:107)θ(cid:107)i∞ −
+(0, 1).
+2k|wi| |ln|X| − ln M|) delivers an (ε, ζ)-approximation of
+the partition function. In particular,
+
+Algorithm 2 with mi ≥ (ln ζ
+
+ε
+
+| i] and wi =
+
+k (θ)| ≥ εZ(θ)
+
+l=1 θJ l
+
+˜ciQφ(i). We conclude, that
+
+Proof. Let X = X(J ) = [(cid:81)i
+P(cid:16)|Z(θ) − ˜Zm
+(cid:32) k(cid:88)
+(cid:18)
+k(cid:88)
+|EJ [X | i] − ˆEmi[X | i]| ≥ ε
+
+|EJ [X | i] − ˆEmi[X | i]| ≥ ε
+
+(cid:17) ≤
+(cid:33)
+k (θ)| ≥ εZ(θ)
+(cid:19)
+
+2|wi| Z(θ)
+
+≤
+
+i=1
+
+P
+
+P
+
+2k|wi| Z(θ)
+
+i=1
+from the triangle inequality and Theorem 5. Now, the claim
+k . (cid:4)
+follows from Theorem 6 with εi = ε
+Notice that ˜c is required to compute m. But this is not re-
+strictive, since ˜c can be computed easily with (8) followed
+by a conversion to native coefﬁcients. Hence, it is safe to
+assume that the ˜c are available for computing m.
+
+2k|wi| and ζ0 = ζ
+
+P(cid:16)|Z(θ) − ˜Zm
+
+(cid:17) ≤ ζ.
+
+5. Numerical Evaluation
+For our experiments, we implemented DCCQ (Alg. 1) and
+SDCCQ (Alg. 2) and execute them on a machine with
+40 E5-2697 Xeon CPU cores. The numerical evaluation
+should show that SDCCQ achieves highly accurate results
+whenever the norm of the parameter vector is small. In ad-
+dition, we investigate cases when the norm is not small and
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+r
+o
+r
+r
+e
+n
+o
+i
+t
+a
+m
+i
+x
+o
+r
+p
+p
+A
+
+Figure 2. Estimation errors for the log-partition function on 10 × 10 Ising grids with randomly generated parameter vectors for various
+coupling strengths. (i): attractive, κ = 0.1, (ii) attractive, κ = 1.0, (iii) mixed, κ = 0.1, (iv) mixed, κ = 1.0. Best viewed in color.
+
+compare our method to the approaches which are listed in
+Table 1. Finally, we analyze the scalability of SDCCQ in
+terms of parallel computing.
+One of the main beneﬁts of SDCCQ is the complexity-
+decoupling. This allows us to compute the Qφ(i) (see
+Alg. 2) only once per structure and reuse them in every
+run2. In total, we computed the Qφ(i) for Ising grid mod-
+els with sizes 2× 2, . . . , 128× 128 and i ∈ {1, 2, . . . , 16}.
+
+Parameters with small norm. First of all, we show that
+SDCCQ achieves small errors when the norm of θ is small
+(≤ 1). Therefore, we conducted a 4× 4 Ising grid with ran-
+dom Gaussian parameters, i.e., θi ∼ N (0, σ). We varied
+σ from 10−4 to 1 in order to generate models with vari-
+ous norms. The partition function was then estimated by
+SDCCQ for polynomial degrees in {2, 4, 6, 8, 10, 12} with
+mi = 103,∀i, while the correct value of the partition func-
+tion was computed by the JT algorithm. In Figure 1 (iii),
+the average absolute estimation error, |Z(θ) − ˜Zm
+k (θ)| (y-
+axis), is plotted against the norm of θ (x-axis). For com-
+parison, the theoretical error curves which are implied by
+Lemma 3 are depicted in Figure 1 (ii). Empirically, the
+error of the stochastic low-degree approximations is lower
+than predicted while the error of the high-degree approxi-
+mations is higher than predicted. Note, however, that the
+error bound of SDCCQ (Theorem 7) is stochastic, i.e., an
+ε-approximation is achieved with a certain probability. Fur-
+ther experiments show that the error can indeed be de-
+creased by increasing the mi. In this setting, an absolute
+error of 12000 corresponds to a relative error of ε < 0.2.
+
+Parameters with large norm.
+In the second experiment,
+we investigate the quality of our new method when the
+norm of the parameter vector is (cid:29) 1 and hence, The-
+orem 7 predicts a high error for small polynomial de-
+grees. Nevertheless, the question is how SDCCQ com-
+pares to other approaches. We use the same experimen-
+
+2Our C++ source code and the precomputed Qφ(i) values are
+available at http://sfb876.tu-dortmund.de/sdccq.
+
+tal setup as in (Ermon et al., 2013). Speciﬁcally, we have
+n = 10 × 10 binary variables x ∈ {−1, 1}n with weights
+θvu=xy = −wvu whenever x (cid:54)= y and θvu=xy = wvu oth-
+erwise. In the attractive setting, the wvu are drawn from
+[0, ω]; in the mixed setting, from [−ω, ω]. Moreover, ver-
+tex weights θv=1 = −θv=−1 = wv are sampled from
+[−κ, κ] with κ ∈ {0.1, 1.0}. This setting implies that (cid:107)θ(cid:107)2
+is in the range [3.86, 44.53], which is far outside of the in-
+terval in which we should expect small errors. Figure 2
+shows the estimation error for the log-partition function,
+k (θ) − ln Z(θ), averaged over 5-folds of SD-
+i.e.
+CCQ, WISH, MF, TRW and LBP. SDCCQ has been run
+with mi = 103,∀i and k ∈ {1, 2, 4, 8}, where, due to
+space restrictions, the plot shows the average over all SD-
+CCQ runs. Individual runs are within a standard deviation
+of 5. Clearly, the error increases for increasing coupling
+strengths. However, SDCCQ is often close to the MF lower
+bound or the TRW upper bound. WISH, delivers the most
+accurate result but has by far the largest complexity per run.
+
+ln ˜Zm
+
+Scalability. Finally, we analyze the empirical runtime on
+randomly parametrized Ising grids with 128× 128 vertices.
+Since the major computational cost in Algorithms 1 and 2
+arise through a large summation and the sampling step, re-
+spectively, both are easy to parallelize. We restricted the
+execution to a subset of the available CPU cores and mea-
+sured the runtime in seconds. The result is shown in Fig. 1
+(iv), where SDCCQ scales well with an increasing number
+of CPU cores.
+
+Conclusion. For the ﬁrst time, we exploited quadrature
+rules to construct an approximation to the partition func-
+tion of probabilistic models with arbitrary structure. We
+derived bounds on the error and compared the new algo-
+rithm to other methods. It turned out that the new method
+scales well on multi-core systems and that it delivers supe-
+rior results, whenever the norm of the model’s parameter
+vector is small. Moreover, complexity-decoupling allows
+us to run probabilistic inference with error guarantees on
+small, resource-constrained devices.
+
+-30-15 0 15 0 0.5 1 1.5 2 2.5 3Coupling strength ωSDCCQTRWLBPMFWISH-30-15 0 15 0 0.5 1 1.5 2 2.5 3Coupling strength ωSDCCQTRWLBPMFWISH-30-15 0 15 0 0.5 1 1.5 2 2.5 3Coupling strength ωSDCCQTRWLBPMFWISH-30-15 0 15 0 0.5 1 1.5 2 2.5 3Coupling strength ωSDCCQTRWLBPMFWISHStochastic Discrete Clenshaw-Curtis Quadrature
+
+Acknowledgments
+This work has been supported by the Deutsche Forschungs-
+gemeinschaft (DFG) within the collaborative research cen-
+ter SFB 876, project A1.
+
+References
+Bernstein, Sergei Natanovich. Sur la meilleure approxima-
+tion des fonctions continues par les polynˆomes du degr´e
+donn´e. i. Communications de la Soci´et´e math´ematique
+de Kharkow. 2-´ee s´erie, 13(2–3):49–144, 1912.
+
+Bethe, Hans A. Statistical theory of superlattices. Proceed-
+ings of the Royal Society of London. Series A, Mathemat-
+ical and Physical Sciences, 150(871):552–575, 1935.
+
+Blei, David M., Ng, Andrew Y., and Jordan, Michael I. La-
+tent Dirichlet allocation. Journal of Machine Learning
+Research, 3:993–1022, 2003.
+
+Bulatov, Andrei and Grohe, Martin. The complexity of
+In Daz, Josep, Karhumki, Juhani,
+partition functions.
+Lepist, Arto, and Sannella, Donald (eds.), Automata,
+Languages and Programming, volume 3142 of Lecture
+Notes in Computer Science, pp. 294–306. Springer, Hei-
+delberg, Germany, 2004.
+
+Clenshaw, C. W. and Curtis, A. R. A method for numer-
+ical integration on an automatic computer. Numerische
+Mathematik, 2(1):197–205, 1960.
+
+Clifford, Peter. Markov random ﬁelds in statistics. In Dis-
+order in physical systems, Oxford Science Publications,
+pp. 19–32. Oxford University Press, New York, 1990.
+
+Cover, Thomas M. and Thomas, Joy A. Elements of In-
+formation Theory. John Wiley & Sons, New York, NY,
+USA, 2nd edition, 2006. ISBN 978-0471241959.
+
+Ermon, Stefano, Gomes, Carla P., Sabharwal, Ashish, and
+Selman, Bart. Taming the curse of dimensionality: Dis-
+crete integration by hashing and optimization. In 30th In-
+ternational Conference on Machine Learning, pp. 334–
+342, 2013.
+
+Fraser, W. A survey of methods of computing minimax and
+near-minimax polynomial approximations for functions
+of a single independent variable. Journal of the ACM, 12
+(3):295–314, July 1965.
+
+Frey, Brendan J. Local probability propagation for fac-
+tor analysis. In Solla, S.A., Leen, T.K., and M¨uller, K.
+(eds.), Advances in Neural Information Processing Sys-
+tems, volume 12, pp. 442–448. MIT Press, Cambridge,
+MA, USA, 2000.
+
+Gautschi, W. Questions of numerical condition related to
+polynomials. Studies in Numerical Analysis, (24):140–
+177, 1985.
+
+Girolami, Mark and Calderhead, Ben. Riemann manifold
+Langevin and Hamiltonian Monte Carlo methods. Jour-
+nal of the Royal Statistical Society: Series B (Statistical
+Methodology), 73(2):123–214, 2011.
+
+Goldberg, Leslie Ann and Jerrum, Mark. A polynomial-
+time algorithm for estimating the partition function of
+the ferromagnetic Ising model on a regular matroid.
+SIAM Journal on Computing, 42(3):1132–1157, 2013.
+
+Gr¨unwald, Peter D. The Minimum Description Length
+Principle. The MIT Press, Cambridge, MA, USA, 2007.
+ISBN 978-0262072816.
+
+Han, Insu, Malioutov, Dmitry, and Shin, Jinwoo. Large-
+scale log-determinant computation through stochastic
+In 32nd International Confer-
+Chebyshev expansions.
+ence on Machine Learning, pp. 908–917, 2015.
+
+Heskes, Tom. Stable ﬁxed points of loopy belief propaga-
+tion are local minima of the Bethe free energy. In Becker,
+S., Thrun, S., and Obermayer, K. (eds.), Advances in
+Neural Information Processing Systems, volume 15, pp.
+343–350, 2002.
+
+Jaakkola, Tommi S. and Jordan, Michael I. Computing up-
+per and lower bounds on likelihoods in intractable net-
+In 12th Annual Conference on Uncertainty in
+works.
+Artiﬁcial Intelligence, pp. 340–348. Morgan Kaufmann
+Publishers, 1996.
+
+Koller, Daphne and Friedman, Nir. Probabilistic Graphical
+Models - Principles and Techniques. MIT Press, 2009.
+ISBN 978-0262013192.
+
+Kschischang, Frank R., Frey, Brendan J., and Loeliger,
+Hans-Andrea. Factor graphs and the sum-product algo-
+rithm. IEEE Transactions on Information Theory, 47(2):
+498–519, 2001.
+
+Lauritzen, Steffen L. Graphical Models. Oxford University
+
+Press, Oxford, UK, 1996. ISBN 978-0198522195.
+
+Lauritzen, Steffen L. and Spiegelhalter, David J. Local
+computations with probabilities on graphical structures
+and their application to expert systems. Journal of the
+Royal Statistical Society. Series B (Methodological), 50
+(2):157–224, 1988.
+
+Liu, Qiang, Peng, Jian, Ihler, Alexander, and Fisher III,
+John. Estimating the partition function by discriminance
+sampling. In 31st Annual Conference on Uncertainty in
+Artiﬁcial Intelligence, pp. 514–522. AUAI Press, 2015.
+
+Stochastic Discrete Clenshaw-Curtis Quadrature
+
+Mason, J.C. and Handscomb, David C. Chebyshev Polyno-
+mials. Chapman and Hall/CRC, 1st edition, 2002. ISBN
+978-0849303555.
+
+Weinberger, Kilian Q. (eds.), Advances in Neural Infor-
+mation Processing Systems, volume 27, pp. 909–917,
+2014.
+
+Xiang, Shuhuang, Chen, Xiaojun, and Wang, Haiyong. Er-
+ror bounds for approximation in Chebyshev points. Nu-
+merische Mathematik, 116(3):463–491, 2010.
+
+Yedidia, Jonathan S., Freeman, William T., and Weiss, Yair.
+Exploring artiﬁcial intelligence in the new millennium.
+chapter Understanding Belief Propagation and its Gen-
+eralizations, pp. 239–269. Morgan Kaufmann Publishers
+Inc., San Francisco, CA, USA, 2003.
+
+Pearl, Judea. Probabilistic Reasoning in Intelligent Sys-
+tems: Networks of Plausible Inference. Morgan Kauf-
+mann Publishers, Burlington, MA, USA, 1988.
+ISBN
+978-1558604797.
+
+Pitman, Edwin James George. Sufﬁcient statistics and in-
+trinsic accuracy. Mathematical Cambridge Philosophi-
+cal Society, 32:567–579, 1936.
+
+Ranganath, Rajesh, Tang, Linpeng, Charlin, Laurent, and
+Blei, David M. Deep exponential families. In Lebanon,
+Guy and Vishwanathan, S. V. N. (eds.), 18th Interna-
+tional Conference on Artiﬁcial Intelligence and Statis-
+tics, volume 38 of JMLR W&CP. JMLR.org, 2015.
+
+Ruozzi, Nicholas. The Bethe partition function of log-
+supermodular graphical models. In Pereira, F., Burges,
+C.J.C., Bottou, L., and Weinberger, Kilian Q. (eds.), Ad-
+vances in Neural Information Processing Systems, vol-
+ume 25, pp. 117–125. Curran Associates, Inc., 2012.
+
+Schraudolph, Nicol N. and Kamenetsky, Dmitry. Efﬁ-
+cient exact inference in planar Ising models. In Koller,
+Daphne, Schuurmans, Dale, Bengio, Yoshua, and Bot-
+tou, L´eon (eds.), Advances in Neural Information Pro-
+cessing Systems, volume 21, pp. 1417–1424, 2008.
+
+Sutton, Charles and McCallum, Andrew. An introduction
+to conditional random ﬁelds. Foundations and Trends in
+Machine Learning, 4(4):267–373, 2011.
+
+Valiant, Leslie G. The complexity of enumeration and re-
+liability problems. SIAM Journal on Computing, 8(3):
+410–421, 1979.
+
+Wainwright, Martin J. and Jordan, Michael I. Graphical
+models, exponential families, and variational inference.
+Foundations and Trends in Machine Learning, 1(1–2):
+1–305, 2008.
+
+Wainwright, Martin J., Jaakkola, Tommi S., and Willsky,
+Alan S. A new class of upper bounds on the log partition
+function. IEEE Transactions on Information Theory, 51
+(7):2313–2335, 2005.
+
+Weiss, Yair. Comparing the mean ﬁeld method and be-
+lief propagation for approximate inference in MRFs. In
+Opper, M. and Saad, D. (eds.), Advanced Mean Field
+Methods:Theory and Practice, pp. 229–239. MIT Press,
+Cambridge, MA, USA, 2001.
+
+Weller, Adrian and Jebara, Tony. Clamping variables
+and approximate inference.
+In Ghahramani, Zoubin,
+Welling, Max, Cortes, Corinna, Lawrence, Neil D., and
+
+

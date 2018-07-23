@@ -1,0 +1,1161 @@
+The Information Sieve
+
+Greg Ver Steeg
+University of Southern California, Information Sciences Institute, Marina del Rey, CA 90292 USA
+Aram Galstyan
+University of Southern California, Information Sciences Institute, Marina del Rey, CA 90292 USA
+
+GREGV@ISI.EDU
+
+GALSTYAN@ISI.EDU
+
+Abstract
+
+We introduce a new framework for unsupervised
+learning of representations based on a novel hi-
+erarchical decomposition of information.
+Intu-
+itively, data is passed through a series of pro-
+gressively ﬁne-grained sieves. Each layer of the
+sieve recovers a single latent factor that is maxi-
+mally informative about multivariate dependence
+in the data. The data is transformed after each
+pass so that the remaining unexplained informa-
+tion trickles down to the next layer. Ultimately,
+we are left with a set of latent factors explain-
+ing all the dependence in the original data and
+remainder information consisting of independent
+noise. We present a practical implementation of
+this framework for discrete variables and apply it
+to a variety of fundamental tasks in unsupervised
+learning including independent component anal-
+ysis, lossy and lossless compression, and predict-
+ing missing values in data.
+
+The hope of ﬁnding a succinct principle that elucidates the
+brain’s information processing abilities has often kindled
+interest in information-theoretic ideas (Barlow, 1989; Si-
+moncelli & Olshausen, 2001).
+In machine learning, on
+the other hand, the past decade has witnessed a shift in
+focus toward expressive, hierarchical models, with suc-
+cesses driven by increasingly effective ways to leverage la-
+beled data to learn rich models (Schmidhuber, 2015; Ben-
+gio et al., 2013). Information-theoretic ideas like the vener-
+able InfoMax principle (Linsker, 1988; Bell & Sejnowski,
+1995) can be and are applied in both contexts with empiri-
+cal success but they do not allow us to quantify the informa-
+tion value of adding depth to our representations. We intro-
+duce a novel incremental and hierarchical decomposition of
+information and show that it deﬁnes a framework for unsu-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+pervised learning of deep representations in which the in-
+formation contribution of each layer can be precisely quan-
+tiﬁed. Moreover, this scheme automatically determines the
+structure and depth among hidden units in the representa-
+tion based only on local learning rules.
+The shift in perspective that enables our information de-
+composition is to focus on how well the learned repre-
+sentation explains multivariate mutual information in the
+data (a measure originally introduced as “total correla-
+tion” (Watanabe, 1960)).
+Intuitively, our approach con-
+structs a hierarchical representation of data by passing it
+through a sequence of progressively ﬁne-grained sieves. At
+the ﬁrst layer of the sieve we learn a factor that explains as
+much of the dependence in the data as possible. The data is
+then transformed into the “remainder information”, which
+has this dependence extracted. The next layer of the sieve
+looks for the largest source of dependence in the remainder
+information, and the cycle repeats. At each step, we obtain
+a successively tighter upper and lower bound on the multi-
+variate information in the data, with convergence between
+the bounds obtained when the remaining information con-
+sists of nothing but independent factors. Because we end up
+with independent factors, one can also view this decompo-
+sition as a new way to do independent component analysis
+(ICA) (Comon, 1994; Hyv¨arinen & Oja, 2000). Unlike tra-
+ditional methods, we do not assume a speciﬁc generative
+model of the data (i.e., that it consists of a linear trans-
+formation of independent sources) and we extract indepen-
+dent factors incrementally rather than all at once. The im-
+plementation we develop here uses only discrete variables
+and is therefore most relevant for the challenging problem
+of ICA with discrete variables, which has applications to
+compression (Painsky et al., 2014).
+After providing some background in Sec. 1, we introduce
+a new way to iteratively decompose the information in data
+in Sec. 2, and show how to use these decompositions to
+deﬁne a practical and incremental framework for unsuper-
+vised representation learning in Sec. 3. We demonstrate the
+versatility of this framework by applying it ﬁrst to indepen-
+dent component analysis (Sec. 4). Next, we use the sieve
+
+The Information Sieve
+
+cause of the dependence in Xi. To formalize this, we in-
+troduce the multivariate mutual information which was ﬁrst
+introduced as “total correlation” (Watanabe, 1960).
+
+(cid:33)
+
+n(cid:89)
+
+as a lossy compression to perform tasks typically relegated
+to generative models including in-painting and generating
+new samples (Sec. 5). Finally, we cast the sieve as a loss-
+less compression and show that it beats standard compres-
+sion schemes on a benchmark task (Sec. 6).
+
+1 Information-theoretic learning
+
+background
+
+Using standard notation (Cover & Thomas, 2006), capital
+Xi denotes a random variable taking values in some do-
+main and whose instances are denoted in lowercase, xi. In
+this paper, the domain of all variables are considered to be
+discrete and ﬁnite. We abbreviate multivariate random vari-
+ables, X ≡ X1:n ≡ X1, . . . , Xn, with an associated prob-
+ability distribution, pX (X1 = x1, . . . , Xn = xn), which
+is typically abbreviated to p(x). We will index different
+groups of multivariate random variables with superscripts,
+X k, as deﬁned in Fig. 1. We let X 0 denote the original ob-
+served variables and we often omit the superscript in this
+case for readability.
+Entropy is deﬁned in the usual way as H(X) ≡
+EX [log 1/p(x)]. We use base two logarithms so that the
+unit of information is bits. Higher-order entropies can be
+constructed in various ways from this standard deﬁnition.
+For instance, the mutual information between two groups
+of random variables, X and Y can be written as the reduc-
+tion of uncertainty in one variable, given information about
+the other, I(X; Y ) = H(X) − H(X|Y ).
+The “InfoMax” principle (Linsker, 1988; Bell & Se-
+jnowski, 1995) suggests that for unsupervised learning we
+should construct Y ’s to maximize their mutual information
+with X, the data. Despite its intuitive appeal, this approach
+has several potential problems (see (Ver Steeg et al., 2014)
+for one example). Here we focus on the fact that the Info-
+Max principle is not very useful for characterizing “deep
+representations”, even though it is often invoked in this
+context (Vincent et al., 2008). This follows directly from
+the data processing inequality (a similar argument appears
+in (Tishby & Zaslavsky, 2015)). Namely, if we start with
+X, construct a layer of hidden units Y 1 that are a function
+of X, and continue adding layers to a stacked representa-
+tion so that X → Y 1 → Y 2 . . . Y k, then the information
+that the Y ’s have about X cannot increase after the ﬁrst
+layer, I(X; Y 1:k) = I(X; Y 1). From the point of view of
+mutual information, Y 1 is a copy and Y 2 is just a copy of
+a copy. While a coarse-grained copy might be useful, the
+InfoMax principle does not quantify how or why.
+Instead of looking for a Y that memorizes the data, we shift
+our perspective to searching for a Y so that the Xi’s are as
+independent as possible conditioned on this Y . Essentially,
+we are trying to reconstruct the latent factors that are the
+
+(cid:32)
+n(cid:88)
+
+i=1
+
+T C(X) ≡ DKL
+
+p(x)||
+
+p(xi)
+
+i=1
+
+(1)
+
+=
+
+H(Xi) − H(X)
+
+This quantity reﬂects the dependence in X and is zero if
+and only if the Xi’s are independent. Just as mutual infor-
+mation is the reduction of entropy in X after conditioning
+on Y , we can deﬁne the reduction in multivariate informa-
+tion in X after conditioning on Y .
+
+T C(X; Y ) ≡
+=
+
+n(cid:88)
+
+i=1
+
+T C(X) − T C(X|Y )
+I(Xi; Y ) − I(X; Y ).
+
+(2)
+
+That T C(X) can be hierarchically decomposed in terms
+of short and long range dependencies was already appreci-
+ated by Watanabe (Watanabe, 1960) and has been used in
+applications such as hierarchical clustering (Kraskov et al.,
+2005). This provides a hint about how higher levels of hier-
+archical representations can be useful: more abstract repre-
+sentations should reﬂect longer range dependencies in the
+data. Our contribution below is to demonstrate a tractable
+approach for learning a hierarchy of latent factors, Y , that
+exactly capture the multivariate information in X.
+
+Incremental information decomposition
+
+2
+We consider any set of probabilistic functions of some in-
+put variables, X, to be a “representation” of X. Looking at
+Fig. 1(a), we consider a representation with a single learned
+latent factor, Y . Then, we try to save the information in X
+that is not captured by Y into the “remainder information”,
+¯X. The ﬁnal result is encapsulated in Cor. 2.4 which says
+that we can repeat this procedure iteratively (as in Fig. 1(b))
+and T C(X) decomposes into a sum of non-negative con-
+tributions from each Yk. Note that X (k) includes Yk, so
+that Y ’s at subsequent layers can depend on latent factors
+learned at earlier layers.
+Theorem 2.1. Incremental Decomposition of Infor-
+mation Let Y be some (deterministic)
+function of
+X1, . . . , Xn and let ¯Xi be a probabilistic function of Xi, Y ,
+for each i = 1, . . . , n. Then the following upper and lower
+bounds on T C(X) hold:
+
+(cid:0)T C( ¯X) + T C(X; Y )(cid:1)
+
+n(cid:88)
+
+A ≤ T C(X) −
+A = −
+
+i=1
+
+I( ¯Xi; Y ), B =
+
+n(cid:88)
+
+i=1
+
+≤ B
+H(Xi| ¯Xi, Y )
+
+(3)
+
+The Information Sieve
+
+(a)
+
+(b)
+
+X 0 : X1 . . . Xn
+1 . . . X 1
+X 1 : X 1
+X 2 : X 2
+1 . . . X 2
+···
+X k : X k
+
+1 . . . X k
+
+n Y1
+n Y 2
+
+1 Y2
+
+n Y k
+
+1 Y k
+
+2 Yk
+
+Figure 1. (a) This diagram describes one layer of the information
+sieve. In this graphical model, the variables in the top layer (Xi’s)
+represent (observed) input variables. Y is some function of all the
+Xi’s that is optimized to be maximally informative about multi-
+variate dependence in X. The remainder information, ¯Xi depends
+on Xi and Y and is set to contain information in Xi that is not
+captured by Y . (b) Summary of variable naming scheme for mul-
+tiple layers of the sieve. The input variables are in bold and the
+learned latent factors are in red.
+
+A proof is provided in App. B. Note that the remainder
+information, ¯X ≡ ¯X1, . . . , ¯Xn, Y , includes Y . Bounds
+on T C(X) also provide bounds on H(X) by using Eq. 1.
+Next, we point out that the remainder information, ¯X, can
+be chosen to make these bounds tight.
+Lemma 2.2. Construction of perfect remainder in-
+formation For discrete, ﬁnite random variables Xi, Y
+drawn from some distribution, p(Xi, Y ), it is possible to
+deﬁne another random variable ¯Xi ∼ p( ¯Xi|Xi, Y ) that
+satisﬁes the following two properties:
+
+I( ¯Xi; Y ) = 0 Remainder contains no Y info
+(i)
+(ii) H(Xi| ¯Xi, Y ) = 0 Original is perfectly recoverable
+We give a concrete construction in App. C. We would like
+to point out one caveat here. The cardinality of ¯Xi may
+have to be large to satisfy these equalities. For a ﬁxed num-
+ber of samples, this may cause difﬁculties with estimation,
+as discussed in Sec. 3. With perfect remainder information
+in hand, our decomposition becomes exact.
+Corollary 2.3. Exact decomposition For Y a function
+of X and perfect remainder information, ¯Xi, i = 1, . . . , n,
+as deﬁned in Lemma 2.2,
+the following decomposition
+holds:
+
+dependence in ¯X. This decomposition can then be iterated
+to extract more and more information from the data.
+Corollary 2.4. Iterative decomposition Using the vari-
+able naming scheme in Fig. 1(b), we construct a hierarchi-
+cal representation where each Yk is a function of X k−1
+and X k includes the (perfect) remainder information from
+X k−1 according to Lemma 2.2.
+
+r(cid:88)
+
+T C(X) = T C(X r) +
+
+T C(X k−1; Yk)
+
+(5)
+
+k=1
+
+It is easy to check that Eq. 5 results from repeated applica-
+tion of Cor. 2.3. We show in the next section that the quan-
+tities of the form T C(X k−1; Yk) can be estimated and opti-
+mized over efﬁciently, despite involving high-dimensional
+variables. As we add the (non-negative) contributions from
+optimizing T C(X k−1; Yk), the remaining dependence in
+the remainder information, T C(X k), must decrease be-
+cause T C(X) is some data-dependent constant. Decom-
+posing data into independent factors is exactly the goal of
+ICA, and the connections are discussed in Sec. 4.
+
+Implementing the sieve
+
+3
+Because this learning framework contains many unfamiliar
+concepts, we consider a detailed analysis of a toy problem
+in Fig. 2 while addressing concrete issues in implementing
+the information sieve.
+
+Y1 = arg max
+
+Y =f (X)
+
+T C(X; Y )
+
+X 1
+X 1
+X 1
+
+1 = X1 + Y1 mod 2
+2 = X2 + Y1 mod 2
+3 = X3
+
+Data
+
+Remainder
+
+X1 X2 X3 Y1 X 1
+0 0
+0
+0
+0 0
+1
+1 0
+1
+1 0
+
+2 X 1
+1 X 1
+3
+1
+0
+0
+0
+0
+0
+0
+1
+
+0
+0
+1
+1
+
+1
+0
+0
+1
+
+Figure 2. A simple example for which we imagine we have sam-
+ples of X drawn from some distribution.
+
+Step 1: Optimizing T C(X k−1; Yk)
+First, we construct
+a variable, Yk, that is some arbitrary function of X k−1 and
+that explains as much of the dependence in the data is pos-
+sible. Note that we have to pick the cardinality of Yk and
+we will always use binary variables. Dropping the layer
+indices, k, the optimization can be written as follows.
+
+T C(X) = T C( ¯X) + T C(X; Y )
+
+(4)
+
+max
+p(y|x)
+
+I(Xi; Y ) − I(X; Y )
+
+(6)
+
+The above corollary follows directly from Eq. 3 and the
+deﬁnition of perfect remainder information. Intuitively, it
+states that the dependence in X can be decomposed into a
+piece that is explained by Y , T C(X; Y ), and the remaining
+
+Here, we have relaxed the optimization to allow for prob-
+abilistic functions of X. If we take the derivative of this
+expression (along with the constraint that p(y|x) should be
+normalized) and set it equal to zero, the following simple
+
+(cid:88)
+
+i
+
+¯X1¯X2¯Xi¯XnXnXiX1X2Input variablesRemainder informationY¯X:The Information Sieve
+
+ﬁxed point equation emerges.
+
+n(cid:89)
+
+i=1
+
+p(y|x) =
+
+p(y)
+Z(x)
+
+p(xi|y)
+p(xi)
+
+i
+
+i
+
+i
+
+|X k
+
+The state space of X is exponentially large in n, the num-
+ber of variables. Fortunately, this ﬁxed point equation tells
+us that we can write the solution in terms of a linear num-
+ber of terms which are just marginal likelihood ratios. De-
+tails of this optimization are discussed in Sec. A. Note that
+the optimization provides a probabilistic function which
+we round to a deterministic function by taking the most
+likely value of Y for each X.
+In the example in Fig. 2,
+T C(X; Y1) = 1 bit, which can be veriﬁed from Eq. 2.
+Surprisingly, we did not need to restrict or parametrize the
+set of possible functions; the simple form of the solution
+was implied by the objective. Furthermore, we can also use
+this function to ﬁnd labels for previously unseen examples
+or to calculate Y ’s for data with missing variables (details
+in Sec. A). Not only that, but a byproduct of the procedure
+is to give us a value for the objective T C(X k−1; Yk), which
+can be estimated even from a small number of samples.
+Step 2: Remainder information Next, the goal is to
+construct the remainder information, X k
+i , as a probabilistic
+function of X k−1
+, Yk, so that the following conditions are
+i ; Y1) = 0 and (ii)H(X k−1
+satisﬁed: (i)I(X k
+i , Yk) =
+0. This can be done exactly and we provide a simple al-
+gorithm in Sec. C. Solutions for this example are given in
+Fig. 2. Concretely, we estimate the marginals, p(xk−1
+, yk)
+from data and then write down a conditional probability ta-
+ble, p(xk
+, yk), satisfying the conditions. The exam-
+ple in Fig. 2 was constructed so that the remainder informa-
+tion had the same cardinality as the original variables. This
+is not always possible. While we can always achieve per-
+fect remainder information by letting the cardinality of the
+remainder information grow, it might become difﬁcult to
+estimate marginals of the form p(X k−1
+, Yk) at subsequent
+layers of the sieve, as is required for the optimization in step
+1. In results shown below we allow the cardinality of the
+variables to increase by only one at each level to avoid state
+space explosion, even if doing so causes I(X k−1
+; Yk) > 0.
+We keep track of these penalty terms so that we can report
+accurate lower bounds using Eq. 3.
+Another issue to note is that in general there may not be
+a unique choice for the remainder information. In the ex-
+3 = X3,
+ample, I(X3; Y ) = 0 already so we choose X 1
+3 = X3 + Y1 mod 2 would also have been a valid
+but X 1
+i = X k−1
+choice. If the identity transformation, X k
+satis-
+ﬁes the conditions, we will always choose it.
+Step 3: Repeat until the end At this point we repeat the
+procedure, putting the remainder information back into step
+1 and searching for a new latent factor that explains any re-
+maining dependency. In this case, we can see by inspection
+
+i |xk−1
+
+i
+
+i
+
+i
+
+i
+
+that T C(X 1) = 0 and, using Eq. 5, we have T C(X) =
+T C(X 1) + T C(X; Y1) = 1 bit. Generally,
+in high-
+dimensional spaces it may be difﬁcult to verify that the
+remainder information is truly independent. When the re-
+mainder information is independent, the result of attempt-
+ing the optimization maxp(yk|xk−1) T C(X k−1; Yk) = 0.
+In practice, we stop our hierarchical procedure when the
+optimization in step 1 stops producing positive results be-
+cause it means our bounds are no longer tightening. Code
+implementing this entire pipeline is available (Ver Steeg).
+Prediction and compression Note that our condition for
+the remainder information that H(X k−1
+i , Yk) = 0 im-
+plies that we can perfectly reconstruct each variable X k−1
+from the remainder information at the next layer. There-
+fore, we can in principle reconstruct the data from the rep-
+resentation at the last layer of the sieve. In the example,
+the remainder information requires two bits to encode each
+variable separately, while the data requires three bits to en-
+code each variable separately. The ﬁnal representation has
+exploited the redundancy between X1, X2 to create a more
+succinct encoding. A use case for lossy compression is dis-
+cussed in Sec. 5. Also note that at each layer some variables
+are almost or completely explained (X 1
+2 in the example
+become constant). Subsequent layers can enjoy a compu-
+tational speed-up by ignoring these variables that will no
+longer contribute to the optimization.
+
+1 , X 1
+
+|X k
+
+i
+
+i
+
+H(Y ) = (cid:80)
+
+4 Discrete ICA
+If X represents observed variables then the entropy, H(X),
+can be interpreted as the average number of bits required
+to encode a single observation of these variables. In prac-
+tice, however, if X is high-dimensional then estimating
+H(X) or constructing this code requires detailed knowl-
+edge of p(x), which may require exponentially many sam-
+ples in the number of variables. Going back at least to Bar-
+low (Barlow, 1989), it was recognized that if X is trans-
+formed into some other basis, Y , with the Y ’s independent
+(T C(Y ) = 0), then the coding cost in this new basis is
+j H(Yj), i.e., it is the same as encoding each
+variable separately. This is exactly the problem of indepen-
+dent component analysis: transform the data into a basis
+for which T C(Y ) = 0, or is minimized (Comon, 1994;
+Hyv¨arinen & Oja, 2000).
+While our method does not directly minimize the total cor-
+relation of Y , Eq. 5 shows that, because T C(X) is a data-
+dependent constant, every increase in the total correlation
+explained by each latent factor directly implies a reduction
+in the dependence of the resulting representation,
+T C(X k−1; Yk).
+
+r(cid:88)
+
+T C(X r) = T C(X) −
+
+k=1
+
+Since the terms in the sum are optimized (and always non-
+
+The Information Sieve
+
+Figure 3. On the far left, we consider three independent binary random variables, S1, S2, S3. The vertical position of each signal is
+offset for visibility. From left to right: Independent source data is linearly mixed, (cid:126)x = A(cid:126)s. This data, X, is fed into the information
+sieve. After going through some intermediate representations, the ﬁnal result is shown on the far right. Consult Fig. 1(b) for the variable
+naming scheme. The ﬁnal representation recovers the independent input sources.
+
+negative), the dependence is decreased at each level. That
+independence could be achieved as a byproduct of efﬁ-
+cient coding has been previously considered (Hochreiter
+& Schmidhuber, 1999). An approach that leading to “less
+dependent components” for continuous variables has also
+been shown (St¨ogbauer et al., 2004).
+For discrete variables, which are the focus of this paper,
+performing ICA is a challenging and active area of re-
+search. Recent state-of-the-art results lower the complexity
+of this problem to only a single exponential in the number
+of variables (Painsky et al., 2014). Our method represents
+a major leap for this problem as it is only linear in the num-
+ber of variables, however, we only guarantee extraction of
+components that are more independent, while the approach
+of Painsky et. al. guarantees a global optimum.
+The most commonly studied scenario for ICA is to con-
+sider a reconstruction problem where some (typically con-
+tinuous) and independent source variables are linearly
+mixed according to some unknown matrix (Comon, 1994;
+Hyv¨arinen & Oja, 2000). The goal is to recover the ma-
+trix and unmix the components (back into their independent
+sources). Next we demonstrate our discrete independent
+component recovery on an example reminiscent of tradi-
+tional ICA examples.
+An ICA example
+Fig. 3 shows an example of recovering
+independent components from discrete random variables.
+The sources, S, are hidden and the observations, X, are a
+linearly mixture of these sources. The mixing matrix used
+in this example is
+
+A = ((1, 1, 1), (2, 0,−1), (1, 2, 0), (−1, 1, 0)).
+
+The information sieve continues to add layers as long as
+it increases the tightness of the information bounds. The
+intermediate representations at each layers are also shown.
+For instance, layer 1 extracts one independent component,
+and then removes this component from the remainder infor-
+mation. After three layers, the sieve stops because X 3 con-
+
+sists of independent variables and therefore the optimiza-
+tion of max T C(X 3; Y4) = 0.
+In this case, the procedure correctly stops after three la-
+tent factors are discovered. Naively, three layers makes
+this a “deep” representation. However, we can examine the
+functional dependence of Y ’s and X’s by looking at the
+strength of the mutual information, I(Yk; X k−1
+), as shown
+in Fig. 4. This allows us to see that none of the learned
+latent factors (Y ’s) depend on each other so the resulting
+model is actually, in some sense, shallow. The example in
+the next section, for contrast, has a deep structure where
+Y ’s depend on latent factors from previous layers. Note
+that the structure in Fig. 4 perfectly reﬂects the structure
+of the mixing matrix (i.e., if we ﬂipped the arrows and
+changes the Y ’s to S’s, this would be an accurate repre-
+sentation of the generative model we used).
+
+i
+
+Figure 4. This visualizes the structure of the learned representa-
+tion for the ICA example in Fig. 3. The thickness of links is pro-
+portional to I(Yk; X k−1
+
+).
+
+i
+
+While the sieve is guaranteed to recover independent com-
+ponents in some limit, there may be multiple ways to de-
+compose the data into independent components. Because
+our method does not start with the assumption of a linear
+mixing of independent sources, even if such a decompo-
+sition exists we might recover a different one. While the
+example we showed happened to return the linear solution
+that we used to generate the problem, there is no guarantee
+to ﬁnd a linear solution, even if one exists.
+
+Truesources(hidden)SObservations(~x=A~s)XS1S2S3X1X11X21X31X2X12X22X32X3X4X14X24X34X13X23X33Y1Y21Y31Y2Y32Y3}}NoremaininginfoinX’sY’srecoverindependentsources,SIntermediaterepresentationsLayer1,X1Layer2,X2Layer3,X3FinalresultX1X2X3Y1X4Y2Y3The Information Sieve
+
+5 Lossy compression on MNIST digits
+The information sieve is not a generative probabilistic
+model. We construct latent factors that are functions of the
+data in a way that maximizes the (multivariate) information
+that is preserved. Nevertheless, because of the way the re-
+mainder information is constructed, we can run the sieve in
+reverse and, if we throw away the remainder information
+and keep only the Y ’s, we get a lossy compression. We can
+use this lossy compression interpretation to perform tasks
+that are usually achieved using generative models includ-
+ing in-painting and generating new examples (the converse,
+interpreting a generative model as lossy compression, has
+also been considered (Hinton & Salakhutdinov, 2006)).
+We illustrate the steps for lossy compression and in-
+painting in Fig. 5. Imagine that we have already trained
+a sieve model. For lossy compression, we ﬁrst transform
+some data using the sieve. The sieve is an invertible trans-
+formation, so we can run it in reverse to exactly recover the
+inputs. Instead we store only the labels, Y , throwing the
+1:n, away. When we invert the
+remainder information, X k
+sieve, what values should we input for X k
+1:n? During train-
+ing, we estimate the most likely value to occur for each
+variable, X k
+i . W.l.o.g., we relabel the symbols so that this
+value is 0. Then, for lossy recovery, we run the sieve in re-
+verse using the labels we stored, Y , and setting X k
+1:n = 0.
+In-painting proceeds in essentially the same way. We take
+advantage of the fact that we can transform data even in the
+presence of missing values, as described in Sec. A. Then we
+replace missing values in the remainder information with
+0’s and invert the sieve normally.
+
+Figure 5. (a) We use the sieve to transform data into some labels,
+Y plus remainder information. For lossy recovery, we invert the
+sieve using only the Y ’s, setting X’s to zero. (b) For in-painting,
+we ﬁrst transform data with missing values. Then we invert the
+sieve, again using zeros for the missing remainder information.
+
+For the following tasks, we consider 50k MNIST digits
+
+(a)
+
+(b)
+
+Figure 6. (a) We visualize each of the learned components, ar-
+ranged in reading order. (b) The structural relationships among
+the latent factors is based on I(Yk; Y k−1
+). The size of a node
+represents the magnitude of T C(X k−1; Yk).
+
+j
+
+that were binarized at the normalized grayscale threshold of
+0.5. We include no prior knowledge about spatial structure
+or invariance under transformations through convolutional
+structure or pooling, for instance. The 28×28 binarized
+images are treated as binary vectors in a 784 dimensional
+space. The digit labels are also not used in our analysis.
+We trained the information sieve on this data, adding lay-
+ers as long as the bounds were tightening. This led to a 12
+layer representation and a lower bound on T C(X) of about
+40 bits. It seems likely that more than 12 layers could be
+effective but the growing size of the state space for the re-
+mainder information increases the difﬁculty of estimation
+with limited data. A visualization of the learned latent fac-
+tors and the relationships among them appears in Fig. 6.
+Unlike the ICA example, the latent factors here have ex-
+hibit multi-layered relationships.
+The middle row of Fig. 7 shows results from the lossy com-
+pression task. We use the sieve to transform the original
+digits into 12 binary latent factors, Y , plus remainder in-
+1:784, and then we use the Y ’s
+formation for each pixel, X 12
+alone to reconstruct the image. In the third row, the Y ’s
+are estimated using only pixels from the top half. Then we
+reconstruct the pixels on the bottom half from these latent
+factors. Similar results on test images are shown in Sec. D,
+along with examples of “hallucinating” new digits.
+
+6 Lossless compression
+Given samples of X drawn from p(x), the best compres-
+sion we can do in theory is to use an average of H(X) bits
+
+SieveTransformInvertX00110XkYkkYk1...002011...SieveX0XkYkkYk1......00001101000000SieveX00110XkYkkYk1...002011...SieveX0XkYkkYk1......00000020110110----(a)(b)Y1Y5Y9Y2Y12Y3Y4Y11Y10Y6Y7Y80>0<0p(Xi=1|Yk=1) p(Xi=1|Yk=0)Y1Y4Y2Y6Y7Y3Y5Y10Y11Y8Y9The Information Sieve
+
+Figure 7. The top row are randomly selected MNIST digits. In the second row, we compress the digits into the 12 binary variables, Yk,
+and then attempt to reconstruct the image. In the bottom row, we learn Y ’s using just the pixels in the top half and then recover the pixels
+in the bottom half.
+
+for our compressed representation (Shannon, 1948). How-
+ever, in practice, if X is high-dimensional then we cannot
+accurately estimate p(x) to achieve this level of compres-
+sion. We consider alternate schemes and compare them to
+the information sieve for a compression task.
+Benchmark
+For a lossless compression benchmark, we
+consider a set of 60k of binarized digits with 784 pixels,
+where the order of the pixels has been randomly permuted
+(the same unknown permutation is applied to each image).
+Note that we have made this task artiﬁcially more difﬁ-
+cult than the straightforward task of compressing digits be-
+cause many compression schemes exploit spatial correla-
+tions among neighboring pixels for efﬁciency. The infor-
+mation sieve is unaffected by this permutation since it does
+not make any assumptions about the structure of the input
+space (e.g. the adjacency of pixels). We use 50k digits as
+training for models, and report compression results on the
+10k test digits.
+Naively, these 28 by 28 binary pixels would require 784 bits
+per digit to store. However, some pixels are almost always
+zero. According to Shannon, we can compress pixel i us-
+ing just H(Xi) bits on average (Shannon, 1948). Because
+the state space of each individual bit is small, this bound
+is actually achievable (using arithmetic coding (Cover &
+Thomas, 2006), for example). Therefore, we should be
+i H(Xi) ≈ 297 bits/digit
+
+able to store the digits using(cid:80)
+
+on average.
+We would like to make the data more compressible by ﬁrst
+transforming it. We consider a simpliﬁed version of the
+sieve with just one layer. We let Y take m possible val-
+ues and then optimize it according to our objective. For
+the remainder information, we use the (invertible) function
+¯xi = |xi−arg maxz p(Xi = z|Y = y)|. In other words, ¯X
+represents deviation from the most likely value of xi for a
+given value of y. The cost of storing a digit in this new rep-
+i=1 H( ¯Xi), where log2 m
+
+resentation will be log2 m +(cid:80)784
+
+bits are used to store the value of Y .
+For comparison, we consider an analogous benchmark in-
+troduced in (Gregor & LeCun, 2011). For this benchmark,
+we just choose m random digits as representatives (from
+the training set). Then for each test digit, we store the iden-
+tity of the closest representative (by Hamming distance),
+
+along with the error which we will also call ¯Xi, so that we
+can recover the original digit. Again, the number of bits per
+digit will just by log2 m plus the cost of storing the errors
+for each pixel according to Shannon.
+
+Figure 8. This shows p(xi = 1|y = k) for k = 1, . . . , 20 for
+each pixel, xi, in an image.
+
+Consider the single layer sieve with Y = 1, . . . , m and
+m = 20. After optimizing, Fig. 8 visualizes the compo-
+nents of Y . As an exercise in unsupervised clustering the
+results are somewhat interesting; the sieve basically ﬁnds
+clusters for each digit and for slanted versions of each digit.
+In Fig. 9 we explicitly construct the remainder information
+(bottom row), i.e.
+the deviation between the most likely
+value of each pixel conditioned on Y (middle row) and the
+original (top row).
+
+Figure 9. The top row shows the original digit, the middle row
+shows the most likely values of the pixels conditioned on the la-
+bel, y = 1, . . . , 20, and the bottom row shows the remainder or
+residual error, ¯X.
+
+The results of our various compression benchmarks are
+shown in Table 1. For comparison we also show results
+from two standard compression schemes, gzip, based on
+Lempel-Ziv coding (Ziv & Lempel, 1977), and Huffman
+coding (Huffman et al., 1952). We take the better compres-
+sion result from storing and compressing the 784 × 50000
+data array in column-major or row-major order with these
+(sequence-based) compression schemes. Note that the
+sieve and random representative benchmark that we de-
+scribed require a codebook of ﬁxed size whose contribu-
+tion is asymptotically negligible and is not included in the
+results.
+
+Original digits12 bit lossy compression recoveryIn-painting bottom halfThe Information Sieve
+
+Table 1. Summary of compression results. Results with a “*” are
+reported based on empirical compression results rather than Shan-
+non bounds.
+
+Method
+Naive
+Huffman* (Huffman et al., 1952)
+gzip* (Ziv & Lempel, 1977)
+Bitwise
+20 random representatives
+50 random representatives
+100 random representatives
+20 sieve representatives
+50 sieve representatives
+100 sieve representatives
+
+Bits per digit
+
+784
+376
+328
+297
+293
+279
+267
+266
+252
+243
+
+Discussion First of all, sequence-based compression
+schemes have a serious disadvantage in this setup. Because
+the pixels are scrambled, to take advantage of correlations
+would require longer window sizes than is typical. The
+random compression scheme does signiﬁcantly better. De-
+spite the scrambled pixels, at least it uses the fact that the
+data consist of iid samples of length 784 pixels. However,
+the sieve leads to much better compression; for instance,
+20 sieve representatives are as good as 100 random ones.
+The idea behind “factorial codes” (Barlow, 1989) is that
+if we can transform our data so that the variables are inde-
+pendent, and then (optimally) compress each variable sepa-
+rately, we will achieve a globally optimal compression. The
+compression results shown here are promising, but are not
+state-of-the-art. The reason is that our discovery of discrete
+independent components comes at a cost of increasing the
+cardinality of variables at each layer of the sieve. To de-
+ﬁne a more practical compression scheme, we would have
+to balance the trade-off between reducing dependence and
+controlling the size of the state space. We leave this direc-
+tion for future work.
+
+7 Related work
+The idea of decomposing multivariate information as an
+underlying principle for unsupervised representation learn-
+ing has been recently introduced (Ver Steeg & Gal-
+styan, 2015; 2014) and used in several contexts (Pepke &
+Ver Steeg, 2016; Madsen et al., 2016). While bounds on
+T C(X) were previously given, here we provided an ex-
+act decomposition. Our decomposition also introduces the
+idea of remainder information. While previous work re-
+quired ﬁxing the depth and number of latent factors in the
+representation, remainder information allows us to build
+up the representation incrementally, learning the depth and
+number of factors required as we go. Besides providing
+a more ﬂexible approach to representation and structure
+learning, the invertibility of the information sieve makes
+it more naturally suited to a wider variety of tasks includ-
+ing lossy and lossless compression and prediction. Another
+
+interesting related result showed that positivity of the quan-
+tity T C(X; Y ) (the same quantity appearing in our bounds)
+implies that the X’s share a common ancestor in any DAG
+consistent with pX (x) (Steudel & Ay, 2015). A different
+line of work about information decomposition focuses on
+distinguishing synergy and redundancy (Williams & Beer,
+2010), though these measures are typically impossible to
+estimate for high-dimensional systems. Finally, a different
+approach to information decomposition focuses on the ge-
+ometry of the manifold of distributions deﬁned by different
+models (Amari, 2001).
+Connections with ICA were discussed in Sec. 4 and the
+relationship to InfoMax was discussed in Sec. 1. The in-
+formation bottleneck (IB) (Tishby et al., 2000) is another
+information-theoretic optimization for constructing repre-
+sentations of data that has many mathematical similarities
+to the objective in Eq. 6, with the main difference being
+that IB focuses on supervised learning while ours is an un-
+supervised approach. Recently, the IB principle was used
+to investigate the value of depth in the context of supervised
+learning (Tishby & Zaslavsky, 2015). The focus here, on
+the other hand, is to ﬁnd an information-theoretic principle
+that justiﬁes and motivates deep representations for unsu-
+pervised learning.
+
+8 Conclusion
+We introduced the information sieve, which provides
+a decomposition of multivariate information for high-
+dimensional (discrete) data that is also computationally
+feasible. The extension of the sieve to continuous vari-
+ables is nontrivial but appears to result in algorithms that
+are more robust and practical (Ver Steeg et al., 2016). We
+established here a few of the immediate implications of the
+sieve decomposition. First of all, we saw that a natural no-
+tion of “remainder information” arises and that this allows
+us to extract information in an incremental way. Several
+distinct applications to fundamental problems in unsuper-
+vised learning were demonstrated and appear promising for
+in-depth exploration. The sieve provides an exponentially
+faster method than the best known algorithm for discrete
+ICA (though without guarantees of global optimality). We
+also showed that the sieve deﬁnes both lossy and lossless
+compression schemes. Finally, the information sieve sug-
+gests a novel conceptual framework for understanding un-
+supervised representation learning. Among the many de-
+viations from standard representation learning a few prop-
+erties stand out. Representations are learned incrementally
+and the depth and structure emerge in a data-driven way.
+Representations can be evaluated information-theoretically
+and the decomposition allows us to separately characterize
+the contribution of each hidden unit in the representation.
+
+The Information Sieve
+
+Acknowledgments
+GV acknowledges support from AFOSR grant FA9550-
+12-1-0417 and GV and AG acknowledge support from
+DARPA grant W911NF-12-1-0034 and IARPA grant
+FA8750-15-C-0071.
+
+References
+Amari, Shun-ichi.
+
+ability distributions.
+on, 47(5):1701–1711, 2001.
+
+Information geometry on hierarchy of prob-
+Information Theory, IEEE Transactions
+
+Barlow, Horace. Unsupervised learning. Neural computation, 1
+
+(3):295–311, 1989.
+
+Bell, Anthony J and Sejnowski, Terrence J. An information-
+maximization approach to blind separation and blind decon-
+volution. Neural computation, 7(6):1129–1159, 1995.
+
+Bengio, Yoshua, Courville, Aaron, and Vincent, Pascal. Repre-
+sentation learning: A review and new perspectives. Pattern
+Analysis and Machine Intelligence, 35(8):1798–1828, 2013.
+
+Comon, Pierre. Independent component analysis, a new concept?
+
+Signal processing, 36(3):287–314, 1994.
+
+Cover, Thomas M and Thomas, Joy A. Elements of information
+
+theory. Wiley-Interscience, 2006.
+
+Gregor, Karol and LeCun, Yann. Learning representations by
+arXiv preprint arXiv:1108.1169,
+
+maximizing compression.
+2011.
+
+Hinton, Geoffrey E and Salakhutdinov, Ruslan R. Reducing the
+dimensionality of data with neural networks. Science, 313
+(5786):504–507, 2006.
+
+Hochreiter, Sepp and Schmidhuber, J¨urgen. Feature extraction
+through lococode. Neural Computation, 11(3):679–714, 1999.
+
+Huffman, David A et al. A method for the construction of mini-
+mum redundancy codes. Proceedings of the IRE, 40(9):1098–
+1101, 1952.
+
+Hyv¨arinen, Aapo and Oja, Erkki. Independent component analy-
+sis: algorithms and applications. Neural networks, 13(4):411–
+430, 2000.
+
+Kraskov, Alexander, St¨ogbauer, Harald, Andrzejak, Ralph G, and
+Grassberger, Peter. Hierarchical clustering using mutual infor-
+mation. EPL (Europhysics Letters), 70(2):278, 2005.
+
+Linsker, Ralph. Self-organization in a perceptual network. Com-
+
+puter, 21(3):105–117, 1988.
+
+Madsen, Sarah, Ver Steeg, Greg, Daianu, Madelaine, Mezher,
+Adam, Jahanshad, Neda, Nir, Talia M., Hua, Xue, Gutman,
+Boris A., Galstyan, Aram, and Thompson, Paul M. Relative
+value of diverse brain mri and blood-based biomarkers for pre-
+dicting cognitive decline in the elderly. In SPIE Medical Imag-
+ing, 2016.
+
+Painsky, Amichai, Rosset, Saharon, and Feder, Meir. Generalized
+binary independent component analysis. In Information The-
+ory (ISIT), 2014 IEEE International Symposium on, pp. 1326–
+1330. IEEE, 2014.
+
+Pepke, Shirley and Ver Steeg, Greg. Multivariate infor-
+mation maximization yields hierarchies of expression com-
+ponents in tumors that are both biologically meaning-
+ful and prognostic.
+10.1101/
+043257. URL http://www.biorxiv.org/content/
+early/2016/03/11/043257.
+
+bioRxiv, 2016.
+
+doi:
+
+Schmidhuber, J¨urgen. Deep learning in neural networks: An
+
+overview. Neural Networks, 61:85–117, 2015.
+
+Shannon, C.E. A mathematical theory of communication. The
+
+Bell System Technical Journal, 27:379423, 1948.
+
+Simoncelli, Eero and Olshausen, Bruno. Natural image statistics
+
+and neural representation. Annu. Rev. Neurosci., 24, 2001.
+
+Steudel, Bastian and Ay, Nihat. Information-theoretic inference
+
+of common ancestors. Entropy, 17(4):2304–2327, 2015.
+
+St¨ogbauer, Harald, Kraskov, Alexander, Astakhov, Sergey A, and
+Grassberger, Peter. Least-dependent-component analysis based
+on mutual information. Physical Review E, 70(6):066123,
+2004.
+
+Tishby, Naftali and Zaslavsky, Noga. Deep learning and the infor-
+mation bottleneck principle. arXiv preprint arXiv:1503.02406,
+2015.
+
+Tishby, Naftali, Pereira, Fernando C, and Bialek, William. The
+information bottleneck method. arXiv:physics/0004057, 2000.
+
+Ver Steeg, Greg.
+
+the discrete information sieve.
+gregversteeg/discrete_sieve.
+
+Open source project
+
+implementing
+http://github.com/
+
+Ver Steeg, Greg and Galstyan, Aram. Discovering structure
+in high-dimensional data through correlation explanation. In
+Advances in Neural Information Processing Systems (NIPS),
+2014.
+
+Ver Steeg, Greg and Galstyan, Aram. Maximally informative hi-
+In Pro-
+erarchical representations of high-dimensional data.
+ceedings of the Sixteenth International Conference on Arti-
+ﬁcial Intelligence and Statistics (AISTATS), 2015. http:
+//arxiv.org/abs/1410.7404.
+
+Ver Steeg, Greg, Galstyan, Aram, Sha, Fei, and DeDeo, Si-
+In In-
+
+mon. Demystifying information-theoretic clustering.
+ternational Conference on Machine Learning, 2014.
+
+Ver Steeg, Greg, Gao, Shuyang, Reing, Kyle, and Galstyan,
+Aram. Sifting common information from many variables.
+2016.
+
+Vincent, Pascal, Larochelle, Hugo, Bengio, Yoshua, and Man-
+zagol, Pierre-Antoine. Extracting and composing robust fea-
+tures with denoising autoencoders. In Proceedings of the 25th
+international conference on Machine learning, pp. 1096–1103.
+ACM, 2008.
+
+Watanabe, Satosi. Information theoretical analysis of multivariate
+correlation. IBM Journal of research and development, 4(1):
+66–82, 1960.
+
+Williams, P.L. and Beer, R.D. Nonnegative decomposition of
+
+multivariate information. arXiv:1004.2515, 2010.
+
+Ziv, Jacob and Lempel, Abraham. A universal algorithm for se-
+quential data compression. IEEE Transactions on information
+theory, 23(3):337–343, 1977.
+
+

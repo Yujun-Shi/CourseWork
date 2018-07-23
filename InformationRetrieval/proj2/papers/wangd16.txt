@@ -1,0 +1,1275 @@
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+Yu-Xiang Wang †
+Veeranjaneyulu Sadhanala †
+Wei Dai †
+Willie Neiswanger †
+Suvrit Sra ‡
+Eric P. Xing †
+† Carnegie Mellon University, 5000 Forbes Ave, PA 15213, USA
+‡ Massachusetts Institute of Technology, 77 Massachusetts Ave, Cambridge, MA 02139, USA
+
+YUXIANGW@CS.CMU.EDU
+VSADHANA@CS.CMU.EDU
+WDAI@CS.CMU.EDU
+WILLIE@CS.CMU.EDU
+SUVRIT@MIT.EDU
+EPXING@CS.CMU.EDU
+
+Abstract
+
+We study parallel and distributed Frank-Wolfe
+algorithms; the former on shared memory ma-
+chines with mini-batching, and the latter in a
+delayed update framework.
+In both cases, we
+perform computations asynchronously whenever
+possible. We assume block-separable constraints
+as in Block-Coordinate Frank-Wolfe (BCFW)
+method (Lacoste-Julien et al., 2013), but our
+analysis subsumes BCFW and reveals problem-
+dependent quantities that govern the speedups
+of our methods over BCFW. A notable fea-
+ture of our algorithms is that they do not de-
+pend on worst-case bounded delays, but only
+(mildly) on expected delays, making them ro-
+bust
+to stragglers and faulty worker threads.
+We present experiments on structural SVM and
+Group Fused Lasso, and observe signiﬁcant
+speedups over competing state-of-the-art (and
+synchronous) methods.
+
+1. Introduction
+The classical Frank-Wolfe (FW) algorithm (Frank &
+Wolfe, 1956) has witnessed a huge surge of interest re-
+cently (Ahipasaoglu et al., 2008; Clarkson, 2010; Jaggi,
+2011; 2013). The FW algorithm iteratively minimizes a
+smooth function f (typically convex) over a compact con-
+vex set M ⊂ Rm. Unlike methods based on projection,
+FW uses just a linear oracle that solves minx∈M (cid:104)x, g(cid:105),
+which can be much simpler and faster than projection.
+This feature underlies the great popularity of FW, which
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+has by now witnessed several extensions such as reg-
+ularized FW (Bredies et al., 2009; Harchaoui et al.,
+2015; Zhang et al., 2013),
+linearly convergent special
+cases (Garber & Hazan, 2013; Lacoste-Julien & Jaggi,
+2015), stochastic versions (Hazan & Kale, 2012; Lafond
+et al., 2015; Ouyang & Gray, 2010), and a randomized
+block-coordinate FW (Lacoste-Julien et al., 2013).
+Despite this progress, parallel and distributed FW variants
+are barely known. We ﬁll this gap and develop new asyn-
+chronous FW algorithms, for the particular setting where
+the constraint set M is block-separable; thus, we solve
+
+f (x) s.t. x = [x(1), ..., x(n)] ∈ n(cid:89)
+
+Mi,
+
+x
+
+i=1
+
+min
+
+(1)
+where Mi ⊂ Rmi (1 ≤ i ≤ n) is a compact convex set and
+x(i) are coordinate partitions of x. This setting for FW was
+considered in Lacoste-Julien et al. (2013), who introduced
+the Block-Coordinate Frank-Wolfe (BCFW) method.
+Such problems arise in many applications, notably, struc-
+tural SVMs (Lacoste-Julien et al., 2013), routing (LeBlanc
+et al., 1975), group fused lasso (Ala´ız et al., 2013;
+Bleakley & Vert, 2011), trace-norm based tensor comple-
+tion (Liu et al., 2013), reduced rank nonparametric regres-
+sion (Foygel et al., 2012), and structured submodular min-
+imization (Jegelka et al., 2013), among others.
+A standard approach to solve (1) is via block-coordinate
+(gradient) descent (BCD), which forms a local quadratic
+model for a block of variables, and then solves a projection
+subproblem (Beck & Tetruashvili, 2013; Nesterov, 2012;
+Richt´arik & Tak´aˇc, 2015). However, for many problems,
+including the ones noted above, projection can be expen-
+sive (e.g., projecting onto the trace norm ball, onto base
+polytopes Fujishige & Isotani, 2011), and in some cases
+even computationally intractable (Collins et al., 2008).
+Frank-Wolfe methods excel in such scenarios as they rely
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+M =(cid:81)
+
+only on linear oracles that solve mins∈M(cid:104)s,∇f (·)(cid:105). For
+i Mi, this breaks into the n independent problems
+
+(cid:104)s(i),∇(i)f (x)(cid:105),
+
+1 ≤ i ≤ n,
+
+min
+s(i)∈Mi
+
+(2)
+where ∇(i) denotes the gradient w.r.t. coordinates x(i). It is
+obvious that these n subproblems can be solved in parallel
+(an idea dating back to at least as early as LeBlanc et al.,
+1975). However, having to update all the coordinates at
+each iteration is expensive, hampering the use of FW on
+big-data problems.
+This drawback is partially ameliorated by BCFW (Lacoste-
+Julien et al., 2013), which randomly selects a block Mi at
+each iteration and performs FW updates. But these updates
+are strictly sequential, and do not take advantage of modern
+multicore architectures or of distributed clusters.
+Contributions. Our main contributions are the following:
+• Asynchronous Parallel block-coordinate Frank-Wolfe
+algorithms (AP-BCFW) for both shared-memory and
+distributed settings. Moreover, AP-BCFW depends only
+(mildly) on the expected delay, therefore is robust to
+stragglers and faulty worker threads.
+
+• An analysis of the primal and primal-dual convergence
+of AP-BCFW and its variants for any minibatch size and
+potentially unbounded maximum delay. When the maxi-
+mum delay is actually bounded, we show stronger results
+using results from load-balancing on max-load bounds.
+• Insightful deterministic conditions under which mini-
+batching provably improves the convergence rate for a
+class of problems (sometimes by orders of magnitude).
+• Experiments that demonstrate on real data how our al-
+gorithm solves a structural SVM problem several times
+faster than the state-of-the-art.
+
+In short, our results contribute towards making FW more
+attractive for big-data applications. To add perspective, we
+compare our methods to closely related works below; we
+refer the reader to Freund & Grigas (2014); Jaggi (2013);
+Lacoste-Julien et al. (2013); Zhang et al. (2012) for addi-
+tional notes and references.
+BCFW and Structural SVM. Our algorithm AP-BCFW
+extends and generalizes BCFW to parallel computation.
+Our analysis follows the structure in (Lacoste-Julien et al.,
+2013), but uses different stepsizes that must be carefully
+chosen. Our results contain BCFW as a special case.
+Lacoste-Julien et al. (2013) primarily focus on more ex-
+plicit (and stronger) guarantee for BCFW on structural
+SVM, while we mainly focus on a more general class of
+problems; the particular subroutine needed by structural
+SVM requires special treatment though (see Appendix C).
+
+Parallelization of sequential algorithms. The idea of par-
+allelizing sequential optimization algorithms is not new. It
+dates back to (Tsitsiklis et al., 1986) for stochastic gradient
+methods; more recently Lee et al. (2014); Liu et al. (2014);
+Richt´arik & Tak´aˇc (2015) study parallelization of BCD.
+The conditions under which these parallel BCD meth-
+ods succeed, e.g., expected separable overapproximation
+(ESO), and coordinate Lipschitz conditions, bear a close
+resemblance to our conditions in Section 3.2, but are not
+the same due to differences in how solutions are updated
+and what subproblems arise. In particular, our conditions
+are afﬁne invariant. We provide detailed comparisons to
+parallel coordinate descent in Appendix D.5.
+Asynchronous algorithms. Asynchronous algorithms that
+allow delayed parameter updates have been proposed ear-
+lier for stochastic gradient descent (Niu et al., 2011) and
+parallel BCD (Liu et al., 2014). We propose the ﬁrst asyn-
+chronous algorithm for Frank-Wolfe. Our asynchronous
+scheme not only permits delayed minibatch updates, but
+also allows the updates for coordinate blocks within each
+minibatch to have different delays. Therefore, each update
+may not be a solution of (2) for any single x. Moreover,
+we obtain strictly better dependence on the delay param-
+eter than predecessors (e.g., an exponential improvement
+over Liu et al. (2014)) possibly due to a sharper analysis.
+Other related work. While preparing our manuscript, we
+discovered the preprint (Bellet et al., 2014) which also stud-
+ies distributed Frank-Wolfe. We note that (Bellet et al.,
+2014) focuses on Lasso type problems and communication
+costs, and hence, is not directly comparable to our results.
+Notation. We brieﬂy summarize our notation now. The
+vector x ∈ Rm denotes the parameter vector, possibly split
+into n coordinate blocks. For block i = 1, ..., n, Ei ∈
+Rm×mi is the projection matrix which projects x ∈ Rm
+down to x(i) ∈ Rmi; thus x(i) = Eix. The adjoint operator
+i maps Rmi → Rm, thus x[i] = E∗
+E∗
+i x(i) is x with zeros
+in all dimensions except x(i) (note the subscript x[i]). We
+denote the size of a minibatch by τ, and the number of par-
+allel workers (threads) by T . Unless otherwise stated, k de-
+notes the iteration/epoch counter and γ denotes a stepsize.
+Finally, C τ
+f (and other such constants) denotes some curva-
+ture measure associated with function f and minibatch size
+τ. Such constants are important in our analysis, and will be
+described in greater detail in the main text.
+
+2. Algorithm
+In this section, we present an asynchronous parallel
+block-coordinate Frank-Wolfe algorithm (AP-BCFW) to
+solve (1). Our algorithm is designed to run fully asyn-
+chronously on either a shared-memory multicore architec-
+ture or on a distributed system.
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+Figure 1. Illustration of the AP-BCFW in the distributed (in red) and share-memory settings (in blue). The “cloud” of all worker nodes
+(or CPU threads) is abstracted into an oracle that keeps feeding the server (or writing to the memory bus) with updates from solving
+possibly approximate (and/or delayed) solutions to (2) on iid uniform random blocks.
+
+Algorithm 1 AP-BCFW: Asynchronous Parallel Block-
+Coordinate Frank-Wolfe (distributed)
+
+Input: An initial feasible x(0), mini-batch size τ, a “Cloud”
+oracle O satisfying Assumptions A1, A2.
+0. Broadcast x(0) to all workers in O.
+for k = 1,2,. . . (k is the iteration number) do
+
+1. Keep receiving (i, s(i)) from O until we have τ disjoint
+blocks (overwrite if collision1). Denote the index set by S.
+2. Update x(k) = x(k−1) + γk
+τ 2k+2n or via line-search.
+γk = 2nτ
+3. Broadcast x(k) (or just x(k) − x(k−1)) to O.
+4. Break if converged.
+
+(cid:80)
+i∈S(s[i] − x(k−1)
+
+) with
+
+[i]
+
+end for
+Output: x(k).
+
+For the shared-memory model, the computational work is
+divided amongst worker threads, each of which has access
+to a pool of coordinates that it may work on, as well as to
+the shared parameters. This setup matches the system as-
+sumptions in (Liu et al., 2014; Niu et al., 2011; Richt´arik &
+Tak´aˇc, 2015), and most modern multicore machines permit
+such an arrangement.
+On a distributed system, the parameter server (Dai et al.,
+2013; Li et al., 2013) broadcasts the most recent param-
+eter vector periodically to each worker and workers keep
+sending updates to the parameter vector after solving the
+subroutines corresponding to a randomly chosen parame-
+ter. In either setting, we do not wait for slower workers or
+synchronize the parameters at any point of the algorithm,
+therefore many updates sent from the workers could be cal-
+culated based on a delayed parameter.
+For convenience, we treat the pool of all workers as a sin-
+gle “cloud” oracle O that keeps sending updates of form
+{i, s(i)} to the server, where i selects a block and s(i) is an
+approximate solution to (2) at the current parameter. More-
+over, we assume that
+A1. The sequence of i from O is sampled i.i.d. uniformly
+
+from {1, 2, ..., n}.
+1We bound the probability of collisions in Appendix D.2.
+
+Assumption A1 is critical as it ensures Step 2 in the algo-
+rithm is an unbiased approximation of the batch FW. This
+assumption allows the workers to be arbitrarily heteroge-
+neous as long as they each sample blocks i.i.d. uniformly
+and the time for each worker to produce s(i) does not de-
+pend on the block index i. Admittedly, this could be trou-
+blesome for some applications with heterogeneous blocks,
+we describe ways to enforce A1 in Appendix D.1.
+An advantage of this oracle abstraction is its potential ap-
+plicability well beyond the per-worker i.i.d. scheme.
+In
+practice, each worker might only have access to a small
+subset of [n] and might be doing sequential sampling with
+periodic reshufﬂing. At the aggregate level, however, the
+oracle assumptions might still be reasonable approxima-
+tions, especially if the number of workers T is large.
+Both distributed and shared-memory settings can be cap-
+tured under this oracle as is illustrated in Figure 1. Pseu-
+docode of our scheme is given in Algorithm 1.
+
+3. Analysis
+The three key questions pertaining to Algorithm 1 are:
+
+• Does it converge?
+• How fast? How much faster than BCFW (τ = 1)?
+• How do delayed updates affect the convergence?
+
+We answer the ﬁrst two questions in Sections 3.1 and
+3.2. Speciﬁcally, we show that AP-BCFW converges at
+a O(1/k) rate. Our analysis reveals that the speedup of
+AP-BCFW over BCFW via parallelization is problem de-
+pendent. Intuitively, we show that speedups due to mini-
+batching (τ > 1) depend on the average “coupling” of the
+objective function f across different coordinate blocks. For
+example, if f has a block symmetric diagonally dominant
+Hessian, then AP-BCFW converges τ /2 times faster. We
+address the third question in Section 3.3, where we estab-
+lish convergence results that depend only mildly on the “ex-
+pected” delay κ. The bound is proportional to κ when we
+
+Parameter serveror Shared memory busSend block updatesWrite a block to busBroadcast new parametersRead a block from busWorker nodesorCPU threadsParallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+√
+allow the delay to grow unboundedly, and proportional to
+
+κ when the delay is bounded by a small κmax.
+
+A1 and A2. Then, for each k ≥ 0, the iterations in Algo-
+rithm 1 and its line search variant obey
+
+3.1. Main convergence results
+We begin by deﬁning a few quantities needed for our anal-
+ysis. The ﬁrst key quantity—also key to the analysis of sev-
+eral other FW methods—is the notion of curvature. Since
+AP-BCFW updates a subset of coordinate blocks at a time,
+we deﬁne set curvature for an index set S ⊆ [n] as
+
+C (S)
+
+f
+
+:=
+
+2
+γ2
+
+sup
+
+x∈M,s(S)∈M(S),
+γ∈[0,1],
+y=x+γ(s[S]−x[S])
+
+(3)
+
+(cid:0)f (y) − f (x)−
+(cid:104)y(S) − x(S),∇(S)f (x)(cid:105)(cid:1).
+(cid:1)−1(cid:88)
+
+C (S)
+
+f
+
+. (4)
+
+S⊂[n],|S|=τ
+
+] =(cid:0)n
+
+τ
+
+For index sets of size τ, we deﬁne the expected set curva-
+ture over a uniform choice of subsets as
+
+f := ES:|S|=τ [C (S)
+C τ
+
+f
+
+f and product curvature C⊗
+
+These curvature deﬁnitions are closely related to the global
+curvature constant Cf of Jaggi (2013) and the coordinate
+curvature C (i)
+f of Lacoste-Julien
+et al. (2013). Lemma 1 makes this relation more precise.
+Lemma 1 (Curvature relations). Suppose S ⊆ [n] with
+cardinality |S| = τ and i ∈ S. Then,
+
+i)
+
+f ≤ C (S)
+C (i)
+n C⊗
+f = C 1
+
+f ≤ Cf ;
+f ≤ C τ
+
+1
+
+ii)
+
+f = Cf .
+
+f ≤ C n
+f scales with τ is critical
+How the expected set curvature C τ
+to bounding the speedup we can expect over BCFW; we
+provide a detailed analysis of this speedup in Section 3.2.
+The next key object is an approximate linear minimizer.
+As in (Jaggi, 2013; Lacoste-Julien et al., 2013), we also
+allow the core computational subroutine that solves (2) to
+yield an approximate minimizer s(i). Formally, we assume:
+A2. There is a constant δ ≥ 0, such that for every k ≥
+1, the chosen minibatch S ⊂ [n] of size τ and the
+corresponding blocks s(S) := (s(i))i∈S from O obey
+(cid:20)
+
+,∇(S)f (k)(cid:105)
+
+(cid:104)s(S),∇(S)f (k)(cid:105) − min
+s(cid:48)∈M(S)
+
+≤ δγkC τ
+.
+(5)
+where the expectation is taken over the random se-
+quence of minibatch indices and corresponding up-
+dates from O in the entire history up to step k.
+
+(cid:21)
+
+(cid:104)s
+(cid:48)
+
+E
+
+2
+
+f
+
+Assumption A2 is strictly weaker than what is required in
+(Jaggi, 2013; Lacoste-Julien et al., 2013), as we only need
+the approximation to hold in expectation. With these deﬁni-
+tions in hand, we are ready to state our convergence result.
+Theorem 2 (Primal Convergence). Say we use a “Cloud”
+oracle O that generates a sequence of updates satisfying
+
+E[f (x(k))] − f (x∗) ≤ 2nC
+τ 2k+2n ,
+f (1 + δ) + f (x(0)) − f (x∗).
+
+where C = nC τ
+
+At a ﬁrst glance, the n2C τ
+f term in the numerator might
+seem bizarre, but as we will see in the next section, C τ
+f can
+be as small as O( τ
+n2 ). This is the scale of the constant one
+should keep in mind to compare the rate to other methods,
+e.g., coordinate descent. Also note that so far this conver-
+gence result does not explicitly work for delayed updates,
+which we will analyze in Section 3.3 separately via the ap-
+proximation parameter δ from (5).
+For FW methods, one can also easily obtain a conver-
+gence guarantee in an appropriate primal-dual sense. To
+this end, we introduce our version of the surrogate duality
+gap (Jaggi, 2013); we deﬁne this as
+
+g(x) := max
+
+s∈M(cid:104)x − s,∇f (x)(cid:105)
+n(cid:88)
+
+=
+
+i=1
+
+max
+
+s(i)∈M(i)
+
+(cid:104)x(i) − s(i),∇(i)f (x)(cid:105) =
+
+(6)
+
+g(i)(x).
+
+n(cid:88)
+
+i=1
+
+To see why (6) is actually a duality gap, note that since f is
+convex, the linearization f (x) + (cid:104)s − x,∇f (x)(cid:105) is always
+smaller than the function evaluated at any s, so that
+g(x) ≥ (cid:104)x − x∗,∇f (x)(cid:105) ≥ f (x) − f (x∗).
+
+(cid:80)
+
+This duality gap is obtained for “free” in batch FW, but
+not in BCFW or AP-BCFW. Here, we only have an unbi-
+i∈S g(i)(x). For large τ, this estimate is
+ased estimate n|S|
+close to g(x) with high probability (McDiarmid’s Inequal-
+ity), and can still be useful as a stopping criterion.
+Theorem 3 (Primal-Dual Convergence). Assume O sat-
+isﬁes A1 and A2. Deﬁne the expected surrogate dual-
+ity gap gk := Eg(x(k)) and weighted average ¯gk :=
+k=1 kgk for the sequence of parameters x(k) in
+Algorithm 1. Then for very K ≥ 1, there exists k∗ ∈ [K]
+such that
+
+(cid:80)K
+
+K(K+1)
+
+2
+
+gk∗ ≤ ¯gK ≤
+
+6nC
+
+τ 2(K + 1)
+
+,
+
+with the same C in Theorem 2.
+
+Relation with FW and BCFW: The above convergence
+guarantees can be thought of as an interpolation between
+BCFW and batch FW. If we take τ = 1, they give exactly
+the convergence guarantee for BCFW (Lacoste-Julien et al.,
+2013, Theorem 2), and if we take τ = n, we can drop
+f (x(0)) − f (x∗) from C (with a small modiﬁcation in the
+analysis) and recover the classic batch guarantee as in Jaggi
+(2013).
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+Dependence on initialization: Unlike classic FW, the con-
+vergence rate of our method depends on the initialization.
+When h0 := f (x(0))− f (x∗) ≥ nC τ
+f and τ 2 < n, the con-
+τ 2 . The same concern was
+vergence is slower by a factor of n
+also raised in (Lacoste-Julien et al., 2013) with τ = 1. We
+can actually remove the f (x(0)) − f (x∗) from C as long
+as we know that h0 ≤ nC τ
+f . By Lemma 1, the expected
+set curvature C τ
+f increases with τ, so the fast convergence
+region becomes larger when we increase τ. In addition, if
+we pick τ 2 > n, the rate of convergence is not affected by
+initialization anymore.
+Speedup: The reader may have noticed the n2C τ
+f term in
+the numerator. This is undesirable as n can be large (for
+instance, in structural SVM n is the total number of data
+points). The saving grace in BCFW is that when τ = 1,
+f is as small as O(n−2) (see Lacoste-Julien et al., 2013,
+C τ
+Lemmas A1 and A2), and it is easy to check that the depen-
+dence on n is the same even for τ > 1. What really matters
+is how much speedup one can achieve over BCFW, and this
+relies critically on how C τ
+f depends on τ. Analyzing this
+dependence is our main focus in the next section.
+
+3.2. Effect of parallelism / mini-batching
+
+To understand when mini-batching is meaningful and to
+quantify its speedup, below we take a more careful look
+f . In particular, we analyze
+at the expected set curvature C τ
+and present a set of insightful conditions that govern its de-
+pendence on τ. The key idea is to quantify how strongly
+different coordinate blocks interact with each other.
+To begin, assume that there exists a positive semideﬁnite
+matrix H such that for any x, y ∈ M
+f (y) ≤ f (x)+(cid:104)y−x,∇f (x)(cid:105)+
+1
+2
+
+(y−x)T H(y−x). (7)
+
+The matrix H may be viewed as a generalization of the
+gradient’s Lipschitz constant (a scalar) to a matrix. For
+quadratic functions f (x) = 1
+2 xT Qx + cT x, we can take
+H = Q. For twice differentiable functions, we can choose
+H ∈ {K | K (cid:23) ∇2f (x), ∀x ∈ M}.
+Since x = [x1, . . . , xn] (we write xi instead of x(i) for
+brevity), we separate H into n × n blocks; so Hij repre-
+sents the block corresponding to xi and xj such that we
+i Hijxj. Now, we deﬁne a bound-
+can take the product xT
+edness parameter Bi for every i, and an incoherence con-
+dition with parameter µij for every block coordinate pair
+Mi,Mj such that
+Bi = sup
+xi∈Mi
+B = Ei∼Unif([n])Bi,
+µ = E(i,j)∼Unif({(i,j)∈[n]2,i(cid:54)=j})µij.
+Using these quantities, we obtain the following bound on
+the expected set-curvature.
+
+xT
+i Hiixi, µij =
+
+xi∈Mi,xj∈Mj
+
+xT
+i Hijxj,
+
+sup
+
+Theorem 4. C τ
+
+f ≤ 4(τ B + τ (τ − 1)µ) for any τ ∈ [n].
+It is clear that when the incoherence term µ is large, the
+expected set curvature C τ
+f is proportional to τ 2, and when
+µ is close to 0, then C τ
+f is proportional to τ. In other words,
+when the interaction between coordinates block is small,
+one gains from parallelizing BCFW. This is analogous to
+the situation in parallel coordinate descent (Liu et al., 2014;
+Richt´arik & Tak´aˇc, 2015) and we will compare the rate of
+convergence explicitly with them in Appendix D.5.
+Corollary 5. Consider a matrix M with Bi on the diagonal
+and µij on the off-diagonal. If M is symmetric diagonally
+dominant (SDD), i.e., the sum of absolute off-diagonal en-
+tries in each row is no greater than the diagonal entry, then
+C τ
+
+f is proportional to τ.
+
+The above result depends on the parameters B and µ.
+In Appendix D.4, we provide two concrete examples
+(multi-class classiﬁcation with structural SVM and graph
+fused lasso) where we can express B and µ as problem-
+dependent quantities and provide explicit upper bounds of
+In both examples, we show that choosing larger τ
+f .
+C τ
+yields faster convergence (at least up to some point).
+
+3.3. Convergence with delayed updates
+
+Often due to the delays in communication, some updates
+pushed back by workers are calculated based on delayed
+parameters that were broadcast earlier. Dropping these up-
+dates or enforcing synchronization will create a huge sys-
+tem overhead especially when the size of the minibatch is
+small. Ideally, we want to just accept the delayed updates
+as if they were correct, and broadcast new parameters to
+workers without locking the updates. The question is, does
+this idea work?
+In this section, we model delays from updates to be i.i.d.
+from an unknown distribution that can depend on k, but
+not on blocks. Under these assumptions, we show that the
+effect of delayed updates can be treated as an approximate
+oracle that satisﬁes A2 in (5) with some speciﬁc constant
+δ that depends on the expected delay κ and the maximum
+delay parameter κmax (when it exists). This allows us to
+invoke results in Section 3.1 to establish convergence for
+delayed updates. The results also depend on the following
+diameter and gradient Lipschitz constant for a norm (cid:107) · (cid:107)
+
+D(S)(cid:107)·(cid:107) = sup
+
+x,y∈M(S)
+
+(cid:107)x − y(cid:107),
+
+sup
+
+1
+
+γ2 (f (y) − f (x) − (cid:104)y − x,∇f (x)(cid:105)),
+
+D(S)(cid:107)·(cid:107) , and Lτ(cid:107)·(cid:107) =
+
+max
+
+S⊂[n]||S|=m
+
+L(S)(cid:107)·(cid:107) .
+
+L(S)(cid:107)·(cid:107) =
+
+Dτ(cid:107)·(cid:107) =
+
+x,y∈M,y=x+s
+(cid:107)s(cid:107)≤γ,
+s∈span(M(S))
+
+(cid:12)(cid:12)|S|=m
+
+max
+
+S⊂[n]
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+Theorem 6 (Delayed Updates as Approximate Oracle).
+For each norm (cid:107) · (cid:107) of choice, let Dτ(cid:107)·(cid:107) and Lτ(cid:107)·(cid:107) be de-
+ﬁned above. Let the a random variable of delay be κ and
+let κ := Eκ be the expected delay from any worker. More-
+over, assume that the algorithm drops any updates with de-
+lay greater than k/2 at iteration k. Then for the version of
+the algorithm without line-search, the delayed oracle will
+produce s ∈ M(S) such that (5) holds with
+δ = 4κτ L1(cid:107)·(cid:107)D1(cid:107)·(cid:107)Dτ(cid:107)·(cid:107)/(C τ
+
+f ).
+
+(8)
+
+Furthermore, if we assume that there is a κmax such that
+P(κ ≤ κmax) = 1 for all k, then (5) holds with δ =
+cn,τ κmax
+
+4τ L1(cid:107)·(cid:107)D1(cid:107)·(cid:107)ED
+
+where
+
+κτ(cid:107)·(cid:107)
+
+Cτ
+f
+
+ 3 log n
+
+log(n/(τ κmax))
+O(log n)
+(1+o(1))τ κmax
+
+n
+
+cn,τ κmax =
+
+if κmaxτ < n/ log n,
+if κmaxτ = O(n log n),
+if κmaxτ (cid:29) n log n.
+
+(9)
+
+The results above imply that AP-BCFW (without line-
+search) converges in both primal optimality and in duality
+gap according to Theorems 2 and 3 with the same O(1/k)
+rate. Comparing to versions that solve (2) exactly, the de-
+layed version has an additional additive factor in the nu-
+merator of form
+
+4nκτ L1(cid:107)·(cid:107)D1(cid:107)·(cid:107)Dτ(cid:107)·(cid:107)
+
+or O
+
+τ L1(cid:107)·(cid:107)D1(cid:107)·(cid:107)ED
+
+κτ(cid:107)·(cid:107) log n
+
+(cid:16)
+
+(cid:17)
+
+with the additional assumption that κmax = O(n log n/τ ).
+Note that (8) depends on the expected delay rather than the
+maximum delay, and as k → ∞ we allow the maximum
+delay to grow unboundedly. This allows the system to au-
+tomatically deal with heavy-tailed delay distributions and
+sporadic stragglers. When we do have a small bounded
+delay, we produce stronger bounds (9) with a multiplier
+that is either a constant (when τ κmax = O(n1−) for any
+ > 0), proportional to log n (when τ κ ≤ n) or propor-
+(when τ κ is large). The whole expression
+tional to τ κmax
+often has sublinear dependence on the expected delay κ.
+For instance, we prove in the appendix the following:
+Lemma 7. When (cid:107) · (cid:107) is Euclidean norm
+
+n
+
+(cid:107)·(cid:107) ≤(cid:112)(cid:100)Eκ(cid:101)Dτ(cid:107)·(cid:107).
+
+(cid:100)Eκτ(cid:101)
+
+ED
+
+κτ(cid:107)·(cid:107) ≤ D
+
+√
+
+The bound is proportional to
+κ when κ = Ω(1). This
+is strictly better than Niu et al. (2011) which has quadratic
+dependence on κmax and Liu et al. (2014) which has expo-
+nential dependence on κmax. Our mild κmax dependence
+for the cases τ κmax > n suggests that the (9) remains pro-
+κ even when we allow the maximum delay
+portional to
+parameter to be as large as n/τ or larger without signif-
+icantly affecting the convergence. Note that this allows
+some workers to be delayed for several data passes.
+
+√
+
+√
+f is often O(
+
+Observe that when τ = 1, where the results reduces
+to a lock-free variant for BCFW, δ becomes proportional
+to L1(cid:107)·(cid:107)[D1(cid:107)·(cid:107)]2/C 1
+f . This is always greater than 1 (see
+e.g., Jaggi, 2013, Appendix D) but due to the ﬂexibility
+of choosing the norm, this quantity corresponding to the
+most favorable norm is typically a small constant. For
+example, when f is a quadratic function, we show that
+f = L1(cid:107)·(cid:107)[D1(cid:107)·(cid:107)]2 (see Appendix D.3). When τ > 1,
+C 1
+τ ) for an appropriately
+τ L1(cid:107)·(cid:107)D1(cid:107)·(cid:107)Dτ(cid:107)·(cid:107)/C τ
+√
+chosen norm. Therefore, (8) and (9) are roughly in the or-
+der of O(κ
+Lastly, we remark that κ and τ are not independent. When
+we increase τ, we update the parameters less frequently and
+κ gets smaller. In a real distributed system, with constant
+throughput in terms of number of oracle solves per second
+from all workers. If the average delay is a ﬁxed number in
+clock time speciﬁed by communication time. Then τ κ is
+roughly a constant regardless how τ is chosen.
+
+√
+τ ) and O(
+
+κτ ) respectively2.
+
+4. Experiments
+In this section, we experimentally demonstrate perfor-
+mance gains from the three key features of our algorithm:
+minibatches of data, parallel workers, and asynchrony.
+
+4.1. Minibatches of Data
+We conduct simulations to study the effect of mini-batch
+size τ, where larger τ implies greater degrees of paral-
+lelism as each worker can solve one or more subproblems
+in a mini-batch.
+In our simulation, we re-use the struc-
+tural SVM setup from Lacoste-Julien et al. (2013) for a se-
+quence labeling task on a subset of the OCR dataset (Taskar
+et al., 2004) (n = 6251, d = 4082). The dual problem has
+block-separable probability simplex constraint therefore al-
+lowing us to run AP-BCFW, and each subproblem can be
+solved efﬁciently using the Viterbi algorithm (more details
+are included in Appendix C). The speedup on this dataset is
+shown in Figure 2(a). For this dataset, we use λ = 1 with
+weighted averaging and line-search throughout (no delay is
+allowed). We measure the speedup for a particular τ > 1
+in terms of the number of iterations (Algorithm 1) required
+to converge relative to τ = 1, which corresponds to BCFW.
+Figure 2(a) shows that AP-BCFW achieves linear speedup
+for mini-batch size up to τ ≈ 50. Further speedup is sensi-
+tive to the convergence criteria.
+In our simulation for Group Fused Lasso, we generate a
+piecewise constant dataset of size (n = 100, d = 10, in
+Eq. 2) with Gaussian noise. We use λ = 0.01 and a primal
+suboptimality threshold as our convergence criterion. At
+each iteration, we solve τ subproblems (i.e. the mini-batch
+size). Figure 2(b) shows the speed-up over τ = 1 (BCFW).
+
+2For details, see our discussion in Appendix D.3
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+solving them m ∼Uniform(5, 15) times instead of just
+once. The speedup is nearly perfect as shown in Figure
+3(d). Again, we observe that a more generous conver-
+gence threshold produces higher speedup, suggesting that
+resource scheduling could be useful (e.g., allocate more
+CPUs initially and fewer as algorithm converges).
+We repeated the experiment on a larger synthetic dataset
+with n = 103155, d = 4082 created from the above men-
+tioned OCR data as follows: for each of the 6877 words,
+generate 15 words with noisy images for characters, where
+the noise is introduced by ﬂipping the bits of the images
+with probability 0.05 independently. The speedup with par-
+allelization, shown in Figure 4, essentially follows the same
+pattern as it did in Figures 3c, 3b for original data.
+
+4.3. Performance gain with asynchronous updates
+We compare AP-BCFW3 with a synchronous version of
+the algorithm (SP-BCFW) where the server assigns τ /T
+subproblems to each worker, then waits for and accumu-
+lates the solutions before proceeding to the next iteration.
+We simulate workers of varying slow-downs in our shared-
+memory setup by assigning a return probability pi ∈ (0, 1]
+to each worker wi. After solving each subproblem, worker
+wi reports the solution to the server with probability pi.
+Thus, a worker with pi = 0.8 will drop 20% of the updates
+on average corresponding to 20% slow-down.
+We use T = 14 workers for the experiments in this section.
+We ﬁrst simulate the scenario with just one straggler with
+return probability p ∈ (0, 1] while the other workers run at
+full speed (p = 1). Figure 5(a) shows that the average time
+per effective datapass (over 20 passes and 5 runs) of AP-
+BCFW stays almost unchanged with slowdown factor 1/p
+of the straggler, whereas it increases linearly for SP-BCFW.
+This is because AP-BCFW relies on the average available
+worker processing power, while SP-BCFW is only as fast
+as the slowest worker.
+Next, we simulate a heterogeneous environment where the
+workers have varying speeds. While varying a parameter
+θ ∈ [0, 1], we set pi = θ + i/T for i = 1, . . . , T . Fig-
+ure 5(b) shows that AP-BCFW slows down only by a factor
+of 1.4 compared to the no-straggler case. Assuming that
+the server and worker each take about half the (wall-clock)
+time on average per epoch, we would expect the run time to
+increase by 50% if the average worker speed halves, which
+θ → ∞). Thus, a factor of 1.4 is
+is the case if θ = 0 (i.e., 1
+reasonable. The performance of SP-BCFW is almost iden-
+tical to that in the previous experiment as its speed is deter-
+mined by the slowest worker. Our experiments show that
+AP-BCFW is robust to stragglers and system heterogeneity.
+
+3The version that has no delayed updates, but allows workers
+
+to asynchronously solve subproblems within each mini-batch.
+
+(a) Structural SVM (n=6251)
+
+(b) Group Fused Lasso (n=100)
+
+Figure 2. Performance improvement with τ for (a) Structual SVM
+on the OCR dataset (Lacoste-Julien et al., 2013; Taskar et al.,
+2004) and (b) Group Fused Lasso on a synthetic dataset. f∗ de-
+notes primal optimum (the “primal” problem is actually referring
+to the dual problem in both cases). The performance metric here
+is the number of iterations to achieve -suboptimality.
+
+Similar to the structural SVM, the speedup is almost perfect
+for small τ (τ ≤ 55) but tapers off for large τ to varying
+degrees depending on the convergence thresholds.
+
+4.2. Shared Memory Parallel Workers
+
+We implement AP-BCFW for the structural SVM in a mul-
+ticore shared-memory system using the full OCR dataset
+(n = 6877). All shared-memory experiments were im-
+plemented in C++ and conducted on a 16-core machine
+with Intel(R) Xeon(R) CPU E5-2450 2.10GHz processors
+and 128G RAM. We ﬁrst ﬁx the number of workers at
+T = 8 and vary the mini-batch size τ. Figure 3(a) shows
+the absolute convergence (i.e.
+the convergence per sec-
+ond). We note that AP-BCFW outperforms single-threaded
+BCFW under all investigated τ, showing the efﬁcacy of
+parallelization. Within AP-BCFW, convergence improves
+with increasing mini-batch sizes up to τ = 3T , but wors-
+ens when τ = 5T as the error from the large mini-batch
+size dominates additional computation. The optimal τ for
+a given number of workers (T ) depends on both the dataset
+(how “coupled” are the coordinates) and also system im-
+plementations (how costly is the synchronization).
+Since speedup for a given T depends on τ, we search for
+the optimal τ across multiples of T to ﬁnd the best speedup
+for each T . Figure 3(b) shows faster convergence of AP-
+BCFW over BCFW (T = 1) when T > 1 workers are avail-
+able. It is important to note that the x-axis is wall-clock
+time rather than the number of epochs.
+Figure 3(c) shows the speedup with varying T . AP-BCFW
+achieves near-linear speed up for smaller T . The speed-
+up curve tapers off for larger T for two reasons: (1) Large
+T incurs higher system overheads, and thus needs larger
+τ to utilize CPU efﬁciently; (2) Larger τ incurs errors as
+shown in Fig. 2(a). If the subproblems were more time-
+consuming to solve, the affect of system overhead would
+be reduced. We simulate harder subproblems by simply
+
+020406080100020406080100τspeedup over τ=1Speedup on OCR dataset  primal threshold=f*+0.02primal threshold=f*+0.04primal threshold=f*+0.06y=x020406080100020406080100τspeedup over τ=1Speedup on Group fused lasso  primal threshold=f*+0.01primal threshold=f*+0.05primal threshold=f*+0.10y=xParallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+(a)
+
+(b)
+
+Figure 3. From left: (a) Primal suboptimality vs wall-clock time using 8 workers (T = 8) and various mini-batch sizes τ. (b) Primal
+suboptimality vs wall-clock time for varying T with best τ chosen for each T separately. (c) Speedup via parallelization with the best τ
+chosen among multiples of T (T, 2T, ...) for each T . (d) The same with longer subproblems.
+
+(c)
+
+(d)
+
+Figure 4. Speedup with parallelization on a synthetic OCR
+dataset. Left plot shows the decay of primal suboptimality and
+the right one shows the speedup.
+
+Figure 5. Average time per data pass in asynchronous and syn-
+chronous modes for two cases: one worker is slow with return
+probability p (left); workers have return probabilities (pis) uni-
+formly in [θ, 1] (right). Times normalized separately for AP-
+BCFW, SP-BCFW w.r.t. to where workers run at full speed.
+
+4.4. Convergence under unbounded heavy-tailed delay
+
+In this section, we illustrate the mild effect of delay on con-
+vergence by randomly drawing an independent delay vari-
+able for each worker. For simplicity, we use τ = 1 (BCFW)
+on the group fused lasso problem from Section 4.1. We
+sample κ using either a Poisson distribution or a heavy-
+tailed Pareto distribution (round to the nearest integer). The
+Pareto distribution is chosen with shape parameter α = 2
+and scale parameter xm = κ/2 such that Eκ = κ and
+Varκ = ∞. During the experiment, at iteration k, any
+updates that were based on a delay greater than k/2 are
+dropped (as our theory stipulates). The results are shown in
+Figure 6. Observe that for both cases, the impact of delay
+is rather mild. With expected delays up to 20, the algorithm
+only takes fewer than twice as many iterations to converge.
+
+Figure 6. Illustrations of the convergence BCFW with delayed up-
+dates. On the left, we have the delay sampled from a Poisson
+distribution. The ﬁgure on the right is for delay sampled from
+a Pareto distribution. We run each problem until the duality gap
+reaches 0.1.
+
+5. Conclusion
+In this paper, we propose an asynchronous paral-
+lel generalization of the block-coordinate Frank-Wolfe
+method (Lacoste-Julien et al., 2013), analyze its conver-
+gence and provide intuitive conditions under which it has
+a provable speed-up over BCFW. We also show that the
+method is resilient to delayed updates in the distributed
+setting. The convergence bound depends only linearly on
+the expected delay and possibly sublinearly if the delay
+is bounded, yielding an exponential improvement over the
+dependence on the same parameter in parallel coordinate
+descent (Liu et al., 2014). The asynchronous updates al-
+low our method to be robust to stragglers and node fail-
+ure as the speed of AP-BCFW depends on average worker
+speed instead of the slowest. We demonstrate the effective-
+ness of the algorithm in structural SVM and Group Fused
+Lasso with both controlled simulation and real-data experi-
+ments on a multi-core workstation. For the structural SVM,
+it leads to a speed-up over the state-of-the-art BCFW by
+an order of magnitude using 16 parallel processors. As
+a projection-free FW method, we expect our algorithm to
+be very competitive in large-scale constrained optimization
+problems, especially when projections are expensive. Fu-
+ture work includes analysis for the strongly convex setting,
+the non-convex setting and ultimately releasing a general
+purpose software package for practitioners to deploy in Big
+Data applications.
+
+time (s)01234primal suboptimality10-410-310-210-1Primal vs time= = T= = 2T= = 3T= = 5TBCFWtime (s)0123456primal suboptimality10-410-310-210-1Primal vs timeT=1T=2T=4T=8T0510speedup02468101214Speedup vs Tprimal threshold = f* + 0.005primal threshold = f* + 0.001y=xT0510speedup02468101214Speedup vs Tprimal threshold = f* + 0.005primal threshold = f* + 0.001y=xtime (s)010203040primal suboptimality10-410-310-210-1Primal vs timeT=1T=2T=4T=8T0510speedup02468101214Speedup vs Tprimal threshold = f* + 1e-3primal threshold = f* + 1e-4y=x5101520−101234561/p(Slowdownfactor)timepereff.datapassasyncsync5101520−101234561/θ(Slowdownfactor)timepereff.datapassasyncsync(a)(b)Epoch02004006008001000Duality gap10-210-1100101102103No delayExpected Delay = 2Expected Delay = 5Expected Delay = 10Expected Delay = 20Epoch050010001500Duality gap10-210-1100101102103No delayExpected Delay = 2Expected Delay = 5Expected Delay = 10Expected Delay = 20Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+Acknowledgements
+We thank the AC and anonymous reviewers for helpful sug-
+gestions that led to signiﬁcant improvement of the paper.
+YW was supported by NSF Award BCS-0941518 to CMU
+Statistics and a grant by Singapore NSF under its Inter-
+national Research Centre @ Singapore Funding Initiative
+administered by the IDM Programme Ofﬁce. VS was par-
+tially supported by NSF grant DMS-1309174. WD was
+supported by DARPA XDATA FA87501220324. SS ac-
+knowledges partial support from NSF-IIS-1409802.
+
+References
+Ahipasaoglu, Damla S, Sun, Peng, and Todd, Michael J.
+Linear convergence of a modiﬁed frank–wolfe algorithm
+for computing minimum-volume enclosing ellipsoids.
+Optimisation Methods and Software, 23(1):5–19, 2008.
+
+Ala´ız, Carlos M, Barbero, ´Alvaro, and Dorronsoro, Jos´e R.
+In Artiﬁcial Neural Networks and
+Group fused lasso.
+Machine Learning–ICANN 2013, pp. 66–73. Springer,
+2013.
+
+Beck, Amir and Tetruashvili, Luba. On the convergence of
+block coordinate descent type methods. SIAM Journal
+on Optimization, 23(4):2037–2060, 2013.
+
+Liang,
+
+Yingyu,
+
+Bellet,
+
+Aur´elien,
+
+Garakani,
+Alireza Bagheri, Balcan, Maria-Florina, and Sha,
+Fei. Distributed Frank-Wolfe algorithm: A uniﬁed
+framework for communication-efﬁcient sparse learning.
+CoRR, abs/1404.2644, 2014.
+
+Bleakley, Kevin and Vert, Jean-Philippe.
+
+The group
+fused Lasso for multiple change-point detection. arXiv
+preprint arXiv:1106.4199, 2011.
+
+Bredies, Kristian, Lorenz, Dirk A, and Maass, Peter. A gen-
+eralized conditional gradient method and its connection
+to an iterative shrinkage method. Computational Opti-
+mization and Applications, 42(2):173–193, 2009.
+
+Clarkson, Kenneth L. Coresets, sparse greedy approxima-
+tion, and the Frank-Wolfe algorithm. ACM Transactions
+on Algorithms (TALG), 6(4):63, 2010.
+
+Collins, Michael, Globerson, Amir, Koo, Terry, Carreras,
+Xavier, and Bartlett, Peter L. Exponentiated gradient al-
+gorithms for conditional random ﬁelds and max-margin
+markov networks. JMLR, 9:1775–1822, 2008.
+
+Dai, Wei, Wei, Jinliang, Zheng, Xun, Kim, Jin Kyu,
+Lee, Seunghak, Yin, Junming, Ho, Qirong, and Xing,
+Eric P. Petuum: a framework for iterative-convergent
+distributed ML. arXiv:1312.7651, 2013.
+
+Fercoq, Olivier and Richt´arik, Peter. Accelerated, paral-
+lel, and proximal coordinate descent. SIAM Journal on
+Optimization, 25(4):1997–2023, 2015.
+
+Foygel, Rina, Horrell, Michael, Drton, Mathias, and Laf-
+ferty, John D. Nonparametric reduced rank regression.
+In NIPS’12, pp. 1628–1636, 2012.
+
+Frank, Marguerite and Wolfe, Philip.
+
+An algorithm
+for quadratic programming. Naval Research Logistics
+Quarterly, 3(1-2):95–110, 1956.
+
+Freund, Robert M. and Grigas, Paul. New analysis and
+results for the frank–wolfe method. Mathematical Pro-
+gramming, 155(1):199–230, 2014. ISSN 1436-4646.
+
+Fujishige, Satoru and Isotani, Shigueo. A submodular
+function minimization algorithm based on the minimum-
+norm base. Paciﬁc Journal of Optimization, 7(1):3–17,
+2011.
+
+Garber, Dan and Hazan, Elad. A linearly convergent condi-
+tional gradient algorithm with applications to online and
+stochastic optimization. arXiv:1301.4666, 2013.
+
+Harchaoui, Zaid,
+
+Juditsky, Anatoli, and Nemirovski,
+Arkadi.
+Conditional gradient algorithms for norm-
+regularized smooth convex optimization. Mathemati-
+cal Programming, 152(1-2):75–112, 2015. ISSN 0025-
+5610.
+
+Hazan, Elad and Kale, Satyen. Projection-free online learn-
+
+ing. In ICML’12, 2012.
+
+Jaggi, Martin. Sparse convex optimization methods for ma-
+chine learning. PhD thesis, Diss., Eidgen¨ossische Tech-
+nische Hochschule ETH Z¨urich, Nr. 20013, 2011, 2011.
+
+Jaggi, Martin. Revisiting Frank-Wolfe: Projection-free
+sparse convex optimization. In ICML’13, pp. 427–435,
+2013.
+
+Jegelka, Stefanie, Bach, Francis, and Sra, Suvrit. Reﬂec-
+tion methods for user-friendly submodular optimization.
+In NIPS’13, pp. 1313–1321, 2013.
+
+Lacoste-Julien, Simon and Jaggi, Martin. On the global lin-
+ear convergence of Frank-Wolfe optimization variants.
+In NIPS’15, pp. 496–504, 2015.
+
+Lacoste-Julien, Simon, Jaggi, Martin, Schmidt, Mark, and
+Pletscher, Patrick. Block-coordinate Frank-Wolfe opti-
+In ICML’13, pp. 53–61,
+mization for structural svms.
+2013.
+
+Lafond, Jean, Wai, Hoi-To, and Moulines, Eric. Conver-
+gence analysis of a stochastic projection-free algorithm.
+arXiv:1510.01171, 2015.
+
+Parallel and Distributed Block-Coordinate Frank-Wolfe Algorithms
+
+LeBlanc, Larry J, Morlok, Edward K, and Pierskalla,
+William P. An efﬁcient approach to solving the road
+network equilibrium trafﬁc assignment problem. Trans-
+portation Research, 9(5):309–318, 1975.
+
+Tsitsiklis, John N, Bertsekas, Dimitri P, Athans, Michael,
+Distributed asynchronous deterministic and
+IEEE
+
+et al.
+stochastic gradient optimization algorithms.
+Transactions on Automatic Control, 31(9), 1986.
+
+Yu, Chun-Nam John and Joachims, Thorsten. Learning
+In ICML’09, pp.
+
+structural svms with latent variables.
+1169–1176. ACM, 2009.
+
+Zhang, Xinhua, Yu, Yaoliang, and Schuurmans, Dale.
+Accelerated training for matrix-norm regularization: A
+boosting approach. In NIPS’12, pp. 2915–2923, 2012.
+
+Zhang, Xinhua, Yu, Yao-Liang, and Schuurmans, Dale.
+In
+
+Polar operators for structured sparse estimation.
+NIPS’13, pp. 82–90, 2013.
+
+Lee, Seunghak, Kim, Jin Kyu, Zheng, Xun, Ho, Qirong,
+Gibson, Garth A, and Xing, Eric P. On model paral-
+lelization and scheduling strategies for distributed ma-
+chine learning. In NIPS’14, pp. 2834–2842, 2014.
+
+Li, Mu, Zhou, Li, Yang, Zichao, Li, Aaron, Xia, Fei,
+Andersen, David G, and Smola, Alexander. Parameter
+server for distributed machine learning. In NIPS Work-
+shop: Big Learning, 2013.
+
+Liu, Ji, Musialski, Przemyslaw, Wonka, Peter, and Ye,
+Jieping. Tensor completion for estimating missing val-
+ues in visual data. Pattern Analysis and Machine Intelli-
+gence, IEEE Transactions on, 35(1):208–220, 2013.
+
+Liu, Ji, Wright, Stephen J, R´e, Christopher, and Bittorf,
+Victor. An asynchronous parallel stochastic coordinate
+descent algorithm. JMLR, 2014.
+
+Mitzenmacher, Michael. The power of two choices in ran-
+domized load balancing. Parallel and Distributed Sys-
+tems, IEEE Transactions on, 12(10):1094–1104, 2001.
+
+Nesterov, Yu. Efﬁciency of coordinate descent methods
+on huge-scale optimization problems. SIAM Journal on
+Optimization, 22(2):341–362, 2012.
+
+Niu, Feng, Recht, Benjamin, R´e, Christopher, and Wright,
+Stephen J. Hogwild!: A lock-free approach to paralleliz-
+In NIPS’11, pp. 693–
+ing stochastic gradient descent.
+701, 2011.
+
+Ouyang, Hua and Gray, Alexander G. Fast stochastic
+Frank-Wolfe algorithms for nonlinear SVMs. In SDM,
+2010.
+
+Qu, Zheng and Richt´arik, Peter. Coordinate descent with
+arbitrary sampling ii: Expected separable overapproxi-
+mation. arXiv preprint arXiv:1412.8063, 2014.
+
+Raab, Martin and Steger, Angelika. Balls into bins - a sim-
+ple and tight analysis. In Randomization and Approxi-
+mation Techniques in Computer Science, pp. 159–170.
+Springer, 1998.
+
+Richt´arik, Peter and Tak´aˇc, Martin. Parallel coordinate de-
+scent methods for big data optimization. Mathematical
+Programming, pp. 1–52, 2015.
+
+Taskar, Ben, Guestrin, Carlos, and Koller, Daphne. Max-
+margin Markov networks. In NIPS’04, pp. 25–32. MIT
+Press, 2004.
+
+

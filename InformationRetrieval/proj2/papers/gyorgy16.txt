@@ -1,0 +1,1563 @@
+Shifting Regret, Mirror Descent, and Matrices
+
+Andr´as Gy¨orgy
+Dept. of Electrical and Electronic Engineering, Imperial College London, London, SW7 2BT, UK
+Csaba Szepesv´ari
+Dept. of Computing Science, University of Alberta, Edmonton, AB, T6G 2E8 CANADA
+
+A.GYORGY@IMPERIAL.AC.UK
+
+SZEPESVA@UALBERTA.CA
+
+Abstract
+
+We consider the problem of online prediction in
+changing environments.
+In this framework the
+performance of a predictor is evaluated as the
+loss relative to an arbitrarily changing predictor,
+whose individual components come from a base
+class of predictors. Typical results in the litera-
+ture consider different base classes (experts, lin-
+ear predictors on the simplex, etc.) separately.
+Introducing an arbitrary mapping inside the mir-
+ror decent algorithm, we provide a framework
+that uniﬁes and extends existing results. As an
+example, we prove new shifting regret bounds for
+matrix prediction problems.
+
+1. Introduction
+In the standard online learning framework, the goal of the
+forecaster is to compete with a set of static reference pre-
+dictors. However, this goal is only meaningful if a static
+predictor can be expected to perform well on the given
+problem. When the environment changes over time, it
+makes more sense to consider dynamic, time-varying ref-
+erence predictors. In this paper we consider the problem
+where the goal of the forecaster is to compete with switch-
+ing predictors that can switch between elements of a base
+predictor class and for each prediction mimic the forecast
+of the actually selected base predictor.
+This problem received substantial attention in both learning
+and information theory, resulting in several algorithms that
+can compete with switching predictors. Most of these algo-
+rithms are based on variants of the exponentially weighted
+average prediction method, bearing different computational
+advantages depending on the base predictor class: variants
+of the ﬁxed-share algorithm of Herbster & Warmuth (1998)
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+are used when the base class is small, while variants of the
+transition diagram based method of Willems (1996) are ap-
+plied for large base reference classes that admit efﬁcient
+solutions for the static prediction problem. While the al-
+gorithms for small expert classes achieve near-optimal be-
+havior in complexity that is linear both in the time horizon
+T and the number of experts N, the algorithms for large
+classes can typically be implemented with O(T 2 log N ) or
+O(T 2d) complexity, where d is the dimension of the expert
+set when it is inﬁnite. Computationally efﬁcient combina-
+tions of the two methods have been proposed for large base
+predictor classes (Willems & Krom, 1997; Hazan & Se-
+shadhri, 2009; Gy¨orgy et al., 2012) whose computational
+complexity is almost linear in T and maintain the mild de-
+pendence on the size of the expert class, while only slightly
+deteriorating performance (see Gy¨orgy et al. 2012 for an
+overview of tracking algorithms.) In fact, these methods
+are general reduction methods that can transform any low-
+regret algorithm to one with low switching (or tracking)
+regret: here the regret scales with the complexity of the
+comparator sequence, measured by the number of switches.
+Another measure introduced by Hazan & Seshadhri (2009)
+considers regret over contiguous time intervals, called the
+adaptive regret, while recently a stronger version of the
+same concept was introduced by Daniely et al. (2015) (see,
+also, Adamskiy et al. 2012). Although strongly adaptive re-
+gret and adaptive regret are stronger measures than switch-
+ing regret, the algorithms developed for these problems are
+essentially identical, and can be showed to perform well
+under all of these criteria.
+A notable case when (near-) optimal performance relative
+to switching predictors is achievable with computational
+complexity that is linear both in time and the dimension of
+the predictors is the case of online linear and convex opti-
+mization: Here, Herbster & Warmuth (2001) uniﬁed earlier
+methods and combined gradient-descent type algorithms
+with projections, while Zinkevich (2003) showed that the
+mirror descent algorithm (e.g., Nemirovski & Yudin, 1998;
+Beck & Teboulle, 2003) with a quadratic regularizer also
+enjoys favorable performance guarantees.
+In these prob-
+
+Shifting Regret, Mirror Descent, and Matrices
+
+lems the complexity of the reference predictors is typi-
+cally measured by some norm of the variation of its pre-
+dictions, measuring how much the predictor shifts over
+time; hence the resulting bounds are usually called shifting
+bounds (when the prediction set is discrete, the complexity
+measure usually reduces to the number of switches). Note
+that the general wrapper algorithms derived for switch-
+ing regret (see Hazan & Seshadhri, 2009; Gy¨orgy et al.,
+2012; Adamskiy et al., 2012; Daniely et al., 2015) are not
+directly applicable to obtain shifting bounds. Recently,
+Cesa-Bianchi et al. (2012) combined the tracking results of
+Herbster & Warmuth (1998); Bousquet & Warmuth (2002)
+with the projection ideas of Herbster & Warmuth (2001)
+to obtain a projected exponential weighting scheme for lin-
+ear/convex optimization that improves upon previous re-
+sults. Finally, Hall & Willett (2013) included models of the
+temporal behavior of the optimal predictor in the mirror de-
+scent algorithm when the Bregman-divergence used as the
+regularizer is bounded.
+In this paper we present a uniﬁed view and analysis of algo-
+rithms derived for online learning with changing environ-
+ments (including tracking, shifting, adaptive and strongly
+adaptive regret), and extend the results of Cesa-Bianchi
+et al. (2012) to cover any instantiation of the mirror de-
+scent algorithm. In particular, after the projection step in
+the mirror descent algorithm, we allow another, arbitrary
+transformation of the prediction (this is similar to the algo-
+rithm of Hall & Willett 2013, but their motivation is dif-
+ferent and, as a result, they give regret bounds of different
+kind). We give sufﬁcient conditions when this “twisted”
+predictor achieves good shifting regret bounds. We extend
+these results by providing shifting bounds for contiguous
+time intervals, extending the recently introduced strongly
+adaptive regret notion of Daniely et al. (2015). As an ex-
+ample, we apply the results to prove shifting bounds for
+matrix prediction problems, which is the ﬁrst result for the
+matrix case with non-stationary comparators.
+
+2. Preliminaries
+We consider the following standard set-up of online con-
+vex optimization. Let d > 0 be an integer and let X be
+a d-dimensional real vector space that is equipped with an
+inner product (cid:104)·,·(cid:105). Let (cid:107) · (cid:107) denote a norm on X, and
+let (cid:107) · (cid:107)∗ denote its dual norm: for any u ∈ X, (cid:107)u(cid:107)∗ =
+supv∈X,(cid:107)v(cid:107)≤1 |(cid:104)u, v(cid:105)|. For any vector v ∈ X, vi denotes
+its ith coordinate (1 ≤ i ≤ d), that is, v = (v1, . . . , vd). For
+simplicity, the reader may think of X as the d-dimensional
+i=1 uivi. For inte-
+gers q ≤ s, [q, s] denotes the set of integers {i : q ≤ i ≤ s}.
+We use 1 to denote a d-dimensional vector whose entries
+are all 1.
+Online optimization is a repeated game. In each round t =
+
+Euclidean space Rd where (cid:104)u, v(cid:105) = (cid:80)d
+
+1, 2, . . . of the game, the forecaster chooses a prediction wt
+from some decision set K ⊂ X, the environment chooses
+a loss function (cid:96)t : K → R from a class L of functions
+mapping from K to R. At the end of round t, the loss
+function (cid:96)t is revealed to the forecaster and the forecaster
+incurs loss (cid:96)t(wt). In this paper we consider online convex
+optimization where K is non-empty, convex and compact,
+and the loss functions (cid:96)t are convex and bounded.
+The goal of the forecaster is to keep its cumulative loss
+
+(cid:98)LT =
+
+T(cid:88)
+
+t=1
+
+(cid:96)t(wt)
+
+for some (or any) time horizon T as small as possi-
+
+ble. While minimizing the loss (cid:98)LT is clearly not possi-
+
+ble in general, we aim at comparing the loss of the fore-
+caster to the loss of an arbitrary predictor sequence uT
+1 =
+(u1, . . . , uT ) ∈ K T , deﬁned as
+
+T(cid:88)
+
+t=1
+
+LT (uT
+
+1 ) =
+
+(cid:96)t(ut).
+
+The regret of the forecaster against uT
+
+1 is deﬁned as
+
+1 ) =(cid:98)LT − LT (uT
+
+1 ).
+
+R(uT
+
+Instead of considering the regret on the whole time interval
+[1, T ], we will consider the strongly adaptive notion of re-
+gret (Daniely et al., 2015), which bounds the regret of the
+algorithm on any interval [q, s] for any 1 ≤ q ≤ s ≤ T .
+More precisely, we will consider this interval regret against
+q = (uq, . . . , us) deﬁned
+a changing predictor sequence us
+as
+
+q) =(cid:98)Lq:s − L(us
+
+R(us
+q)
+t=q (cid:96)t(wt) and L(us
+
+q) = (cid:80)s
+
+where (cid:98)Lq:s = (cid:80)s
+
+t=q (cid:96)t(ut)
+(note that to simplify the notation, the time interval in the
+q). By convex-
+regret is only denoted through the index of us
+ity of the losses, for any u ∈ K,
+
+(cid:96)t(wt) − (cid:96)t(u) ≤ (cid:104)∇ (cid:96)t(wt), wt − u(cid:105),
+
+(1)
+where ∇ (cid:96)t denotes a subgradient of (cid:96)t, hence we will focus
+on bounding (cid:104)∇ (cid:96)t(wt), wt−u(cid:105). For brevity, in the remain-
+der of the paper we will use the notation ft = ∇ (cid:96)t(wt). We
+will also assume that ft is bounded.
+The algorithm studied is based on the mirror descent (MD)
+algorithm (Nemirovski & Yudin, 1998; Beck & Teboulle,
+2003). To deﬁne the mirror descent algorithm, we need
+some extra deﬁnitions. Let A ⊂ X be a convex set, and we
+will consider competing with predictors taking values in
+K ∩ A, which is assumed to be non-empty. Let R : A → R
+be a Legendre function: R is strictly convex, its derivative,
+∇ R(u), exists for any u ∈ A◦ (A◦ denotes the interior
+
+Shifting Regret, Mirror Descent, and Matrices
+
+of A) and (cid:107)∇ R(u)(cid:107) → ∞ as u approaches the boundary
+of A. The Bregman divergence DR : A × A◦ → R with
+respect to R is deﬁned, for any (u, v) ∈ A × A◦, as
+DR(u, v) = R(u) − R(v) − (cid:104)∇ R(v), u − v(cid:105) .
+
+3. The twisted mirror descent algorithm
+Starting at a point w1 ∈ K ∩ A◦, the mirror descent algo-
+rithm recursively predicts, at time t + 1,
+
+wt+1 = argmin
+u∈K∩A
+
+[ηt(cid:104)ft, u(cid:105) + DR(u, wt) ]
+
+where ηt > 0 (recall that ft = ∇ (cid:96)t(wt) denotes a sub-
+gradient of (cid:96)t at wt). We consider a generalization of
+the mirror descent algorithm given in Algorithm 1. We
+call this algorithm the twisted mirror descent (TMD) al-
+gorithm. The main point is that once the standard mini-
+mization step in the mirror descent algorithm is performed,
+the resulting value vt is transformed using some function
+: K × Lt−1 → K ∩ A◦ to get the ﬁnal prediction
+φt
+wt = φt(vt, (cid:96)1, . . . , (cid:96)t−1). While this mapping is admit-
+tedly overly general (it allows maps that do not function-
+ally depend on vt), several algorithms from the literature
+can be written in this form using some special function
+φt with some structure (Herbster & Warmuth, 2001; Bous-
+quet & Warmuth, 2002; Cesa-Bianchi et al., 2012; Hall &
+Willett, 2013).
+In particular, Hall & Willett (2013) pro-
+pose a variant where φt is time-invariant and depends on
+vt only. We follow this line of work and consider only
+φt : K → K ∩ A◦ and wt = φt(vt). Obviously, when φt
+is identity, the TMD algorithm becomes the standard mir-
+ror descent algorithm. Further speciﬁc choices of φt will
+be discussed later. In the analysis of the algorithm we will
+also use the unconstrained minimum
+
+˜vt+1 = argmin
+
+u∈A
+
+[ηt(cid:104)∇ (cid:96)t(wt), u(cid:105) + DR(u, wt) ] .
+
+It is well-known that, due to our assumptions, both vt and
+˜vt+1 are unique and belong to A◦, and
+
+vt+1 = argmin
+v∈K∩A
+
+DR(v, ˜vt+1).
+
+(2)
+
+This latter equality suggests the implementation whereby
+ﬁrst ˜vt+1 is computed and then the obtained point is pro-
+jected back to K ∩ A to obtain vt+1. However, we will also
+ﬁnd (2) useful in our proofs.
+Similarly to the two standard analyses of the mirror descent
+algorithm, we will analyze the TMD algorithm based on a
+well-known lemma, which goes back at least to the work
+of Herbster & Warmuth (2001):
+Lemma 1. Let w ∈ A◦, g ∈ X, and deﬁne
+v = argminw(cid:48)∈K∩A[(cid:104)g, w(cid:48)(cid:105) + DR(w(cid:48), w)] and ˜v =
+
+Algorithm 1 Twisted mirror descent.
+1. Set w1 ∈ K ∩ A◦.
+2. At time t = 1, 2, . . . predict wt, and compute
+
+vt+1 = argmin
+u∈K∩A
+
+[ηt(cid:104)∇ (cid:96)t(wt), u(cid:105) + DR(u, wt) ]
+
+wt+1 = φt+1(vt+1, (cid:96)1, . . . , (cid:96)t)
+
+argminw(cid:48)∈A[(cid:104)g, w(cid:48)(cid:105) + DR(w(cid:48), w)]. Then for any u ∈
+K ∩ A,
+
+(cid:104)g, w − u(cid:105) ≤ DR(u, w) − DR(u, v)
+
++ DR(w, ˜v) − DR(v, ˜v) .
+
+If, in addition, R is σ-strongly convex with respect to the
+norm (cid:107)·(cid:107), that is, DR(u, v) ≥ σ
+2(cid:107)u−v(cid:107)2 for all u ∈ A, v ∈
+A◦, then one can show that
+
+DR(w, ˜v) − DR(v, ˜v) ≤ (cid:107)g(cid:107)2∗
+2σ .
+
+(3)
+
+This yields the so-called prox-lemma (Beck & Teboulle,
+2003; Nemirovski et al., 2009), stating that
+
+(cid:104)g, w − u(cid:105) ≤ DR(u, w) − DR(u, v) +
+
+(cid:107)g(cid:107)2∗
+2σ
+
+.
+
+In our subsequent statements we will usually state the gen-
+eral bound of Lemma 1 and use the nicer-looking prox-
+lemma bounds in the examples, except for the matrix pre-
+diction case in Section 4 where the divergence form gives
+qualitatively better results.
+
+3.1. Shifting regret
+
+probability simplex, R(v) = (cid:80)d
+divergence is DR(v, v(cid:48)) =(cid:80)d
+
+In this section we generalize the results of Cesa-Bianchi
+et al. (2012) who only considered prediction on the sim-
+plex, that is, when K = A = Pd is the d-dimensional
+i=1 vi log vi − vi for any
+vector v = (v1, . . . , vd) ∈ A, and the resulting Bregman
+i when
+d) ∈ A◦.1 The results show that the regret
+1 scales with the speed of change of
+
+− vi + v(cid:48)
+
+i=1 vi log vi
+v(cid:48)
+
+i
+
+1, . . . , v(cid:48)
+
+v(cid:48) = (v(cid:48)
+of TMD relative to uT
+1 .
+uT
+We start with a few simple reformulations of Lemma 1 that
+help writing telescoping terms and deﬁne meaningful map-
+pings φt. The ﬁrst result is a generalization of the decom-
+position given by Cesa-Bianchi et al. (2012) for the sim-
+plex.
+
+1Throughout the paper we use the deﬁnition 0 log 0 = 0,
+which results in a continuous extension of R and DR at the
+boundary of A.
+
+Shifting Regret, Mirror Descent, and Matrices
+
+(cid:16)
+
+Lemma 2. Assuming A contains the 0 vector, the following
+bound holds for the TMD algorithm for any t = 1, 2, . . . ,
+and any ut, ut+1 ∈ K ∩ A:
+DR(ut, wt) − DR(ut+1, wt+1)
+(cid:104)ft, wt − ut(cid:105) ≤ 1
+ηt
++ R(ut+1) − R(ut)
++ DR(0, wt+1) − DR(0, vt+1)
++ (cid:104)∇ R(vt+1) − ∇ R(wt+1), ut(cid:105)
++ (cid:104)∇ R(wt+1), ut − ut+1(cid:105)
++ DR(wt, ˜vt+1) − DR(vt+1, ˜vt+1)
+
+(cid:17)
+,
+where ˜vt+1 = argminu∈A [ηt(cid:104)∇ (cid:96)t(wt), u(cid:105) + DR(u, wt) ].
+
+Proof. The lemma is an easy application of Lemma 1 for
+the TMD algorithm with g = ηtft, w = wt, v = vt+1,
+˜v = ˜vt+1 and u = ut followed by the decomposition
+
+DR(ut, wt) − DR(ut, vt+1)
+
+= DR(ut, wt) − DR(ut+1, wt+1)
+
++ DR(ut+1, wt+1) − DR(ut, vt+1)
+
+and some algebra:
+DR(ut+1, wt+1) − DR(ut, vt+1)
+
+= R(ut+1) − R(wt+1) − (cid:104)∇ R(wt+1), ut+1 − wt+1(cid:105)
+
+−R(ut) + R(vt+1) + (cid:104)∇ R(vt+1), ut − vt+1(cid:105)
+
+= R(ut+1) − R(ut) + (cid:104)∇ R(vt+1)
+
+−∇ R(wt+1), ut(cid:105) + (cid:104)∇ R(wt+1), ut − ut+1(cid:105)
++R(0) − R(wt+1) − (cid:104)∇ R(wt+1),−wt+1(cid:105)
+−R(0) + R(vt+1) + (cid:104)∇ R(vt+1),−vt+1(cid:105).
+
+Putting everything together gives the statement of the
+lemma.
+
+To make use of the above result, one needs to deﬁne the
+mappings φt to keep the following three terms small:
+
+• DR(0, wt+1) − DR(0, vt+1);
+• ∇ R(vt+1) − ∇ R(wt+1);
+• ∇ R(wt+1).
+
+The following theorem shows that controlling these quanti-
+ties by an appropriate choice of φt indeed results in a mean-
+ingful bound.
+Theorem 3. Assume that, for all t, TMD is run with ηt =
+η > 0 and with a choice of the mappings φt guaranteeing
+
+sup
+
+u∈K∩A\{0}
+
+DR(0, wt+1) − DR(0, vt+1) ≤ Lt
+(cid:104)∇ R(vt+1) − ∇ R(wt+1), u(cid:105)
+≤ Mt
+(cid:107)u(cid:107)
+(cid:107)∇ R(wt+1)(cid:107)∗ ≤ Nt
+
+for some Lt, Mt, Nt ∈ R. Then, for any comparator se-
+1 ∈ (K ∩ A)T and any interval [q, s] ⊂ [1, T ],
+quence uT
+the regret R(us
+
+q) is bounded from above by
+
+DR(uq, wq) − DR(us+1, ws+1) + R(us+1) − R(uq)
+
+(cid:32)
+
+1
+η
+
+s(cid:88)
+s(cid:88)
+
+t=q
+
++
+
++
+
+(Lt + Mt(cid:107)ut(cid:107) + Nt(cid:107)ut − ut+1(cid:107))
+
+(cid:0)DR(wt, ˜vt+1) − DR(vt+1, ˜vt+1)(cid:1)(cid:33)
+
+,
+
+(4)
+
+t=q
+
+where uT +1 ∈ K ∩ A is arbitrary2 and ˜vt+1 is deﬁned in
+Lemma 2.
+
+Proof. The Cauchy-Schwartz inequality implies that the
+second inner product in Lemma 2 can be bounded as
+(cid:104)∇ R(wt+1), ut − ut+1(cid:105) ≤ (cid:107)∇ R(wt+1)(cid:107)∗(cid:107)ut − ut+1(cid:107),
+
+while the conditions on φt imply
+
+(cid:104)∇ R(vt+1) − ∇ R(wt+1), ut(cid:105) ≤ Mt(cid:107)ut(cid:107).
+
+(cid:16)
+
+Applying these results in Lemma 2 shows
+(cid:104)ft, wt − ut(cid:105)
+DR(ut, wt) − DR(ut+1, wt+1)
+≤ 1
+η
++ R(ut+1) − R(ut) + Lt + Mt(cid:107)ut(cid:107)
++ Nt(cid:107)ut − ut+1(cid:107) + DR(wt, ˜vt+1) − DR(vt+1, ˜vt+1)
+Summing this inequality for all q ≤ t ≤ s, the statement of
+the theorem follows immediately by (1).
+
+(cid:17)
+
+q) =(cid:80)s−1
+
+The above result is a typical example of a regret bound
+with respect to a time-varying reference sequence uT
+1 , as
+(cid:80)s
+q: assuming Lt = L and
+it depends on the variations of us
+Mt = M for all T , the dependence is on the total norm
+t=q (cid:107)ut−ut+1(cid:107)
+t=q (cid:107)ut(cid:107) and the variation DV (us
+of the sequence (note that us+1 can always be chosen to be
+equal to us when we express the bound in the theorem).
+Example 4. The simplest example when TMD, and actu-
+ally the pure MD, works is the case when we use a p-norm
+regularizer with p ∈ (1, 2] over a ball, that is, A = X =
+p, K = {u ∈ Rd : (cid:107)u(cid:107)p ≤ D/2}. In
+Rd, R(u) = 1
+this case the dual norm is the q-norm with q = p/(p − 1).
+q), the value of
+us+1 can be chosen freely to optimize the bound. The above form
+is presented for the sake of simplicity. This holds for any of our
+future regret bounds, too, however, this note will not be repeated
+any more.
+
+2In fact, for any s, in the regret bound for R(us
+
+2(cid:107)u(cid:107)2
+
+Shifting Regret, Mirror Descent, and Matrices
+
+Furthermore, DR is known to be (p − 1)-strongly con-
+vex with respect to the p-norm. Thus, assuming (cid:107)ft(cid:107)q ≤
+G, (3) implies that DR(wt, ˜vt+1) − DR(vt+1, ˜vt+1) ≤
+η2G2/(2(p − 1)). It is easy to see that in this setup the
+identity mapping φt(v) = v is a good choice (reducing
+TMD to MD), giving Lt = Mt = 0, and Nt = D/2
+since (cid:107)∇ R(u)(cid:107)q = (cid:107)u(cid:107)p. Selecting w1 = 0, we have
+DR(u1, w1) = R(u1) ≤ D2/8 for any u ∈ K, and setting
+uT +1 = uT yields R(uT +1) ≤ D2/8, giving the following
+regret bound
+
+R(uT
+
+1 )
+
++
+
+ηT G2
+2(p − 1)
+
+,
+
+4η
+
+1 ) ≤ D2 + 2D · DV (uT
+1 ) =(cid:80)T−1
+(cid:113) p−1
+
+t=1 (cid:107)ut − ut+1(cid:107)p (for simplicity and
+where DV (uT
+illustrational purposes, we consider the regret only over
+the whole interval [1, T ]). Optimizing η independently of
+DV (uT
+
+2T and results in the bound
+
+1 ) gives η = D
+G
+
+1 )(cid:1)(cid:115)
+1 ) ≤ G(cid:0)D + DV (uT
+
+R(uT
+
+T
+
+2(p − 1)
+
+.
+
+Optimizing η also as a function of an a priori known upper
+bound DV ≥ DV (uT
+
+1 ), we get
+
+(cid:115)
+1 ) ≤ G
+
+R(uT
+
+T (D2 + 2D · DV )
+
+2(p − 1)
+
+.
+
+=
+
+T V (u, v) = (cid:80)d
+
+A slightly different (sometimes improved) version of Theo-
+rem 3 can be obtained if we can give coordinatewise condi-
+tions for the gradients of R in the theorem. In the following
+we consider the case when X = Rd and all coordinates of
+the gradients of R are non-positive, and the predictors are
+taken from the non-negative orthant. In what follows we
+make ∇i R denote the ith coordinate of the gradient of R.
+i=1 max{ui − vi, 0} for all
+We also let D+
+u, v ∈ Rd, which satisﬁes D+
+2(cid:107)u − v(cid:107)1 and equals
+T V = 1
+the total variation distance when (cid:107)u(cid:107)1 = (cid:107)v(cid:107)1.
+Theorem 5. Assume K ⊂ [0,∞)d, and ∇i R(u) ≤ 0 for
+all u ∈ K ∩ A. Suppose that, for all t, TMD is run with
+ηt = η > 0 and R that is σ-strongly convex with respect to
+(cid:107) · (cid:107), and with a choice of the mappings φt guaranteeing
+
+DR(0, wt+1) − DR(0, vt+1) ≤ Lt
+∇i R(vt+1) − ∇i R(wt+1) ≤ Mt
+−∇i R(wt+1) ≤ Nt
+
+for some Lt, Mt, Nt ∈ R. Then, for any comparator se-
+1 ∈ (K ∩ A)T and any interval [q, s] ⊂ [1, T ],
+quence uT
+
+(cid:16)
+
+1
+η
+
+the regret R(us
+
+q) is bounded from above by
+
+DR(uq, wq) − DR(us+1, ws+1) + R(us+1) − R(uq)
+
++
+
+s(cid:88)
+(cid:0)Lt + Mt((cid:107)ut(cid:107)1 − D+
+T V (ut+1, ut)(cid:1)(cid:17)
+
+t=q
+
++ NtD+
+
+η
+2σ
+where uT +1 ∈ (K ∩ A) is arbitrary.
+
++
+
+s(cid:88)
+
+t=q
+
+T V (ut+1, ut))
+
+(cid:107)ft(cid:107)2∗ ,
+
+Proof. The proof of the theorem follows the same lines as
+that of Theorem 3. The slight difference is in how the inner
+products in Lemma 2 are bounded. We will use the fact that
+∇i R(vt+1) ≤ 0:
+(cid:104)∇ R(vt+1) − ∇ R(wt+1), ut(cid:105) + (cid:104)∇ R(wt+1), ut − ut+1(cid:105)
+
+(cid:104)
+
+≤ (cid:88)
+(cid:88)
+
+i:ut,i≤ut+1,i
+
++
+
+i:ut,i>ut+1,i
+
+(∇i R(vt+1) − ∇i R(wt+1))ut,i
+
+(cid:104)
+
+−∇i R(wt+1)(ut+1,i − ut,i)
+(∇i R(vt+1) − ∇i R(wt+1))ut,i
+−∇i R(wt+1)(ut+1,i − ut,i)
++∇i R(vt+1)(ut+1,i − ut,i)
+(∇i R(vt+1) − ∇i R(wt+1))ut,i
+
+(cid:105)
+
+(cid:105)
+(cid:105)
+
+−∇i R(wt+1)(ut+1,i − ut,i)
+(∇i R(vt+1) − ∇i R(wt+1))ut+1,i
+
+i:ut,i≤ut+1,i
+
+(cid:104)
+
+(cid:88)
+(cid:88)
+(cid:88)
+(cid:16) d(cid:88)
+T V (ut+1, ut) + Mt((cid:107)u(cid:107)1 − D+
+
+ut+1,i − (cid:88)
+
+(ut+1,i − ut,i)
+
+i:ut,i≤ut+1,i
+
+i:ut,i≤ut+1,i
+
+i=1
+
+i:ut,i>ut+1,i
+
++ Mt
+
+= NtD+
+
++
+
+≤ Nt
+
+(cid:17)
+
+(ut+1,i − ut,i)
+
+T V (ut+1, ut)).
+
+The proof can be ﬁnished in the same way as in Theorem 3,
+also using (3) to bound the difference of the divergence
+terms in the last line of the bound of Lemma 2.
+
+plex, R(v) = (cid:80)d
+DR(v, v(cid:48)) =(cid:80)d
+
+Example 6. The above theorem is very useful when one
+works on the simplex, as in (Cesa-Bianchi et al., 2012).
+Then K = Pd is the d-dimensional probability sim-
+i=1 vi log vi − vi for any vector v =
+(v1, . . . , vd) ∈ K, and the resulting Bregman divergence is
+d) ∈ K.
+Note that in this case the norm is the 1-norm and σ = 1 (by
+
+when v(cid:48) = (v(cid:48)
+
+i=1 vi log vi
+v(cid:48)
+
+1, . . . , v(cid:48)
+
+i
+
+Shifting Regret, Mirror Descent, and Matrices
+
+Pinsker’s inequality). Then selecting φt as the ﬁxed share
+update of Herbster & Warmuth (2001), that is,
+wt+1 = φt(vt+1) = (1 − α)vt+1 + α
+d 1
+
+(5)
+
+1−α, and Nt = log d
+
+for some α > 0, the assumptions of the theorem are sat-
+isﬁed, giving rise to the bound in Proposition 1 of Cesa-
+(cid:80)T−1
+Bianchi et al. (2012) as follows: First, we have Lt = 0,
+α. Letting uT +1 = uT ,
+Mt = log 1
+t=1 (cid:107)ut+1 − ut(cid:107)1, assuming each ft ∈
+1 ) = 1
+m(uT
+2
+[0, 1]d and starting the algorithm from the uniform distri-
+bution w1 = 1/d, the bound becomes
+R(uT
+1 )
+≤ log d + (T − m(uT
+
+1−α + m(uT
+
+1 )) log 1
+
+1 ) log d
+α
+
++
+
+η
+
+ηT
+8
+
+.
+
+The 1/8 factor instead of 1/2 in the last term can be
+obtained by shifting ft to [−1/2, 1/2]d, which does not
+change the linearized regret. This result exactly recovers
+the corresponding bounds of Herbster & Warmuth (2001)
+and Cesa-Bianchi et al. (2012). The slight improvement
+compared to Theorem 3 is the appearence of the −m(uT
+1 )
+term multiplying log 1
+1−α and the appearance of 1/2 in the
+deﬁnition of m(uT
+
+1 ).
+
+4. Application to linear prediction over
+
+trace-bounded positive deﬁnite matrices
+
+In this section we consider the application of the previous
+result to a natural online matrix-prediction problem, taken
+from Hazan et al. (2012), who showed that a number of
+matrix-valued prediction problems, such as collaborative
+ﬁltering, gambling and max-cut can be reduced to this com-
+mon problem. Here we show how TMD can be applied to
+this problem to compete with a changing sequence of ma-
+trices for a more general family of matrix prediction prob-
+lems, thereby simultaneously extending, e.g., the scope of
+the results of Hazan et al. (2012). Further, our results also
+show, that contrary to what Hazan et al. (2012) claim, stan-
+dard mirror descent analysis is sufﬁcient to get nontrivial
+results for matrix prediction – at least as long as one uses
+Lemma 1 instead of the prox-lemma.3
+In order to deﬁne the problem, we need some notation. Let
+S denote the vector space of N × N real-valued symmet-
+ric matrices equipped with the inner product (cid:104)X, Y (cid:105) =
+tr(X(cid:62)Y ). Further, let S++ ⊂ S (and S+ ⊂ S) denote
+3 In particular, Hazan et al. (2012) wrote in the second half of
+√
+page 38.2: “In contrast, a direct application of the online mirror
+√
+descent framework to this problem yields a regret of O(
+τ 2T ) =
+n2T )”. In their paper, the matrices are n× n, which implies
+O(
+that this bound is trivial, as they explain it. Our results show that
+a general online mirror descent framework, in particular Theo-
+rem 3, gives the bounds of the desired scaling behavior.
+
+norm: (cid:107)X(cid:107) = (cid:107)X(cid:107)tr = (cid:80)N
+
+the set of N × N real-valued positive deﬁnite (respec-
+tively, semi-deﬁnite) matrices. Let (cid:107)X(cid:107) denote the trace-
+i=1 |λi(X)|, where λi(X) is
+the ith eigenvalue of matrix X ∈ S. The dual norm of
+the trace-norm is the spectral (or operator) norm: (cid:107)X(cid:107)∗ =
+max1≤i≤N |λi(X)|. Note that H¨older’s inequality holds by
+duality, that is, (cid:104)X, Y (cid:105) ≤ (cid:107)X(cid:107)(cid:107)Y (cid:107)∗, for X, Y ∈ S.
+Let τ be a positive number. The competitor set K is chosen
+to be a closed convex, non-empty subset of
+
+Kτ =(cid:8) X ∈ S+ : (cid:107)X(cid:107) ≤ τ(cid:9) .
+
+Note that Kτ is a closed, convex set. The loss is assumed
+to be linear: (cid:96)t(X) = (cid:104)Ft, X(cid:105), where Ft ∈ S is assumed to
+have bounded dual norm, that is, Ft ∈ L for some L ⊂ Lγ
+with
+
+Lγ =(cid:8) F ∈ S : (cid:107)F 2(cid:107)∗ ≤ γ(cid:9) .
+
+We will consider the (τ, γ)-matrix prediction problem
+where we want to compete with the best matrix from
+K ⊂ Kτ in hindsight given a sequence of loss matri-
+ces F1, . . . , FT ∈ L. For simplicity, we assume that
+N IN×N ∈ K where IN×N denotes the N × N identity
+τ
+matrix.
+Hazan et al. (2012) considered a special (τ, γ)-matrix pre-
+diction problem: In there setup K is a subset of
+
+Kτ,β =(cid:8) X ∈ S+ : (cid:107)X(cid:107) ≤ τ, Xi,i ≤ β, 1 ≤ i ≤ N(cid:9) ,
+(cid:98)Lγ =(cid:8) F ∈ S : (cid:107)F 2(cid:107) ≤ γ, F 2 is diagonal(cid:9) .
+
+for some β > 0, and L is a subset of
+
+The signiﬁcance of this problem is that several interest-
+ing matrix prediction problems, such as online collabo-
+rative ﬁltering, gambling and max-cut can be reduced to
+this form, which they call the (β, τ, γ)-matrix prediction
+
+problem. Note that Kτ,β ⊂ K and (cid:98)Lγ ⊂ Lγ, thus
+this is a strictly smaller set of problems. Also note that
+N IN×N ∈ Kτ,β implies τ ≤ βN.
+τ
+Let us now consider how TMD can be applied to these set-
+tings (to emphasize that the iterates are matrices, we will
+write capital letters Vt and Wt instead of vt and wt, respec-
+tively). Unsurprisingly, we choose the unnormalized neg-
+ative entropy regularizer to instantiate TMD. To introduce
+this, deﬁne the application of a function f : R → R to a
+i , where
+is an eigendecomposition of X. Note
+
+symmetric matrix X as f (X) =(cid:80)N
+X =(cid:80)N
+
+i=1 f (λi)uiu(cid:62)
+
+i=1 λiuiu(cid:62)
+
+that f (X) is well deﬁned.
+For X positive deﬁnite, we let R(X) denote the unnormal-
+ized negative entropy of X:
+
+i
+
+R(X) = tr(X log(X) − X).
+
+Shifting Regret, Mirror Descent, and Matrices
+
+φt(X) = fα(X) = (1 − α)X +
+
+αcφ
+N
+
+IN×N .
+
+(6)
+
+βγT
+
+It is well-known that R is a Legendre function over A =
+S+. In particular, the derivative of R exists on A◦ = S++
+and satisﬁes ∇R(X) = log(X). Thus, the underlying
+Bregman divergence is equal to
+
+DR(X, Y ) = tr(X log X − X log Y − X + Y ) .
+
+For brevity, we will call DR(X, Y ) the relative entropy of
+X with respect to Y .
+It remains to choose the mappings φt : Kτ → Kτ . For
+0 ≤ α ≤ 1, and 0 < cφ, let fα(λ) = (1 − α)λ + αcφ/N
+and deﬁne
+
+i
+
+i=1 λiuiu(cid:62)
+
+X = (cid:80)N
+
+it holds that (cid:80)N
+
+Note that the latter is a generalization of the ﬁxed share
+update (5). To see why the second equality holds, no-
+tice that since X is symmetric, for the eigendecomposition
+i=1 uiu(cid:62)
+i = IN×N .
+N IN×N ∈ K, then
+Furthermore, by the convexity of K, if cφ
+φt(X) ∈ K for any X ∈ K. That is, in this case φt is a
+valid transformation in TMD.
+From Theorem 3, we get the following result:
+√
+γ ≤ 1, and let
+Theorem 7. Assume η, γ > 0 such that η
+ηt = η > 0 for all t > 0. Let K ⊂ Kτ be a closed convex
+N IN×N ∈ K, let φt be deﬁned by (6) with cφ = τ.
+set with τ
+If τ (1−α+α/N ) ≥ 1, deﬁne N∗ = log((1−α+α/N )τ ),
+else let N∗ = log N
+1 be sequences such that
+Ut ∈ K and Ft ∈ L for some L ⊂ Lγ. Let W1 = τ
+N IN×N
+2 be the sequence of matrices chosen by TMD
+and let W T
+for t ∈ [2, T ] with Wt ∈ K when the adversary’s choices
+t=1(cid:104)Ft, Wt(cid:105) − (cid:104)Ft, Ut(cid:105)
+are F T
+be the regret of TMD against U T
+1 on this sequence. Then,
+deﬁning UT +1 = UT ,
+R(U T
+1 )
+≤ 1
+η
+
+1 . Finally, let R(U T
+(cid:40)
+
+τ + (cid:107)U1(cid:107)(log N − 1) + ατ T
+
+1 ) = (cid:80)T
+
+ατ . Let F T
+
+1 , U T
+
+(cid:16) 1
+
+(cid:17) T(cid:88)
+
+(cid:107)Ut(cid:107) + N∗ T(cid:88)
+
++ log
+
+1−α
+
+(cid:107)Ut − Ut+1(cid:107)
+
+(cid:41)
+
++ ηT
+
+t=1
+sup
+
+W∈K,F∈L
+
+t=1
+
+(cid:104)W, F 2(cid:105) .
+
+Before presenting the proof of the theorem, which is a di-
+rect consequence of Theorem 3 and standard techniques an-
+alyzing the mirror descent algorithm for positive semidef-
+inite matrices (see, e.g., Tsuda et al., 2006; Arora & Kale,
+2007; Hazan et al., 2012), we present regret bounds for
+two special cases, the (τ, γ)- and (β, τ, γ)-matrix predic-
+tion problems. Note that Theorem 13 of Hazan et al. (2012)
+follows from this result (when Ut is the constant sequence).
+This clearly demonstrates the power of Theorem 3.
+
+Corollary 8. Suppose the assumptions of Theorem 7 hold
+and T > 1.4 Set α = 1/T and suppose τ ≥ 1+ N−1
+T N−N +1 .5
+Then, for the (τ, γ)-matrix prediction problem, selecting
+
+(cid:113) (3+log N )
+(cid:16)
+τ(cid:112)γT (1 + log N )
+(cid:32)(cid:115)
+
+, we have
+
+1 ) = O
+
+γT
+
+(cid:17)
+
+η =
+
+R(U T
+
++ O
+
+γT
+
+1 + log N
+
+log(τ )
+
+(cid:33)
+
+(cid:107)Ut − Ut+1(cid:107)
+
+.
+
+T−1(cid:88)
+
+t=1
+
+(cid:113) τ (3+log N )
+
+R(U T
+
+1 ) = O
+
++ O
+
+For the (β, τ, γ)-matrix prediction problem, selecting η =
+
+, we have
+
+(cid:16)(cid:112)βγτ T (1 + log N )
+(cid:32)(cid:115)
+
+(cid:17)
+
+βγT
+
+τ (1 + log N )
+
+log(τ )
+
+(cid:33)
+
+.
+
+(cid:107)Ut − Ut+1(cid:107)
+
+T−1(cid:88)
+
+t=1
+
+1−α
+
+(cid:17)(cid:80)T
+
+(cid:17)(cid:80)T
+
+Since Ut ∈ K and log 1
+
+Proof. We apply Theorem 7.
+α, ατ T = τ.
+1/(T − 1), we have −(cid:107)U1(cid:107) + log
+log
+
+(cid:16) 1
+By the deﬁnition of
+1−α ≤
+(cid:16) 1
+t=1 (cid:107)Ut(cid:107) ≤
+log τ. Moreover, (cid:107)UT − U1(cid:107) ≤(cid:80)T−1
+t=2 (cid:107)Ut(cid:107) ≤ τ. By the condition on τ, N∗ ≤
+t=1 (cid:107)Ut − Ut+1(cid:107). Fi-
+τ γ, while for W ∈ Kτ,β and F ∈ (cid:98)Lγ, (cid:104)W, F 2(cid:105) ≤ βγ.
+nally, for W ∈ Kτ and F ∈ Lγ, (cid:104)W, F 2(cid:105) ≤ (cid:107)W(cid:107)(cid:107)F 2(cid:107)∗ ≤
+without the(cid:80)T−1
+Putting everything together and optimizing the value of η
+t=1 (cid:107)Ut−Ut+1(cid:107) term, we obtain the bounds
+
+1−α
+
+of the corollary.6
+
+Proof of Theorem 7. The result follows from Theorem 3
+once we choose the appropriate values for the parameters
+of this theorem and verify its conditions. Let us ﬁrst choose
+values for Lt, Nt and Mt. Fix a value for t.
+We need to select Lt so that
+
+DR(0, Wt+1) − DR(0, Vt+1) ≤ Lt .
+
+Since DR(0, Y ) = tr(Y ), we have DR(0, Wt+1) −
+DR(0, Vt+1) = tr(Wt+1−Vt+1) = α(τ−tr(Vt+1)) ≤ ατ,
+thanks to Vt+1 ∈ S+. Hence, we choose Lt = ατ.
+Now, consider the condition
+
+(cid:104)∇ R(Vt+1) − ∇ R(Wt+1), U(cid:105)
+
+sup
+
+U∈K∩S++
+
+(cid:107)U(cid:107)
+
+≤ Mt
+
+√
+γ ≤ 1 implies a larger lower bound on T .
+
+4The inequality η
+5Similar results can be derived for τ < 1 + N−1
+6In fact, the constants for the (τ, γ)-matrix prediction problem
+can be slightly improved by using that DR is 1/τ-strongly convex
+on Kτ and applying (3) (i.e., the prox-lemma), but this is left out
+for simplicity.
+
+T N−N +1 .
+
+Shifting Regret, Mirror Descent, and Matrices
+
+i=1 λiziz(cid:62)
+
+and let Vt+1 =(cid:80)N
+Vt+1. By the deﬁnition of φ, Wt+1 =(cid:80)N
+
+(the domain of ∇R is S++). Fix some U ∈ K ∩ S+
+i be an eigendecomposition of
+i=1((1 − α)λi +
+i . As noted earlier, ∇ R(X) = log(X). Hence,
+ατ /N )ziz(cid:62)
+(cid:19)
+= ∇ R(Vt+1) − ∇ R(Wt+1)
+N(cid:88)
+.
+
+(cid:18)
+
+λi
+
+Z
+
+=
+
+log
+
+(1 − α)λi + ατ /N
+
+ziz(cid:62)
+
+i
+
+and so
+
+(cid:104)Z, U(cid:105) =
+
+i=1
+
+N(cid:88)
+
+i=1
+
+(cid:18)
+
+log
+
+(cid:19)
+
+(cid:104)ziz(cid:62)
+
+i , U(cid:105).
+
+λi
+
+(1 − α)λi + ατ /N
+
+Now, since U is nonnegative deﬁnite, (cid:104)ziz(cid:62)
+tr(z(cid:62)
+
+i U zi ≥ 0. Therefore,
+
+i U zi) = z(cid:62)
+
+i , U(cid:105) =
+
+where C = max1≤j≤N log
+
+λj
+
+(1−α)λj +ατ /N
+
+. Therefore,
+
+Proof. Note that ˜V = ∇R−1(∇R(W ) − F ) =
+exp(log(W ) − F ). Plugging this into the deﬁnition of DR
+we get
+DR(W, ˜V ) = tr(W log W − W log ˜V − W + ˜V )
+
+= tr(W log W − W (log W − F ) − W + ˜V )
+= tr(W F − W + exp(log(W ) − F )) .
+
+By the Golden-Thompson inequality, tr(exp(log(W ) −
+F )) ≤ tr W exp(−F ). Now, for any A ∈ S, (cid:107)A(cid:107)∗ ≤ 1,
+exp(A) ≺ IN×N + A + A2 (for matrices A, B ∈ S+,
+A ≺ B denotes B − A ∈ S+).
+Further, for any
+W, A, B ∈ S+, A ≺ B implies (cid:104)W, A(cid:105) ≤ (cid:104)W, B(cid:105). Hence,
+tr W exp(−F ) ≤ tr W (IN×N − F + F 2). Putting the
+inequalities together, cancelling terms we get the claimed
+inequality.
+
+√
+
+γ ≤
+Using this lemma with F = ηFt, W = Wt, since η
+1 by assumption, we get DR(Wt, ˜Vt+1) ≤ η2(cid:104)Wt, F 2
+t (cid:105).
+Moreover, −DR(Vt+1, ˜Vt+1) ≤ 0.
+To ﬁnish, we choose UT +1 = U1 and so it remains to
+i be the
+eigendecomposition of U1. Since U1 is symmetric, we
+i . Hence,
+can write W1 = τ
+= τ +
+
+bound DR(U1, W1). Let U1 = (cid:80)N
+(cid:80)N
+i=1 λiziz(cid:62)
+(cid:16)
+(cid:17)
+DR(U1, W1) = τ + (cid:80)N
+i=1 ziz(cid:62)
+τ − 1(cid:1) ≤ τ + (cid:107)U1(cid:107) log N −
+(cid:0)log λi
+(cid:107)U1(cid:107) log N +(cid:80)N
+τ /N − λi
+(cid:80)N
+i=1 λi = τ + (cid:107)U1(cid:107)(log N − 1), where we used that
+
+N IN×N = τ
+
+λi log λi
+
+i=1 λi
+
+i=1
+
+N
+
+log(λi/τ ) ≤ 0 since λi ≤ τ and λi ≥ 0.
+Plugging in the bounds obtained into (4), we get
+R(U T
+1 )
+≤ 1
+τ + (cid:107)U1(cid:107)(log N − 1) + ατ T
+η
+
+(cid:110)
+
+(cid:16) 1
+
+(cid:17) T(cid:88)
+
+(cid:107)Ut(cid:107) + N∗ T(cid:88)
+
+(cid:107)Ut − Ut+1(cid:107)(cid:111)
+
++ log
+
+1−α
+
++ ηT
+
+t=1
+sup
+
+W∈K,F∈L
+
+t=1
+
+(cid:104)W, F 2(cid:105) ,
+
+which is the desired bound.
+
+5. Conclusion
+We presented a unifying framework for deriving mirror-
+descent based algorithms for online learning in changing
+environments. A generic result was provided that indicated
+how mirror descent algorithms can be modiﬁed to obtain
+shifting regret bounds and shifting regret bounds over in-
+tervals. As corollaries, we derived existing variants of the
+mirror descent algorithm (for various problems), and re-
+covered their shifting regret bounds, as well as derived a
+new matrix prediction algorithm for tracking and the ﬁrst
+shifting bound for matrix prediction problems.
+
+(cid:104)Z, U(cid:105) ≤ C
+
+(cid:104)ziz(cid:62)
+
+N(cid:88)
+(cid:16)
+
+i=1
+
+(cid:19)
+
+(cid:17)
+
+i , U(cid:105)
+(cid:18)
+
+≤ log
+
+λj
+
+(1 − α)λj
+
+(cid:19)
+
+(cid:18)
+
+log
+
+(1 − α)λj + ατ /N
+
+λj
+
+(cid:18) 1
+
+(cid:19)
+
+= log
+
+1 − α
+
+(cid:80)N
+
+and hence C ≤ log( 1
+
+i=1 log( 1
+
+1−α )ziz(cid:62)
+
+H¨older’s inequality we get
+
+Introduce Z(cid:48) =
+i . Thus, (cid:104)Z, U(cid:105) ≤ (cid:104)Z(cid:48), U(cid:105) and from
+
+1−α ).
+
+(cid:104)Z, U(cid:105) ≤ (cid:107)Z(cid:48)(cid:107)∗(cid:107)U(cid:107) ≤ log
+
+(cid:19)
+
+(cid:18) 1
+
+1 − α
+
+(cid:107)U(cid:107)
+
+and so we choose Mt = log 1
+Let us now turn to the choice of Nt. We need to choose Nt
+such that
+
+1−α.
+
+(cid:107)∇ R(Wt+1)(cid:107)∗ ≤ Nt.
+
+We have
+
+(cid:107)∇ R(Wt+1)(cid:107)∗ = max
+1≤i≤N
+
+(cid:16)
+
+(cid:12)(cid:12)(cid:12)log
+
+(1 − α)λi + α
+
+τ
+N
+
+(7)
+
+(cid:17)(cid:12)(cid:12)(cid:12) .
+
+A simple case analysis gives that this is upper bounded by
+N∗, which can be chosen to be the value of Nt.
+Now, let us bound DR(Wt, ˜Vt+1). For this, we use the
+following lemma, which can be extracted from Tsuda et al.
+(2006); Arora & Kale (2007) or Hazan et al. (2012):
+Lemma 9. Let R be the negentropy regularizer, F ∈ S,
+(cid:107)F(cid:107)∗ ≤ 1, W ∈ S++, ˜V = argminV ∈S+(cid:104)F, V (cid:105) +
+DR(V, W ). Then DR(W, ˜V ) ≤ (cid:104)W, F 2(cid:105).
+
+Shifting Regret, Mirror Descent, and Matrices
+
+M. Herbster and M. K. Warmuth. Tracking the best expert.
+
+Machine Learning, 32(2):151–178, 1998.
+
+M. Herbster and M. K. Warmuth. Tracking the best lin-
+ear predictor. Journal of Machine Learning Research, 1:
+281–309, 2001.
+
+A. Nemirovski and D. Yudin. Problem Complexity and
+
+Method Efﬁciency in Optimization. Wiley, 1998.
+
+A. Nemirovski, A. Juditsky, G. Lan, and A. Shapiro.
+Robust stochastic approximation approach to stochas-
+tic programming. SIAM J. Optimization, 4:1574–1609,
+2009.
+
+K. Tsuda, G. Ratsch, and M. K. Warmuth. Matrix exponen-
+tiated gradient updates for on-line learning and Bregman
+projection. Journal of Machine Learning Research, 6(1):
+995–1018, 2006.
+
+F. M. J. Willems.
+
+Coding for a binary independent
+IEEE Trans-
+piecewise-identically-distributed source.
+actions on Information Theory, IT-42:2210–2217, Nov.
+1996.
+
+F. M. J. Willems and M. Krom. Live-and-die coding for
+binary piecewise i.i.d. sources. In Proc. 1997 IEEE Int.
+Symp. Inform. Theory, pp. 68, Ulm, Germany, June–July
+1997.
+
+M. Zinkevich. Online convex programming and general-
+ized inﬁnitesimal gradient ascent. In Proc. 20th Interna-
+tional Conference on Machine Learning (ICML-2003),
+Washington, DC, 2003.
+
+Acknowledgements
+We would like to thank Yaoliang Yu and the anonymous re-
+viewers for their insightful comments on earlier versions of
+this paper. This work was supported in part by the Alberta
+Innovates Technology Futures through the Alberta Ingenu-
+ity Centre for Machine Learning and by NSERC.
+
+References
+D. Adamskiy, W. M. Koolen, A. V. Chernov, and V. Vovk.
+A closer look at adaptive regret. In Algorithmic Learn-
+ing Theory - 23rd International Conference, ALT 2012,
+Lyon, France, October 29-31, 2012. Proceedings, pp.
+290–304, 2012.
+
+S. Arora and S. Kale. A combinatorial, primal-dual ap-
+In STOC, pp. 227—
+
+proach to semideﬁnite programs.
+236. 2007.
+
+A. Beck and M. Teboulle. Mirror descent and nonlinear
+projected subgradient methods for convex optimization.
+Operations Research Letters, 31(3):167–175, 2003.
+
+O. Bousquet and M. K. Warmuth. Tracking a small set of
+experts by mixing past posteriors. Journal of Machine
+Learning Research, 3:363–396, Nov. 2002.
+
+N. Cesa-Bianchi, P. Gaillard, G. Lugosi, and G. Stoltz.
+Mirror descent meets ﬁxed share (and feels no regret).
+In P. L. Bartlett, F. Pereira, C. Burges, L. Bottou, and
+K. Weinberger (eds.), Advances in Neural Information
+Processing Systems 25, pp. 989–997. 2012.
+
+A. Daniely, A. Gonen, and S. Shalev-Shwartz. Strongly
+In Proceedings of the 32nd
+adaptive online learning.
+International Conference on Machine Learning, ICML
+2015, Lille, France, 6-11 July 2015, pp. 1405–1411,
+2015.
+
+A. Gy¨orgy, T. Linder, and G. Lugosi. Efﬁcient tracking of
+large classes of experts. IEEE Transactions on Informa-
+tion Theory, IT-58(11):6709–6725, Nov. 2012.
+
+E. C. Hall and R. M. Willett. Dynamical models and
+tracking regret in online convex programming. In Proc.
+20th International Conference on Machine Learning
+(ICML2013), volume 28 of JMLR Workshop and Con-
+ference Proceedings, Atlanta, GA, June 2013.
+
+E. Hazan and C. Seshadhri. Efﬁcient learning algorithms
+for changing environments. In Proc. 26th Annual Inter-
+national Conference on Machine Learning, pp. 393–400.
+ACM, 2009.
+
+E. Hazan, S. Kale, and S. Shalev-Shwartz. Near-optimal
+algorithms for online matrix prediction. In COLT. 2012.
+
+

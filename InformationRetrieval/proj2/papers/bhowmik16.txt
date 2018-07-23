@@ -1,0 +1,1146 @@
+Sparse Parameter Recovery from Aggregated Data
+
+Avradeep Bhowmik
+Joydeep Ghosh
+The University of Texas at Austin, TX, USA
+Oluwasanmi Koyejo
+Stanford University, CA & University of Illinois at Urbana Champaign, IL, USA
+
+AVRADEEP.1@UTEXAS.EDU
+GHOSH@ECE.UTEXAS.EDU
+
+SANMI@ILLINOIS.EDU
+
+Abstract
+
+Data aggregation is becoming an increasingly
+common technique for sharing sensitive infor-
+mation, and for reducing data size when storage
+and/or communication costs are high. Aggre-
+gate quantities such as group-average are a form
+of semi-supervision as they do not directly pro-
+vide information of individual values, but despite
+their wide-spread use, prior literature on learning
+individual-level models from aggregated data is
+extremely limited. This paper investigates the
+effect of data aggregation on parameter recov-
+ery for a sparse linear model, when known re-
+sults are no longer applicable. In particular, we
+consider a scenario where the data are collected
+into groups e.g. aggregated patient records, and
+ﬁrst-order empirical moments are available only
+at the group level. Despite this obfuscation of in-
+dividual data values, we can show that the true
+parameter is recoverable with high probability
+using these aggregates when the collection of
+true group moments is an incoherent matrix, and
+the empirical moment estimates have been com-
+puted from a sufﬁciently large number of sam-
+ples. To the best of our knowledge, ours are
+the ﬁrst results on structured parameter recov-
+ery using only aggregated data. Experimental re-
+sults on synthetic data are provided in support
+of these theoretical claims. We also show that
+parameter estimation from aggregated data ap-
+proaches the accuracy of parameter estimation
+obtainable from non-aggregated or “individual”
+samples, when applied to two real world health-
+care applications- predictive modeling of CMS
+Medicare reimbursement claims, and modeling
+of Texas State healthcare charges.
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+1. Introduction
+As the scale and scope of data collection continues to grow,
+data aggregation has become increasingly popular in such
+varied domains as healthcare and sensor networks. Ag-
+gregation is a common technique for sharing of privacy-
+sensitive healthcare data, where sensitive patient informa-
+tion is subject to various Statistical Disclosure Limitation
+(SDL) techniques [Armstrong et al. 1999] before public re-
+lease. Similarly, large scale data collection programs like
+the General Social Survey (GSS) report data in aggregated
+form1. Data from IoTs and other distributed sensor net-
+works are often collected in aggregated form to mitigate
+communication costs, and improve robustness to noise and
+malicious interference [Wagner 2004; Zhao et al. 2003].
+Building individual-level models given aggregates in the
+form of means, sample statistics, etc., constitutes a rela-
+tively unexplored semi-supervision framework. We note
+that even standard problems like regression and parameter
+recovery become very challenging in the context of aggre-
+gated data. Speciﬁcally, na¨ıve application of standard tech-
+niques in the aggregated context is vulnerable to the eco-
+logical fallacy [Robinson 2009; Goodman 1953], wherein
+conclusions drawn from aggregated data can differ signiﬁ-
+cantly from inferences at individual level, and are mislead-
+ing to researchers/policy makers using the data.
+As a ﬁrst work on parameter recovery from aggregated
+data, we investigate the problem for regression in the case
+of linear models, where the mapping between input fea-
+tures and the output variable is deﬁned by a vector param-
+eter. We consider the scenario, very common in domains
+like healthcare, sociological studies, etc., where data is col-
+lected and aggregated within groups, e.g., patient records
+aggregated at county or hospital level, and empirical esti-
+mates of true group level moments for features and targets
+are the only available information.
+
+1The General Social Survey, NORC, http://www3.
+
+norc.org/GSS+Website/
+
+Sparse Parameter Recovery from Aggregated Data
+
+While this problem is relatively easy to handle in the non-
+aggregated setup, parameter recovery becomes highly chal-
+lenging when only aggregated data is available and the re-
+sulting linear systems are under-determined. Well known
+works on compressed sensing [Donoho & Elad 2003; Can-
+des & Tao 2005] have shown that recovery is still possible
+from such systems when the parameter is sparse (common
+in many applications of interest, e.g. in healthcare where
+interpretability is part of the desiderata), but existing anal-
+yses do not apply directly to the aggregated case.
+Our work is motivated by the question: “Is it possible to
+infer the individual-level parameter of a linear model given
+aggregated data?” Surprisingly, we answer this question in
+the afﬁrmative, and to our knowledge, ours is the ﬁrst such
+work. We use techniques that exploit structural properties
+of the data aggregation procedure and show that under stan-
+dard incoherence conditions on the matrix of true group
+level moments, the true parameter is recoverable with high
+probability.
+The key contributions of this paper are summarised below:
+
+1. to our knowledge we are the ﬁrst to investigate the
+problem of recovery of the sparse population param-
+eter of a linear model when both target variables as
+well as features are aggregated as sample moments.
+We provide a theoretical analysis showing that under
+standard conditions, the parameter can be recovered
+exactly with high probability.
+
+2. we extend the analysis to capture approximation ef-
+fects such as sample estimates of the population mo-
+ment, additive noise, and histogram aggregated tar-
+gets, showing that the population parameter is recov-
+erable in these scenarios.
+
+3. in the bigger picture, our work extends existing re-
+sults in the compressed sensing literature by providing
+guarantees for exact and approximate parameter re-
+covery for the case when the noise in the sensing ma-
+trix and measurement vector are linearly correlated,
+which may be of independent interest.
+
+Experimental results on synthetic data are provided in sup-
+port of these theoretical claims. We also show that the
+estimated parameter approaches the predictive accuracy of
+parameter estimation from non-aggregated or “individual-
+level” samples when applied to two real world healthcare
+applications - predictive modeling of reimbursement on
+CMS Medicare data, and estimation of healthcare charges
+using Texas State hospital billing records.
+2. Parameter Recovery from Exact Means
+Let x ∈ Rd represent features and y ∈ R represent the tar-
+get variables, drawn independently from a joint distribution
+
+(x, y) ∼ P. We assume a linear model where each feature
+is related to the target y via some parameter β0 ∈ Rd with
+noise  as
+
+y = x(cid:62)β0 + 
+
+(1)
+
+where  represents observation noise assumed zero mean
+E[] = 0 without loss of generality.
+In the standard re-
+gression setting, data is observed at the individual level in
+the form of n pairs of targets and their corresponding fea-
+tures as D(x,y) = {(xi, yi) : i = 1, 2, . . . n}, so β0 may be
+estimated using standard techniques. Instead, we assume
+that the inputs Dx = {xi : i = 1, 2,··· n} and the targets
+Dy = {yl : l = 1, 2,··· n} are subject to an aggregation
+process (not controlled by the learner) that produces sum-
+maries. In particular, we focus on an aggregation procedure
+that produces means or ﬁrst order moments of the data2.
+We consider the case when this aggregation procedure is
+applied separately to k subgroups of the population. This is
+common in many domains, e.g., in healthcare, such groups
+may refer to patient data aggregated by ward, or by hospi-
+tals, or based on administrative units like HRR’s or HSA’s.
+Similarly, the natural grouping could be demographic in-
+formation for GSS data and topological clustering for sen-
+sor networks.
+We assume that the grouping is ﬁxed, and data associated
+with each group j ∈ {1, 2,··· k} is drawn independently
+from a possibly group-dependent distribution (x, y)j ∼ Pj
+with their own corresponding group-dependent means for
+covariates/features {µj = EPj [x], j = 1,··· , k} and tar-
+gets {νj = EPj [y], j = 1,··· , k}.
+We also assume that the model parameter of interest β0
+is shared by the entire population. By the distributive
+property of inner products and linearity of the expecta-
+tion operator, any β0 consistent with the data satisﬁes the
+j β0 = νj ∀ j = 1, 2,··· , k. Let
+set of equations µ(cid:62)
+M = [µ1, µ2,··· µk](cid:62) ∈ Rk×d be the matrix of feature
+means, and y = [ν1, ν2,··· νk](cid:62) ∈ Rk is the vector of
+target means, it follows from eq. (1) that β0 satisﬁes
+
+Mβ0 = y.
+
+(2)
+
+Clearly, if k ≥ d and the rank of M is greater than d, then
+(2) is sufﬁcient to characterize β0. The more interesting
+case, and a more practical scenario, is when k (cid:28) d, that
+is, the dimensionality of the problem is much larger than
+the number of subgroups. We defer to compressed sensing
+approaches to estimate β0 from such systems.
+
+2a discussion on higher order moments is presented in the sup-
+
+plementary material
+
+Sparse Parameter Recovery from Aggregated Data
+
+2.1. Estimation from True Means using Compressed
+
+Sensing
+
+The compressed sensing literature includes several theoret-
+ical and empirical results on the recovery of model parame-
+ters in under-determined systems. A line of work including
+[Candes & Tao 2006; Donoho 2006], among others, have
+shown that subject to certain sparsity conditions on β0 and
+restricted isometry constraints on the matrix M, the param-
+eter β0 can be recovered.
+Deﬁnition 2.1. For a k × d matrix M and a set T ⊆
+{1, 2,··· , d}, suppose MT is the k × |T| matrix consist-
+ing of the columns of M corresponding to T . Then, the
+s-restricted isometry constant δs of the matrix M is deﬁned
+as the smallest quantity δs such that the matrix MT obeys
+
+(1 − δs)(cid:107)c(cid:107)2
+
+2 ≤ (cid:107)MT c(cid:107)2
+
+2 ≤ (1 + δs)(cid:107)c(cid:107)2
+
+2
+
+for every subset T ⊂ {1, 2,··· , d} of size |T| < s and all
+real c ∈ R|T|
+Restricted isometry is a common and standard assumption
+in the sparse parameter recovery literature. Intuitively, this
+property means that when M satisﬁes Deﬁnition 2.1 with a
+small δs, every sub-matrix of small enough size constructed
+out of the columns of the matrix behaves approximately
+like an orthonormal system. In fact, a number of random
+matrices satisfy this property including the Gaussian en-
+semble and the Bernoulli ensemble [Donoho 2006; Cand`es
+et al. 2006].
+For the rest of the paper we assume that the matrix of true
+means M satisﬁes the restricted isometry property. This is
+quite general as it is a direct corollary for many kinds of
+common and standard assumptions on the true mean ma-
+trix, for example the assumption that the true mean ma-
+trix is generated from a Gaussian distribution. Evidence
+from health care literature [Armstrong et al. 1999; Robin-
+son 2009] suggests that indeed, there is a signiﬁcant geo-
+graphical variation in demographics and health outcomes
+(due to variations in demographic make-up, average eco-
+nomic status, prevalent industries, etc.) which is often used
+as a predictive feature for healthcare models [Park & Ghosh
+2014; Bhowmik et al. 2015]. All of this, together with our
+experiments on real datasets, suggest that there is sufﬁcient
+inhomogeneity in mean healthcare attributes across groups
+to justify the matrix incoherence assumption for M.
+Suppose we had access to the true mean matrices (M, y).
+First, we consider the case when observations are noise-
+free, i.e.  = 0. Suppose β0 is known to be κ0-sparse
+and M satisﬁes the restricted isometry hypothesis, then the
+following result applies:
+Theorem 2.1 (Exact Recovery [Foucart 2010]). Let Θ0 =
+≈ 0.465. If there exists an s0 such that δ2s0 < Θ0
+√
+3
+4+
+for M, then as long as κ0 < s0, the constraint Mβ0 = y
+
+6
+
+is sufﬁcient to uniquely recover any κ0-sparse β0 exactly
+as the solution of the following optimization problem:
+
+(cid:107)β(cid:107)1
+
+min
+
+β
+
+s.t. Mβ = y.
+
+(3)
+
+√
+
+A similar result for approximate recovery holds for the case
+when the observations are corrupted with noise , i.e., in-
+stead of y = Mβ0, we are given y = Mβ0 + .
+Theorem 2.2 (Approximate Recovery [Candes 2008]). Let
+2 − 1 ≈ 0.414. If there exists an s0 for M such
+Θ1 =
+that δ2s0 < Θ1, then as long as κ0 < s0 and the noise 
+in observations y = Mβ0 +  is bounded as (cid:107)(cid:107)2 < ξ,
+any κ0-sparse β0 can be recovered within an (cid:96)2 distance
+of Cs0 ξ from the true parameter β0 using the noisy mea-
+surements (M, y). That is, the solution ˆβ to the following
+optimization problem:
+
+min
+β0
+
+(cid:107)β(cid:107)1 s.t. (cid:107)Mβ − y(cid:107)2 < ξ
+
+(4)
+satisﬁes (cid:107) ˆβ − β0(cid:107)2 < Cs0ξ where the constant Cs0 de-
+pends only on δ2s0 and is well-behaved (for example when
+δ2s0 = 0.2, the constant is less than 8.5).
+2.2. Empirical Mean Estimates and Aggregation Error
+
+Clearly, if the matrix of true means M satisﬁes the re-
+stricted isometry hypothesis, and β0 is sufﬁciently sparse,
+Theorems 2.1 and 2.2 apply. Therefore, given the true pop-
+ulation means M and y, the parameter β0 can be recovered
+exactly from noiseless data y by solving (3) and approxi-
+mately from noisy observations by solving (4).
+Unfortunately, in many practical scenarios we do not have
+access to the true M or y, but only to group level empir-
+ical estimates computed from a ﬁnite number of samples.
+Assume n samples for each group to simplify the analy-
+sis. Denote the corresponding empirically estimated means
+for the jth group by ˆµj,n and ˆνj,n for each j = 1,··· k.
+The corresponding sample mean matrices are given by
+
+(cid:99)Mn = [ ˆµ1,n,··· ˆµk,n](cid:62) and ˆυn = [ˆν1,n,··· ˆνk,n](cid:62).
+timating β0 are restricted to empirical estimates ((cid:99)Mn, ˆυn)
+where(cid:99)Mn = M + En and ˆυn = y + sn, and the results
+
+The empirical mean estimation procedure introduces ag-
+gregation errors En and sn to the setup. That is instead
+of the true group means (M, y), the data available for es-
+
+from section 2.1 no longer apply directly. For the rest of
+the manuscript, we investigate parameter recovery for this
+scenario.
+3. Parameter Recovery from Approximate
+
+Means
+
+As mentioned earlier, the aggregation procedure for the es-
+timation of true means introduces additive error terms En
+and sn to the matrices M and y. Note that for the models
+
+Sparse Parameter Recovery from Aggregated Data
+
+(cid:107)β(cid:107)1
+
+β
+
+min
+
+s.t. (cid:99)Mnβ = ˆυn.
+
+(6)
+
+we study in this work, these two noise terms are not inde-
+pendent but are linearly correlated. Existing compressed
+sensing literature is restricted to the analysis of models
+where the additive error terms En and sn are indepen-
+dent. Furthermore, any such existing analysis that deals
+with additive error terms are severely limited in the sense
+that they can only provide guarantees for approximate re-
+covery rather than exact recovery (e.g. see [Zhao & Yu
+2006; Rosenbaum et al. 2013; Rudelson & Zhou 2015]).
+Remarkably, as we show in the subsequent sections the true
+parameter is still exactly recoverable with high probabil-
+ity, even in the presence of linearly correlated aggregation
+error. This is because the aggregation procedure applied
+to linear models generates additional structure, which can
+then be exploited by the estimation procedure to get exact
+parameter recovery even from empirical estimates of the
+data means from a ﬁnite number of samples.
+We ﬁrst analyse the case where the aggregation procedure
+has been applied to noise-free samples and then extend the
+analysis to the noisy case, and to the special case of data
+collected as histogram aggregates.
+Throughout this manuscript we shall make the standard as-
+sumption [Georgiou & Kyriakakis 2006; Hsu et al. 2012]
+that the marginal distribution of each coordinate of the co-
+variates is sub-Gaussian with parameter σ2. Thus, for each
+covariate x(i)
+] and each group
+j ∈ {1, 2,··· k}, and for every t ∈ R, the logarithm of the
+moment generating function is quadratically bounded
+
+j ∈ xj = [x(1)
+
+··· x(d)
+
+, x(2)
+
+j
+
+j
+
+j
+
+ln E[et(x(i)
+
+j −µ(i)
+
+j )] <
+
+t2σ2
+
+2
+
+.
+
+Similarly, we assume that the marginal distribution for each
+noise term is zero-mean and sub-Gaussian with parameter
+ρ. Note that the assumptions on the covariates and the noise
+terms are only on the marginal distributions. In particular,
+we do not require either independence or identical distri-
+bution across groups or even across individual coordinates.
+As discussed in section 5.1, the analysis for alternative dis-
+tributional assumptions follows along very similar lines by
+using other standard concentration inequalities. Proofs for
+all subsequent results are presented in the supplement.
+
+3.1. Noise-Free Observations
+
+First we consider empirical means computed from noise-
+less observations. As mentioned earlier, the true parameter
+β0 can still be recovered exactly from empirical estimates
+
+of group means ((cid:99)Mn, ˆυn) despite the presence of linearly
+
+correlated aggregation error (En, sn).
+Key observation: For a linear model, the relationship
+satisﬁed by the true group means E[y] = E[x](cid:62)β0 is
+also exactly satisﬁed by the empirically estimated means
+
+(cid:16)(cid:80) x
+
+(cid:17)(cid:62)
+
+n
+
+n =
+
+β0. Therefore, for aggregated noise-free
+
+(cid:80) y
+observations, the equation(cid:99)Mnβ0 = ˆυn
+(cid:99)Mn satisﬁes the restricted isometry constraints, we may
+
+still holds exactly. As long as the empirical moment matrix
+
+still guarantee exact recovery by solving the optimization
+problem:
+
+(5)
+
+Our ﬁrst main result is to show that this is indeed the case,
+and the true parameter β0 can be recovered with high prob-
+ability if the number of samples n used to compute empiri-
+cal moment estimates in each subgroup is sufﬁciently large.
+≈ 0.465.
+√
+Theorem 3.1 (Main result 1). Let Θ0 = 3
+4+
+Suppose there exists an s0 such that the isometry constant
+δ2s0 for the true mean matrix M satisﬁes δ2s0 < Θ0. Also
+suppose that the marginal distribution of the coordinates
+of each feature is sub-Gaussian with parameter σ2. Then,
+recovered exactly with probability at least 1 − e−C0n by
+solving (6). Here, the constant C0 in the expression is such
+that C0 ∼ O
+
+given ((cid:99)Mn, ˆυn) any κ0-sparse β0 with κ0 < s0 can be
+
+(cid:16) (Θ0−δ2s0 )2
+
+(cid:17)
+
+.
+
+6
+
+kdσ2(1+δ2s0 )
+
+We can unpack the result with respect to the constant C0
+which depends on the isometry parameter δ2s0, the size
+of the mean matrix (k, d) and the sub-Gaussian parame-
+ter of the feature terms σ. The robustness of the isometry
+
+property of (cid:99)Mn depends on the strength of the isometry
+are required for estimating (cid:99)Mn if M satisﬁes the isome-
+
+property in the true moment matrix M. Fewer samples
+
+try hypothesis more robustly (that is, δ2s0 small) and con-
+sequently, a larger value of (Θ0−δ2s0 )2
+. Similarly, if the
+feature distributions have a thinner tail i.e. a smaller value
+of the sub-Gaussian parameter σ2, empirically estimated
+means are more accurate with fewer samples.
+
+1+δ2s0
+
+3.2. Observations with Noise
+
+We now consider the case when the observations are noisy
+and the equation (5) no longer holds exactly.
+In partic-
+ular, we assume that the data used to compute the sam-
+ple moments is observed with zero mean additive noise as
+i,jβ0 + i,j for each datapoint i ∈ {1,··· , n} in
+i,j = x(cid:62)
+y
+population subgroup j ∈ {1,··· , k}. This leads to an error
+in the empirical target means over and above the aggrega-
+tion error.
+Let ˆυn, = ˆυn + n where ˆυn, (henceforth denoted ˆυ)
+is the empirical target mean estimated from noisy samples
+and n is the cumulative estimation error due to noise in
+
+n samples. With the feature sample mean (cid:99)Mn, eq.
+
+(cid:99)Mnβ = ˆυn = ˆυ − n.
+
+becomes
+
+(5)
+
+(7)
+
+Similar to the results of Theorem 2.2, it can be expected
+
+that if the sample mean matrix (cid:99)Mn satisﬁes the isometry
+
+hypothesis for noisy measurements, and if the error term
+n is bounded as (cid:107)n(cid:107)2 < ξ for some ξ > 0, then β0 can
+be recovered to within an (cid:96)2 distance of O(ξ) by solving
+the following optimization problem
+
+min
+
+β
+s.t.
+
+(cid:107)β(cid:107)1
+
+(cid:107)(cid:99)Mnβ − ˆυ(cid:107)2 < ξ.
+
+(8)
+
+√
+
+In fact, in our case we can show that the aggregation pro-
+cedure smooths out the destabilising effects of noise in ob-
+servations to allow arbitrarily accurate parameter recovery
+within any small degree ξ of (cid:96)2 estimation error.
+2− 1 ≈ 0.414.
+Theorem 3.2 (Main Result 2). Let Θ1 =
+Suppose there exists an s0 such that the isometry constant
+δ2s0 for the true mean matrix M satisﬁes δ2s0 < Θ1. Also
+suppose that the marginal distribution of the coordinates of
+each feature is sub-Gaussian with parameter σ2, and noise
+in each observation is zero-mean and sub-Gaussian with
+parameter ρ2. Let ξ > 0 be any small positive real value.
+Then, any κ0-sparse β0 with κ0 < s0 can be recovered
+within an (cid:96)2 distance of O(ξ) with probability at least 1 −
+e−C1n − e−C2n by solving (8). Here, the constant C1 is
+such that C1 ∼ O
+and the constant C2 is
+such that C2 ∼ O
+
+(cid:16) (Θ1−δ2s0 )2
+(cid:16) ξ2
+(cid:17)
+
+kdσ2(1+δ2s0 )
+
+(cid:17)
+
+.
+
+ρ2k
+
+The constant term in O(ξ) is the same as that in Theo-
+rem 2.2 and it depends only on δ2s0 and is well-behaved
+for small values of δ2s0. Note the similarity of the con-
+stant C1 in the noisy case and the constant C0 in the exact
+case. As for exact recovery, the probability of recovery de-
+pends on the tail properties of the feature distribution as
+well as the robustness of the isometry property for the true
+mean matrix M. The constant ξ2
+ρ2k in the additional term
+accounts for observational noise. As expected, more sam-
+ples are required if the noise has heavy tails ρ2 or if the de-
+gree of approximation ξ is small. In addition, the constant
+for O(ξ) in the approximation factor may depend only δ2s0
+in a manner similar to Theorem 2.2.
+
+3.3. Extension to Histogram Aggregation
+
+For the preceding analysis, we have assumed that errors in
+the target moments is a result of the empirical aggregation
+or observational noise. It is worth noting that this analy-
+sis can be extended to cover any additional source of error
+which can be bounded deterministically or with high prob-
+ability. An example of this is when the targets are available
+
+Sparse Parameter Recovery from Aggregated Data
+
+as histogram aggregates with bin size ∆ and the mean is
+estimated from the histogram. Suppose h∆ is the error in
+estimation of target mean from the histogram such that the
+estimated sample mean ˆυ∆ is related to the true sample
+mean for the targets as ˆυ∆ = ˆυn + h∆.
+Then, we can use the exact same procedure as for noisy
+observations to bound the (cid:96)2 error in estimation of β0 to
+O(ξ∆) by solving the optimisation problem
+
+min
+
+β
+s.t.
+
+(cid:107)β(cid:107)1
+
+(cid:107)(cid:99)Mnβ − ˆυ∆(cid:107)2 < ξ∆
+
+(9)
+
+for some positive ξ∆ > 0.
+The value of ξ∆ and theoretical guarantees arising there-
+from will depend on the manner in which the target mean
+in estimated from the histogram. Here, we analyse one such
+standard moment estimation approach.
+Consider a single population subgroup. Suppose the range
+of the targets is bounded by some R, that is, ymax− ymin <
+R. We have a set of bins B = {Bτ = (bτ , bτ +1) : τ =
+∆(cid:99)} such that bτ +1 − bτ = ∆ for each bin. We
+1, 2,··· ,(cid:98) R
+also have for each bin an integer nτ which is the number
+of targets for that subgroup that fall in that particular bin.
+Suppose ¯bτ = (bτ +bτ +1)
+is the mid point of each bin. Then,
+the target mean for that group is estimated as
+
+2
+
+(cid:80)
+¯bτ(cid:80)
+
+τ nτ
+τ nτ
+
+ˆν∆ =
+
+=
+
+(cid:80)
+
+¯bτ
+
+.
+
+τ nτ
+n
+
+√
+
+For this mean imputation procedure, we get a very simi-
+lar result to Theorem 3.2 for aggregated data that bounds
+the probability of recovery in terms of the isometry con-
+stants of the true mean matrix and the granularity of the
+histogram.
+2− 1 ≈ 0.414.
+Theorem 3.3 (Main Result 3). Let Θ1 =
+Suppose there exists an s0 such that the isometry constant
+δ2s0 for the true mean matrix M satisﬁes δ2s0 < Θ1.Also
+suppose that each covariate has a sub-Gaussian distribu-
+tion with parameter σ2. Let the targets for each group be
+available as histogram aggregates with bin size bounded
+below by ∆. Then, any κ0-sparse β0 with κ0 < s0 can
+k∆) with prob-
+be recovered within an (cid:96)2 distance of O(
+ability at least 1 − e−C1n by solving (9) with ξ∆ =
+2 .
+k ∆
+Here, the constant C1 is such that C1 ∼ O
+.
+
+(cid:16) (Θ1−δ2s0 )2
+
+√
+Note that the constants on O(
+k∆) are the same as in the
+case of noisy observations. Also, in the case of exact es-
+timation, bin size ∆ → 0, therefore β0 can be recovered
+exactly. Furthermore, the bin size does not have any effect
+on the sample complexity of recovery probability, only on
+the accuracy of estimation.
+In particular, the recovery error is small for a histogram
+of ﬁne enough granularity. In most cases of binned data,
+
+kdσ2(1+δ2s0 )
+
+(cid:17)
+
+√
+
+√
+
+Sparse Parameter Recovery from Aggregated Data
+
+1. error in the design matrix(cid:99)M = M + E, without any
+
+error or noise in observation vector y
+
+the bin size used for reporting the histogram decreases as
+a function of n.
+In fact for many real world scenarios
+(see [Scott 1979]) the bin size decreases at least as fast as
+nc ) for some 0 < c < 1. In any case, the worst
+∆ = O( 1
+case error in parameter estimation is limited solely by the
+bin size, and tighter bounds can be obtained by making rea-
+sonable assumptions on the target distribution. Note that if
+instead of supplying a coarse histogram the data is released
+in full (without specifying the relationship between x and y
+in each group), the effective bin size is 0 and the parameter
+can be estimated exactly by Theorem 3.3.
+
+Related Work
+
+While there is a rich literature on sparse parameter recov-
+ery and predictive modeling in general, the aggregated data
+case is much more limited. To our knowledge, ours is the
+ﬁrst analysis of sparse parameter recovery for aggregated
+data of any kind, and our main results have not been shown
+in more than 60 years of ecological data analysis dating
+at least to Goodman [Goodman 1953], with parallel work
+in the compressed sensing literature, and renewed interest
+in machine learning [Park & Ghosh 2014; Bhowmik et al.
+2015]. We now brieﬂy outline the relevant literature.
+Data aggregation was studied in the context of privacy
+preservation by [Park & Ghosh 2014] which used clus-
+tering and low rank models for data reconstruction from
+averaged targets.
+In the classiﬁcation literature, learning
+from label proportions (LLP) [Quadrianto et al. 2009; Pa-
+trini et al. 2014] involves estimation of classiﬁers given the
+proportion of discrete valued labels in groups or bags of la-
+beled targets. Regression involving histogram aggregated
+targets was introduced by [Bhowmik et al. 2015] which
+introduced an estimation algorithm and evaluated it empir-
+ically, but did not provide a theoretical analysis.
+There are several differences between our work and the
+works described above. First and most importantly, all
+three of the aforementioned lines of work assumed aggre-
+gation only in targets and studied a setup where features
+are known unaggregated at individual level. In our work,
+both targets and features are aggregated. Unlike our work,
+[Park & Ghosh 2014] was focused on data reconstruction
+rather than predictive modeling. Next, the LLP literature
+looks at classiﬁcation given discrete-values targets, while
+we look at regression where targets can take arbitrary val-
+ues. Furthermore, unlike [Bhowmik et al. 2015], our work
+provides a rigorous theoretical analysis with recovery guar-
+antees. Finally, all existing lines of work are concerned
+with accurate prediction, and to our knowledge there have
+been no studies of sparse parameter recovery.
+The techniques used in our work follows a long line of re-
+search on compressed sensing as discussed in Section 2.1,
+where related analyses fall mainly under three categories:
+
+2. noise in observations ˆυ = y + s, with a ﬁxed design
+
+matrix M without error
+
+3. design matrix error E and observation noise s, where
+
+E and s are independent
+
+Prior work, eg.[Herman & Strohmer 2010; Zhao & Yu
+2006; Rudelson & Zhou 2015], deals only with case 1, or
+with cases 2 and 3 in a way to only provide approximate
+parameter recovery guarantees. We focus our investigation
+on the aggregated data case 4: where E and s are linearly
+correlated. Even ignoring the linear correlation in the noise
+model, the best existing analyses are still limited to using
+a naive error bounding technique to analyse the stability of
+the LASSO resulting in weak guarantees for only approxi-
+mate parameter recovery.
+In contrast, we propose non-trivial modiﬁcations to the
+analysis, and are able to exploit the additional structure
+generated by the data aggregation procedure to recover the
+sparse parameter exactly even with aggregation error, as in
+Theorem 3.1, and upto arbitrarily accurate degree of esti-
+mation from noisy data as we see in Theorems 3.2 and 3.3.
+
+4. Experiments
+We corroborate our theoretical results with experiments on
+synthetic data to show that probability of exact parameter
+recovery follows a pattern just as predicted by our main re-
+sults. We also demonstrate the efﬁcacy of our technique
+in two real world applications by applying it to predic-
+tive modeling of outpatient reimbursement claims in CMS
+Medicare data (DE-SynPUF), and to modeling healthcare
+costs using Texas Inpatient Discharge dataset (TxID) from
+the Texas Department of State Health Services.
+4.1. Synthetic Data
+
+We ﬁrst generate the true covariate mean matrix M using
+a Gaussian and a Bernoulli ensemble, and compute the re-
+spective true target means using a sparse β0. We then gen-
+erate random covariates centred around the true mean ma-
+trix and compute the corresponding empirical mean matrix
+
+(cid:99)Mn from the covariates. The targets are then generated us-
+
+ing the parameter β0. We consider two cases separately-
+noiseless targets y and targets y to which noise has been
+added. The corresponding empirical target means ˆυn and
+ˆυ are computed for both sets of targets and used together
+
+with the sample covariate means(cid:99)Mn to estimate β0.
+
+This entire procedure is repeated multiple times and the
+proportion of instances in which the true parameter β0 is
+recovered exactly, both in magnitude and support, is plot-
+ted against the number of datapoints used to compute the
+
+Sparse Parameter Recovery from Aggregated Data
+
+(a) Probability of recovering exact parameter
+
+(b) Probability of recovering exact parameter
+
+Figure 1: Probably of exact parameter recovery (both magnitude and signed support) on Gaussian (ﬁg 1a) and Bernoulli
+(ﬁg 1b) models for noise-free (black) and noisy (blue) observations with increasing number of datapoints in each group
+
+empirical sample means. Figures 1a and 1b show the re-
+sults for Gaussian and Bernoulli ensembles respectively.
+As can be seen in the ﬁgures, the probability of recovering
+the exact parameter increases as the number of data points
+used to compute the empirical sample means increases, in
+a manner exactly as predicted by our theoretical results.
+4.2. Real datasets - DE-SynPUF and TxID
+
+We now apply our methods to two real datasets. Since
+ours is the ﬁrst work on sparse recovery from aggregated
+data, we do not know of any competing algorithmic base-
+lines. We evaluate our methods by comparing the parame-
+ter estimated from aggregated data to the performance up-
+per bound of the “true” parameter that is estimated from the
+full non-aggregated dataset.
+Our ﬁrst dataset is the CMS Beneﬁciary Summary (DE-
+SynPUF) dataset [DESynPUF 2008] which is a public use
+dataset created by the Centers for Medicare and Medi-
+caid Services and is often used for testing different data
+mining or statistical inferential methods before getting ac-
+cess to full Medicare data. We use a subset of the DE-
+SynPUF dataset for Louisiana state from the year 2008 and
+model outpatient institutional annual primary payer reim-
+bursement (PPPYMT-OP) with all the available predictor
+variables that include age, race, sex, duration of coverage,
+presence/absence of a variety of chronic conditions, etc.
+Our second dataset is the Texas Inpatient Discharge dataset
+(TxID) from the Texas Department of State Health Services
+([TxID 2014], see also [Park & Ghosh 2014]). We model
+healthcare charges using hospital billing records from the
+fourth quarter of 2006 in the TxID dataset, and use all the
+available individual level predictor variables, which include
+demographic information like race, and real valued vari-
+
+ables like length of hospital stay for each datapoint.
+In both these datasets, we ﬁrst use a LASSO estimator
+(with parameter chosen via cross-validation) on the full
+dataset to obtain a sparse regression parameter βf ull. We
+use a k-means algorithm to cluster the datapoints into
+groups and compute the sample means for each group with
+increasing number of datapoints. We then use only these
+empirical sample means to obtain an estimate βagg for the
+parameter, and compare βagg to the parameter βf ull ob-
+tained from full non-aggregated dataset. Results averaged
+across multiple clusterings are shown in ﬁgures 2 and 3.
+Figures 2a and 3a show the (cid:96)2 norm of the distance be-
+tween the parameter estimated from the full dataset βf ull
+and the parameter estimated from the aggregated version
+βagg, for the DE-SynPUF dataset and TxID dataset respec-
+tively, plotted against the number of datapoints used to esti-
+mate the means. Figure 2b and 3b show the number of con-
+ﬂicts or discrepancies between the support (non-zero coor-
+dinates) of βagg estimated from aggregated data and sup-
+port of βf ull estimated from the non-aggregated dataset,
+for the DE-SynPUF dataset and TxID dataset respectively.
+As the number of datapoints used to compute the sample
+means increases, the parameter recovered using aggregated
+data exactly identiﬁes the support of the “true” parameter
+estimated from the full dataset, and also closely matches it
+in magnitude.
+5. Discussion
+5.1. Extensions
+
+The techniques presented in this work can be applied to
+the parameter recovery problem in a much wider class of
+cases of interest by building on and extending existing re-
+
+Sparse Parameter Recovery from Aggregated Data
+
+(a) Avg. Error in Parameter Recovery (cid:107)βf ull − βagg(cid:107)
+
+(b) Avg. Error in Support Recovery
+
+Figure 2: Performance on DESynPUF dataset with increasing number of datapoints in each group
+
+(a) Avg. Error in Parameter Recovery (cid:107)βf ull − βagg(cid:107)
+
+(b) Avg. Error in Support Recovery
+
+Figure 3: Performance on TxID dataset with increasing number of datapoints in each group
+
+sults in the compressed sensing literature (see [Candes et al.
+2006; Candes & Tao 2007; Cai et al. 2010, 2009], etc). In
+particular, we note that various alternative frameworks like
+non-sparse β0, alternative estimators to LASSO, beyond
+sub-gaussian assumptions on different marginals, etc. can
+be analysed in an identical manner, and our main results on
+parameter recovery would still continue to hold, albeit with
+slightly different sample complexity.
+
+5.2. Higher Order Moments
+
+The results in this paper focused on estimation from ﬁrst
+order moments. It may seem like including higher order
+moments might make estimation in this framework easier
+but it turns out that this is not the case in general. We in-
+clude a discussion in the supplement on the difﬁculties of
+using higher order moments for estimation. In particular,
+we prove a surprising and counter-intuitive negative result
+which shows that even with second order moments, in the
+general case the estimation cannot be guaranteed to be eas-
+ier or more accurate than when we use only ﬁrst order mo-
+ments. Similar results may also hold for other higher order
+moments.
+
+6. Conclusion and Future Work
+In this paper we study the problem of parameter recovery
+for sparse linear models from data which has been aggre-
+gated in the form of empirical means computed from dif-
+ferent subgroups of the population. We show that when
+the collection of true group moments is an incoherent ma-
+trix, the parameter can be recovered with high probability
+from the empirical moments alone provided the empirical
+moments are computed from a sufﬁciently large number
+of samples. We extend the framework to the case of mo-
+ments computed from noisy or histogram aggregated data
+and show that the parameter can still be recovered within
+an arbitrarily small degree of error. We corroborate our
+theoretical results with experiments on synthetic data and
+also show results on two real world healthcare applications-
+predictive modeling of reimbursement claims from CMS
+Medicare data, and modeling healthcare charges using hos-
+pital billing records from the Texas Department of State
+Health Services. For future work, we plan to extend the
+framework to more general models including GLM’s and
+non-linear models, and to design techniques to incorporate
+higher order moments in the procedure.
+
+Sparse Parameter Recovery from Aggregated Data
+
+Acknowledgements
+Authors acknowledge support from NSF under grant IIS-
+1421729.
+
+References
+Armstrong, Marc P, Rushton, Gerard, and Zimmerman,
+Dale L. Geographically masking health data to preserve
+conﬁdentiality. Statistics in Medicine, 18(5):497–525,
+1999.
+
+Bhowmik, Avradeep, Ghosh,
+
+Joydeep, and Koyejo,
+Oluwasanmi. Generalized Linear Models for Aggre-
+In Proceedings of the Eighteenth Interna-
+gated Data.
+tional Conference on Artiﬁcial Intelligence and Statis-
+tics, pp. 93–101, 2015.
+
+Cai, T Tony, Xu, Guangwu, and Zhang, Jun. On recovery of
+sparse signals via (cid:96)1 minimization. Information Theory,
+IEEE Transactions on, 55(7):3388–3397, 2009.
+
+Cai, T Tony, Wang, Lie, and Xu, Guangwu. Shifting in-
+equality and recovery of sparse signals. Signal Process-
+ing, IEEE Transactions on, 58(3):1300–1308, 2010.
+
+Candes, Emmanuel and Tao, Terence. The Dantzig selec-
+tor: statistical estimation when p is much larger than n.
+The Annals of Statistics, pp. 2313–2351, 2007.
+
+Candes, Emmanuel J. The restricted isometry property and
+its implications for compressed sensing. Comptes Ren-
+dus Mathematique, 346(9):589–592, 2008.
+
+Candes, Emmanuel J and Tao, Terence. Decoding by linear
+programming. Information Theory, IEEE Transactions
+on, 51(12):4203–4215, 2005.
+
+Candes, Emmanuel J and Tao, Terence. Near-optimal sig-
+nal recovery from random projections: Universal encod-
+ing strategies? Information Theory, IEEE Transactions
+on, 52(12):5406–5425, 2006.
+
+Cand`es, Emmanuel J, Romberg, Justin, and Tao, Terence.
+Robust uncertainty principles: Exact signal reconstruc-
+tion from highly incomplete frequency information. In-
+formation Theory, IEEE Transactions on, 52(2):489–
+509, 2006.
+
+Candes, Emmanuel J, Romberg, Justin K, and Tao, Ter-
+ence. Stable signal recovery from incomplete and in-
+accurate measurements. Communications on pure and
+applied mathematics, 59(8):1207–1223, 2006.
+
+DESynPUF. Medicare Claims Synthetic Public Use
+Centers for Medicare and Med-
+Files (SynPUFs).
+icaid Services, 2008.
+http://www.cms.gov/
+Research-Statistics-Data-and-Systems/
+
+Downloadable-Public-Use-Files/
+SynPUFs/index.html.
+
+Donoho, David L. For most large underdetermined sys-
+tems of linear equations the minimal (cid:96)1-norm solution is
+also the sparsest solution. Communications on pure and
+applied mathematics, 59(6):797–829, 2006.
+
+Donoho, David L and Elad, Michael. Optimally sparse rep-
+resentation in general (nonorthogonal) dictionaries via
+(cid:96)1 minimization. Proceedings of the National Academy
+of Sciences, 100(5):2197–2202, 2003.
+
+Foucart, Simon. A note on guaranteed sparse recovery via
+(cid:96)1-minimization. Applied and Computational Harmonic
+Analysis, 29(1):97–103, 2010.
+
+Georgiou, Panayiotis G and Kyriakakis, Chris. Robust
+maximum likelihood source localization:
+the case for
+sub-gaussian versus gaussian. Audio, Speech, and Lan-
+guage Processing, IEEE Transactions on, 14(4):1470–
+1480, 2006.
+
+Goodman, Leo A. Ecological regressions and behavior of
+
+individuals. American Sociological Review, 1953.
+
+Herman, Matthew A and Strohmer, Thomas. General de-
+viants: An analysis of perturbations in compressed sens-
+ing. Selected Topics in Signal Processing, IEEE Journal
+of, 4(2):342–349, 2010.
+
+Hsu, Daniel, Kakade, Sham M, and Zhang, Tong. A tail in-
+equality for quadratic forms of subgaussian random vec-
+tors. Electron. Commun. Probab, 17(52):1–6, 2012.
+
+Park, Yubin and Ghosh, Joydeep. Ludia: an aggregate-
+constrained low-rank reconstruction algorithm to lever-
+age publicly released health data. In Proceedings of the
+20th ACM SIGKDD international conference on Knowl-
+edge discovery and data mining, pp. 55–64. ACM, 2014.
+
+Patrini, Giorgio, Nock, Richard, Caetano, Tiberio, and
+In Advances
+Rivera, Paul.
+in Neural Information Processing Systems, pp. 190–198,
+2014.
+
+(almost) no label no cry.
+
+Quadrianto, Novi, Smola, Alex J, Caetano, Tiberio S, and
+Le, Quoc V. Estimating labels from label proportions.
+The Journal of Machine Learning Research, 10:2349–
+2374, 2009.
+
+Robinson, William S. Ecological correlations and the be-
+havior of individuals. International journal of epidemi-
+ology, 38(2):337–341, 2009.
+
+Rosenbaum, Mathieu, Tsybakov, Alexandre B, et al. Im-
+proved matrix uncertainty selector. In From Probability
+to Statistics and Back: High-Dimensional Models and
+
+Sparse Parameter Recovery from Aggregated Data
+
+Processes–A Festschrift in Honor of Jon A. Wellner, pp.
+276–290. Institute of Mathematical Statistics, 2013.
+
+Rudelson, Mark and Zhou, Shuheng.
+
+High dimen-
+sional errors-in-variables models with dependent mea-
+surements. arXiv preprint arXiv:1502.02355, 2015.
+
+Scott, David W. On optimal and data-based histograms.
+
+Biometrika, 66(3):605–610, 1979.
+
+of
+
+State Health
+
+Texas
+2014.
+
+TxID.
+
+Texas Inpatient Public Use Data File.
+Services,
+
+Department
+https://www.dshs.state.tx.us/thcic/
+hospitals/Inpatientpudf.shtm.
+
+Wagner, David. Resilient aggregation in sensor networks.
+In Proceedings of the 2nd ACM workshop on Security of
+ad hoc and sensor networks, pp. 78–87. ACM, 2004.
+
+Zhao, Jerry, Govindan, Ramesh, and Estrin, Deborah.
+Computing aggregates for monitoring wireless sensor
+In Sensor Network Protocols and Applica-
+networks.
+tions, 2003, pp. 139–148. IEEE, 2003.
+
+Zhao, Peng and Yu, Bin. On model selection consistency
+of lasso. The Journal of Machine Learning Research, 7:
+2541–2563, 2006.
+
+

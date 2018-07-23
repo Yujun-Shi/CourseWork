@@ -1,0 +1,1361 @@
+Black-Box α-Divergence Minimization
+
+Jos´e Miguel Hern´andez-Lobato1∗
+JMH@SEAS.HARVARD.EDU
+Yingzhen Li2∗
+YL494@CAM.AC.UK
+Mark Rowland2
+MR504@CAM.AC.UK
+Daniel Hern´andez-Lobato3
+DANIEL.HERNANDEZ@UAM.ES
+Thang D. Bui2
+TDB40@CAM.AC.UK
+Richard E. Turner2
+RET26@CAM.AC.UK
+1Harvard University, 2University of Cambridge, 3Universidad Aut´onoma de Madrid, ∗Both authors contributed equally.
+
+Abstract
+
+Black-box alpha (BB-α) is a new approximate
+inference method based on the minimization of
+α-divergences. BB-α scales to large datasets
+because it can be implemented using stochastic
+gradient descent. BB-α can be applied to com-
+plex probabilistic models with little effort since
+it only requires as input the likelihood function
+and its gradients. These gradients can be eas-
+ily obtained using automatic differentiation. By
+changing the divergence parameter α, the method
+is able to interpolate between variational Bayes
+(VB) (α → 0) and an algorithm similar to expec-
+tation propagation (EP) (α = 1). Experiments on
+probit regression and neural network regression
+and classiﬁcation problems show that BB-α with
+non-standard settings of α, such as α = 0.5, usu-
+ally produces better predictions than with α → 0
+(VB) or α = 1 (EP).
+
+1. Introduction
+Bayesian probabilistic modelling provides useful tools for
+making predictions from data. The formalism requires a
+probabilistic model p(x|θ), parameterized by a parameter
+vector θ, over the observations D = {xn}N
+n=1. Bayesian
+inference treats θ as a random variable and predictions are
+then made by averaging with respect to the posterior belief
+
+(cid:34) N(cid:89)
+
+p(θ|D) ∝
+
+(cid:35)
+
+p(xn|θ)
+
+p0(θ) ,
+
+n=1
+
+where p(xn|θ) is a likelihood factor and p0(θ) is the prior.
+Unfortunately the computation of this posterior distribution
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+is often intractable for many useful probabilistic models.
+One can use approximate inference techniques to sidestep
+this difﬁculty. Two examples are variational Bayes (VB)
+(Jordan et al., 1999) and expectation propagation (EP)
+(Minka, 2001a). These methods adjust the parameters of
+a tractable distribution so that it is close to the true poste-
+rior, by ﬁnding an stationary point of an energy function.
+Both VB and EP are speciﬁc cases of local α-divergence
+minimization, where the parameter α ∈ (−∞, +∞) \ {0}
+speciﬁes the properties of the divergence to be minimized
+(Minka, 2005). If α → 0, VB is obtained and α = 1 gives
+EP (Minka, 2005). Power EP (PEP) (Minka, 2004) extends
+EP to general settings of α, whose optimal value may be
+model, dataset and/or task speciﬁc.
+EP can provide better solutions than VB in speciﬁc cases.
+For instance, VB provides poor approximations when non-
+smooth likelihood functions are used (Cunningham et al.,
+2011; Turner & Sahani, 2011b; Opper & Winther, 2005).
+EP also often performs better when factored approxi-
+mations are employed (Turner & Sahani, 2011a; Minka,
+2001b). There are, however, issues that hinder the wide
+deployment of EP, and by extension of power EP too. First,
+EP requires to store in memory local approximations of the
+likelihood factors. This has prohibitive memory cost for
+large datasets and big models. Second, efﬁcient implemen-
+tations of EP based on message passing have no conver-
+gence guarantees to an stationary point of the energy func-
+tion (Minka, 2001a).
+Previous work has addressed the ﬁrst issue by using “fac-
+tor tying”/“local parameter sharing” through the “stochas-
+tic EP”/“averaged EP” (SEP/AEP) algorithms (Li et al.,
+2015; Dehaene & Barthelm´e, 2015). However, the energy
+function of SEP/AEP is unknown, making the attempts
+for proving convergence of these algorithms difﬁcult. On
+the second issue, Heskes & Zoeter (2002) and Opper &
+Winther (2005) derived a convergent double-loop imple-
+mentation of EP. However, it can be far slower than the
+
+Black-Box Alpha
+
+Figure 1. Connections between the proposed black-box alpha
+(BB-α) algorithm and a number of existing approaches. EC ab-
+breviates expectation consistent approximate inference (Opper &
+Winther, 2005) which is a double-loop convergent algorithm sim-
+ilar to Heskes & Zoeter (2002). VMP stands for variational mes-
+sage passing described in Minka (2005), which should be distin-
+guished from another version in Winn & Bishop (2005). Other
+acronyms are explained in the main text.
+
+original message passing procedure. Teh et al. (2015) pro-
+posed the stochastic natural-gradient EP (SNEP) method,
+which is also double-loop-like, but in practice, they only
+perform one-step inner loop update to speed up training.
+Buoyed by the success of factor tying methods (SEP/AEP) ,
+we propose to apply the same idea directly to the power EP
+energy function, rather than through the power EP message
+passing updates as in SEP/AEP. We call this new method
+Black-box alpha (BB-α). Figure 1 illustrates its differences
+and connections to other existing methods. Besides being
+memory efﬁcient as SEP/AEP, BB-α has an analytic energy
+form that does not require double-loop procedures and can
+be directly optimized using gradient descent. This means
+that popular stochastic optimization methods can be used
+for large-scale learning with BB-α.
+An advantage of BB-α, that gives origin to its name, is that
+it is a black-box method that can be straightforward applied
+to very complicated probabilistic models. In such models,
+the energy function of VB, EP and power EP does not exist
+in an analytic form. Black-box VB (Ranganath et al., 2014)
+sidesteps this difﬁculty by using Monte Carlo approxima-
+tions of the VB energy, see (Salimans et al., 2013) for a
+related technique.
+In this work, we follow a similar ap-
+proach and also approximate the BB-α energy by Monte
+Carlo. Similar approximations have already been applied
+to EP (Barthelm´e & Chopin, 2011; Gelman et al., 2014;
+Xu et al., 2014; Teh et al., 2015). However, these meth-
+ods do not use the factor tying idea and consequently, are
+based on expensive double-loop approaches or on message
+passing algorithms that lack convergence guarantees.
+
+2. α-Divergence and power EP
+Let us begin by brieﬂy reviewing the α-divergence upon
+which our method is based. Consider two probability den-
+sities p and q of a random variable θ; one fundamental
+question is to assess how close the two distributions are.
+
+Figure 2. An illustration of approximating distributions by α-
+divergence minimization. Here p and q shown in the graphs
+are unnormalized probability densities. Reproduced from Minka
+(2005). Best viewed in color.
+
+The α-divergence (Amari, 1985) measures the “similarity”
+between two distributions, and in this paper we adopt a
+more convenient form1 (Zhu & Rohwer, 1995):
+
+Dα[p||q] =
+
+1
+
+α(1 − α)
+
+1 −
+
+p(θ)αq(θ)1−αdθ
+
+.
+
+(1)
+
+(cid:18)
+
+(cid:90)
+
+(cid:19)
+
+The following examples with different α values are inter-
+esting special cases:
+
+(2)
+
+(3)
+
+D1[p||q] = lim
+α→1
+D0[p||q] = lim
+α→0
+
+Dα[p||q] = KL[p||q] ,
+
+Dα[p||q] = KL[q||p] ,
+
+(cid:90) (cid:16)(cid:112)p(θ) −(cid:112)q(θ)
+(cid:17)2
+
+[p||q] = 2
+
+dθ = 4Hel2[p||q] .
+
+2
+
+D 1
+2
+
+(4)
+two limiting cases KL[p||q] denotes the
+For the ﬁrst
+Kullback-Leibler (KL) divergence given by KL[p||q] =
+Ep[log p(θ) − log q(θ)].
+In (4) Hel[p||q] denotes the
+Hellinger distance between two distributions; D 1
+is the
+only member of the family of α-divergences that is sym-
+metric in p and q.
+To understand how the choice of α might affect the result
+of approximate inference, consider the problem of approx-
+imating a complicated distribution p with a tractable Gaus-
+sian distribution q by minimizing Dα[p||q]. The resulting
+(unnormalized) approximations obtained for different val-
+ues of α are visualized in Figure 2. This shows that when
+α is a large positive number the approximation q tends to
+cover all the modes of p, while for α → −∞ (assuming
+the divergence is ﬁnite) q is attracted to the mode with the
+largest probability mass. The optimal setting of α might
+reasonably be expected to depend on the learning task that
+is being considered.
+
+1Equivalent to the original deﬁnition by setting α(cid:48) = 2α − 1
+
+in Amari’s notation.
+
+Previous workThis workThis paperlocal updatesenergyoptimizationuntiefactorsfactortyingfactortyinguntiefactorsVMPVBVBSEPEPECPEPSNEP10(BB-VB)VMPVBEPBlack-Box Alpha
+
+Setting aside the analytic tractability of the computations,
+we note that the minimization of a global α-divergence
+might not always be desirable.
+If the true posterior has
+many modes, a global approximation of this ﬂavor that is
+reﬁned using α ≥ 1 will cover the modes, and can place
+substantial probability in the area where the true posterior
+has low probability (see the last plot in Figure 2). The
+power EP algorithm (Minka, 2001a; 2004) minimizes in-
+stead a set of local α-divergences. We now give a brief
+review of the power EP algorithm. Recall the deﬁnition of
+the typically intractable posterior distribution
+
+p(θ|D) ∝
+
+p(xn|θ)
+
+p0(θ) .
+
+(5)
+
+(cid:35)
+
+(cid:34) N(cid:89)
+
+n=1
+
+Here for simplicity,
+the prior distribution p0(θ) =
+exp{s(θ)T λ0 − log Z(λ0)} is assumed to have an expo-
+nential family form, where λ0 and s(θ) are vectors of nat-
+ural parameters and sufﬁcient statistics, respectively, and
+Z(λ0) is the normalization constant or partition function
+required to make p0(θ) a valid distribution. We can use
+power EP to approximate the true posterior p(θ|D). We
+deﬁne the site approximation fn(θ) = exp{s(θ)T λn},
+which is is within the same exponential family as the prior,
+and is used to approximate the effect of the n-th likeli-
+hood factor p(xn|θ). The approximate posterior is then
+deﬁned as the product of all fn and the prior: q(θ) ∝
+n λn + λ0)}. In the following sections we
+use λq to denote the natural parameters of q(θ), and in
+n λn + λ0. According
+to Minka (2004) and Seeger (2005), the power EP energy
+function with power α is
+
+exp{s(θ)T ((cid:80)
+the EP context we deﬁne λq = (cid:80)
+(cid:18) N
+
+E(λ0,{λn}) = log Z(λ0) +
+
+log Z(λq)
+
+(cid:19)
+
+− 1
+
+α
+
+n=1
+
+log
+
+− 1
+α
+
+p(xn|θ)α exp{s(θ)T (λq − αλn)}dθ .
+(6)
+This energy is equal to minus the logarithm of the power
+EP approximation of the model evidence p(D), that is, the
+normalizer of the right-hand side of (5). Therefore, min-
+imizing (6) with respect to {λn} is arguably a sensible
+way to tune these variational parameters. However, power
+EP does not directly perform gradient descent to minimize
+E(λ0,{λn}). Instead, it ﬁnds a stationary solution to the
+optimization problem by running a message passing algo-
+rithm that repeatedly applies the following four steps for
+every site approximation fn:
+
+N(cid:88)
+
+(cid:90)
+
+1 Compute the cavity distribution:
+
+q\n(θ) ∝ q(θ)/fn(θ)α,
+
+i.e. λ\n ← λq − αλn;
+
+2 Compute the “tilted” distribution by inserting the ex-
+
+act likelihood factor raised to the power α:
+
+˜pn(θ) ∝ q\n(θ)p(xn|θ)α;
+
+3 Adjust q by matching moments:
+
+Eq[s(θ)] ← E ˜pn [s(θ)];
+
+4 Recover the site approximation fn(θ) by setting
+λn ← λq − λ\n, and compute the ﬁnal update for
+
+q(θ) by λq ←(cid:80)
+
+n λn + λ0.
+
+(cid:90)
+
+Notice in step 3 moment matching is equivalent to updating
+the q distribution by minimizing an α-divergence, with the
+target proportional to p(xn|θ) exp{s(θ)T (λq − λn)}. To
+see this, consider approximating some p distribution with q
+by minimizing the α-divergence; the gradient of Dα[p||q]
+w.r.t. the natural parameters λq is:
+∇λq Dα[p||q] = − 1
+α
+Z ˜p
+α
+
+p(θ)αq(θ)1−α∇λq log q(θ)dθ
+
+(Eq[s(θ)] − E ˜p[s(θ)]) ,
+
+(7)
+where ˜p ∝ pαq1−α with normalization constant
+Z ˜p and α (cid:54)= 0.
+Substituting p with p(cid:48)(θ) ∝
+p(xn|θ) exp{s(θ)T (λq−λn)} and zeroing the gradient re-
+sults in step 3 that matches moments between the tilted dis-
+tribution and the approximate posterior. Also Minka (2004)
+derived the stationary condition of (6) as
+
+=
+
+E ˜pn[s(θ)] = Eq[s(θ)], ∀n ,
+
+(8)
+
+so that it agrees with (7). This means, at convergence, q(θ)
+minimizes the α-divergences from all the tilted distribu-
+tions to the approximate posterior.
+Alternatively, Heskes & Zoeter (2002) and Opper &
+Winther (2005) proposed a convergent double-loop algo-
+rithm to solve the energy minimization problem for normal
+EP (α = 1) (see supplementary material). This algorithm
+(cid:80)
+ﬁrst rewrites the energy (6) as a function of the cavity pa-
+rameters λ\n and adds the constraint (N − 1)λq + λ0 =
+n λ\n that ensures agreement between the global ap-
+proximation and the local component approximate factors.
+It then alternates between an optimization of the cavity pa-
+rameters in the inner loop and an optimization of the pa-
+rameters of the posterior approximation λq in the outer
+loop. However, this alternating optimization procedure of-
+ten requires too many iterations to be useful in practice.
+
+3. Approximate local minimization of
+
+α-divergences
+
+In this section we introduce black-box alpha (BB-α), which
+approximates power EP with a simpliﬁed objective. Now
+
+Black-Box Alpha
+
+we constrain all the site parameters to be equal, i.e. λn = λ
+for all n. This is equivalent to tying all the local fac-
+tors, where now fn(θ) = f (θ) for all n. Then all the
+cavity distributions are the same with natural parameter
+λ\n = (N − α)λ + λ0, and the approximate posterior
+is parameterized by λq = N λ + λ0. Recall that fn(θ)
+captures the contribution of the n-th likelihood to the pos-
+terior. Now with shared site parameters we are using an
+“average site approximation” f (θ) = exp{s(θ)T λ} that
+approximates the average effect of each likelihood term on
+the posterior. Under this assumption we rewrite the energy
+function (6) by replacing λn with λ:
+
+E(λ0, λ) = log Z(λ0) − log Z(λq)
+
+N(cid:88)
+
+n=1
+
+− 1
+α
+
+log Eq
+
+(cid:20)(cid:18) p(xn|θ)
+
+(cid:19)α(cid:21)
+
+f (θ)
+
+(9)
+
+.
+
+Figure 3 illustrates the comparison between the original
+power EP and the proposed method. Also, as there is a
+one-to-one correspondence between λ and λq given λ0,
+i.e. λ = (λq − λ0)/N, we can therefore rewrite (9) as
+E(λ0, λq) using the global parameter λq.
+The factor tying constraint was proposed in Li et al. (2015)
+and Dehaene & Barthelm´e (2015) to obtain versions of EP
+called stochastic EP (SEP) and averaged EP (AEP), re-
+spectively, thus the new method also inherits the advantage
+of memory efﬁciency. However, applying this same idea di-
+rectly to the energy function (6) results in a different class
+of algorithms from AEP, SEP and power SEP. The main dif-
+ference is that, when an exponential family approximation
+is considered, SEP averages the natural parameters of the
+approximate posteriors obtained in step 3 of the message
+passing algorithm from the previous section. However, in
+BB-α the moments, also called the mean parameters, of the
+approximate posteriors are averaged and then converted to
+the corresponding natural parameters2. To see this, one can
+take derivatives of E(λ0, λq) w.r.t. λq and obtain the new
+stationary conditions for α (cid:54)= 0 and α (cid:54)= N:
+
+N(cid:88)
+
+n=1
+
+Eq[s(θ)] =
+
+1
+N
+
+E ˜pn [s(θ)] .
+
+(10)
+
+Therefore, the moments of the q distribution, i.e. the expec-
+tation of s(θ) with respect to q(θ), is equal to the average
+of the expectation of s(θ) across the different tilted distri-
+butions ˜pn(θ) ∝ p(xn|θ)αq\n(θ), for n = 1, . . . , N. It
+might not always be sensible to average moments, e.g. this
+approach is shown to be biased even in the simple case
+where the likelihood terms also belong to the same ex-
+ponential family as the prior and approximate posterior
+
+2Under a minimal exponential family assumption, there exists
+a one-to-one correspondence between the natural parameter and
+the mean parameter.
+
+Figure 3. A cartoon for BB-α’s factor tying constraint. Here we
+assume the dataset has N = 3 observations. Best seen in color.
+
+(see supplementary material). Moreover, BB-α can mode-
+average, e.g. when approximating the posterior distribution
+of component means in a Gaussian Mixture Model, which
+may or may not be desired depending on the application.
+But unlike SEP, the new method explicitly deﬁnes an en-
+ergy function as an optimization objective, which enables
+analysis of convergence and applications of stochastic opti-
+mization/adaptive learning rate methods. Moreover, it can
+provide an approximate posterior with better uncertainty
+estimates than VB (see supplementary), which is desirable.
+The energy also makes hyper-parameter optimization sim-
+ple, which is key for many applications.
+We prove the convergence of the new approximate EP
+method by showing that the new energy function (9) is
+bounded below for α ≤ N when the energy function is ﬁ-
+nite. First, using Jensen’s inequality, we can prove that the
+third term − 1
+in (9) is non-
+increasing in α, because for arbitrary numbers 0 < α < β
+β is strictly concave on x ≥ 0.
+or β < α < 0 the function x
+For convenience we shorthand this term as G(α). Then
+the proof is ﬁnished by subtracting from (9) ˜G(N ) :=
+− 1
+pendent of the q distribution:
+E(λ0, λq) − ˜G(N )
+=G(α) + log Z(λ0) − log Z(λq) − ˜G(N )
+=G(α) − G(N ) ≥ 0 .
+
+n log(cid:82) p0(θ)p(xn|θ)N dθ, a function that is inde-
+(cid:80)
+
+(cid:80)N
+
+(cid:104)(cid:16) p(xn|θ)
+
+(cid:17)α(cid:105)
+
+n=1 log Eq
+
+f (θ)
+
+N
+
+α
+
+α
+
+The stationary point of (6) is expected to converge to the
+stationary point of (9) when more and more data are avail-
+able. More precisely, as N grows, we expect q(θ) and the
+cavities to become very concentrated. When this happens,
+the contribution of each likelihood factor p(xn|θ) to the
+tilted distribution ˜pn(θ) becomes very small because the
+likelihood is a rather ﬂat function when compared to the
+cavity distribution q\n(θ). Therefore, as the amount of data
+N increases, we expect all the terms E ˜pn[s(θ)] in (10) to
+be very similar to each other. When all of them are equal,
+we have that (10) implies (8).
+As in power EP, which value of α returns the best approx-
+imation depends on the particular application. In the limit
+
+tie local factorsBlack-Box Alpha
+
+that α approaches zero, the BB-α energy (9) converges to
+the variational free energy:
+
+(cid:21)
+
+p(xn|θ)
+f (θ)
+
+(cid:20)
+(cid:21)
+
+log
+
+lim
+α→0
+
+(cid:20)
+
+E(λ0, λq)
+
+= log Z(λ0) − log Z(λq) − N(cid:88)
+
+(cid:81)
+Eq
+n p(xn|θ)p0(θ)
+= −Eq
+exp{s(θ)T λq}/Z(λq)
+= −Eq [log p(θ,D) − log q(θ)]
+= EV B(λ0, λq) .
+
+log
+
+n=1
+
+Note also, the α-divergence as a function of α is smooth in
+[0, 1]. Therefore, by adjusting the α parameter, we can in-
+terpolate between the solutions given by variational Bayes
+and the solutions given by the resulting approximation to
+EP. In the supplementary material we demonstrate this con-
+tinuity in α with a linear regression example.
+The prior hyper-parameters λ0 can be optimally adjusted
+by minimizing (9). This can be done through a variational
+EM-like procedure. First we optimize the energy function
+w.r.t. the q distribution until convergence. Then we take
+the gradients w.r.t. λ0 and equate them to zero to obtain
+the update for the prior, which is Eq[s(θ)] = Ep0 [s(θ)].
+However, this procedure is inefﬁcient in practice. Instead
+we jointly optimize the approximate posterior q and the
+prior distribution p0 similar to the approach of Hern´andez-
+Lobato & Hern´andez-Lobato (2016) for normal EP.
+
+3.1. Large scale learning
+
+When N is large, it might be beneﬁcial to minimize (9)
+using stochastic optimization techniques. In particular, we
+can uniformly sample a mini-batch of data S ⊆ {1, . . . , N}
+and construct the noisy estimate of the energy function
+given by
+
+E(λ0, λq) ≈ log Z(λ0) − log Z(λq)
+
+(cid:88)
+
+n∈S
+
+− 1
+α
+
+N
+|S|
+
+log Eq
+
+(cid:20)(cid:18) p(xn|θ)
+
+(cid:19)α(cid:21)
+
+f (θ)
+
+(11)
+
+.
+
+The gradients of (11) can then be used to minimize the
+original objective by stochastic gradient descent. Under
+mild conditions, as discussed by Bottou (1998), and us-
+ing a learning rate schedule {γt} that satisﬁes the Robbins-
+Monro conditions
+
+∞(cid:88)
+
+∞(cid:88)
+
+γt = ∞,
+
+t < ∞,
+γ2
+
+t=1
+
+t=1
+
+the stochastic optimization procedure will converge to a
+ﬁxed point of the exact energy function (9).
+Similar to SEP/AEP (Li et al., 2015; Dehaene & Barthelm´e,
+2015), BB-α only maintains the global parameter λq and
+
+the prior parameter λ0. This has been shown to achieve a
+signiﬁcant amount of memory saving. On the other hand,
+recent work on parallelizing EP (Gelman et al., 2014; Xu
+et al., 2014; Teh et al., 2015), whether in a synchronous
+manner or not, extends to BB-α naturally. But unlike EP,
+which computes different cavity distributions for different
+data points, BB-α uses the same cavity distribution for each
+data point.
+
+3.2. Black-box α-divergence minimization
+
+f (θ)
+
+(cid:17)α(cid:105)
+
+(cid:104)(cid:16) p(xn|θ)
+
+In complicated probabilistic models, we might not be able
+to analytically compute the expectation over the approx-
+in (11) involving the
+imate distribution Eq
+likelihood factors. However, we can obtain an estimate
+of these integrals by Monte Carlo.
+In this work we use
+the simplest method for doing this, but techniques like
+SMC and MCMC could also have the potential to be de-
+ployed. We draw K samples θ1, . . . , θK from q(θ) and
+then approximate the integrals by expectations with respect
+to those samples. This produces the following noisy esti-
+mate of the energy function:
+
+ˆE(λ0, λq) = log Z(λ0) − log Z(λq)
+
+(cid:88)
+
+n∈S
+
+− 1
+α
+
+N
+|S|
+
+log
+
+1
+K
+
+k
+
+(cid:88)
+
+(cid:18) p(xn|θk)
+
+(cid:19)α
+
+.
+
+f (θk)
+
+(12)
+Note, however, that the resulting stochastic gradients will
+be biased because the energy function (12) applies a non-
+linear transformation (the logarithm) to the Monte Carlo
+estimator of the integrals. Nevertheless, this bias can be
+reduced by increasing the number of samples K. Our ex-
+periments indicate that when K ≥ 10 the bias is almost
+negligible w.r.t. the variance from sub-sampling the data
+using minibatches, for the models considered here.
+There are two other tricks we have used in our implementa-
+tion. The ﬁrst one is the reparameterization trick (Kingma
+& Welling, 2014), which has been used to reduce the vari-
+ance of the Monte Carlo approximation to the variational
+free energy. Consider the case of computing expectation
+Eq(θ)[F (θ)]. This expectation can also be computed as
+Ep()[F (g())], if there exists a mapping g(·) and a distri-
+bution p() such that θ = g() and q(θ)dθ = p()d.
+Now consider a Gaussian approximation q(θ) as a run-
+ning example. Since the Gaussian distribution also has an
+(minimal) exponential family form, there exists a one-to-
+one correspondence between the mean parameters {µ, Σ}
+and the natural parameters λq = {Σ−1µ, Σ−1}. Further-
+more, sampling θ ∼ q(θ) is equivalent to θ = g() =
+µ + Σ1/2,  ∼ N (0, I). Thus the sampling approxima-
+
+tion ˆE(λ0, λq) can be computed as
+ˆE(λ0, λq) = log Z(λ0) − log Z(λq)
+
+Black-Box Alpha
+
+stochastic optimizer progressively increases the variance
+parameters to capture the uncertainty around the mean of
+q. This trick considerably improves the performance of the
+stochastic optimization method for BB-α and BB-VB. The
+prior p(x) is always taken to be a factorized Gaussian with
+zero mean and unit standard deviation. The implementa-
+tion of each of the analyzed methods is available for repro-
+ducible research.
+
+4.1. Probit regression
+
+We perform experiments with a Bayesian probit regression
+model to validate the proposed black-box approach. We op-
+timize the different objective functions using minibatches
+of size 32 and Adam (Kingma & Ba, 2014) with its default
+parameter values during 200 epochs. BB-α and BB-VB are
+implemented by drawing K = 100 Monte Carlo samples
+for each minibatch. The following values α = 1, α = 0.5
+and α = 10−6 for BB-α are considered in the experiments.
+The performance of each method is evaluated on 50 ran-
+dom training and test splits of the data with 90% and 10%
+of the data instances, respectively.
+Table 1 shows the average test log-likelihood and test error
+obtained by each technique in the probit regression datasets
+from the UCI data repository (Lichman, 2013). We also
+show the average rank obtained by each method across all
+the train/test splits of the data. Overall, all the methods
+obtain very similar results although BB-α with α = 1.0
+seems to perform slightly better. Importantly, BB-α with
+α = 10−6 produces the same results as BB-VB, which ver-
+iﬁes our theory of continuous interpolations near the limit
+α → 0.
+
+4.2. Neural network regression
+
+We perform additional experiments with neural networks
+for regression with 100 units in a single hidden layer with
+ReLUs and Gaussian additive noise at the output. We con-
+sider several regression datasets also from the UCI data
+repository (Lichman, 2013). We use the same training pro-
+cedure as before, but using 500 epochs instead of 200. The
+noise variance is learned in each method by optimizing the
+corresponding objective function: evidence lower bound in
+BB-VB and (9) in BB-α.
+The average test log-likelihood across 50 splits of the data
+into training and test sets are visualized in Figure 4. The
+performance of BB-α = 10−6 is again almost indistin-
+guishable from that of BB-VB. None of the tested α set-
+tings clearly dominates the other choices in all cases, in-
+dicating that the optimal α may vary for different prob-
+lems. However, α = 0.5 produces good overall results.
+This might be because the Hellinger distance is the only
+symmetric divergence measure in the α-divergence family
+which balances the tendencies of capturing a mode (α <
+
+(cid:88)
+
+n∈S
+
+− 1
+α
+
+N
+|S|
+
+log
+
+1
+K
+
+k
+
+(cid:88)
+
+(cid:18) p(xn|g(k))
+
+(cid:19)α
+
+,
+
+f (g(k))
+
+(13)
+with 1, ..., K sampled from a zero mean, unit variance
+Gaussian. A further trick is resampling {k} every M > 1
+iterations. In our experiments with neural networks, this
+speeds-up the training process since it reduces the transfer-
+ence of randomness to the GPU, which slows down com-
+putations.
+Given a new probabilistic model, one can then use the
+proposed approach to quickly implement, in an automatic
+manner, an inference algorithm based on the local mini-
+mization of α-divergences. For this one only needs to write
+code that evaluates the likelihood factors f1, . . . , fN in
+(13). After this, the most difﬁcult task is the computation of
+the gradients of (13) so that stochastic gradient descent with
+minibatches can be used to optimize the energy function.
+However, the computation of these gradients can be easily
+automated by using automatic differentiation tools such as
+Autograd (http://github.com/HIPS/autograd)
+or Theano (Bastien et al., 2012). This approach allows us to
+quickly implement and test different modeling assumptions
+with little effort.
+
+4. Experiments
+We evaluated the proposed algorithm black-box alpha (BB-
+α), on regression and classiﬁcation problems using a pro-
+bit regression model and Bayesian neural networks. The
+code for BB-α is publicly available3 We also compare with
+a method that optimizes a Monte Carlo approximation to
+the variational lower bound (Ranganath et al., 2014). This
+approximation is obtained in a similar way to the one de-
+scribed in Section 3.2, where one can show its equivalence
+to BB-α by limiting α → 0. We call this method black-
+box variational Bayes (BB-VB). In the implementation of
+BB-α and BB-VB shown here, the posterior approxima-
+tion q is always a factorized Gaussian (but more complex
+distributions can easily be handled). The mean parame-
+ters of q are initialized by independently sampling from
+a zero mean Gaussian with standard deviation 10−1. We
+optimize the logarithm of the variance parameters in q to
+avoid obtaining negative variances. We use -10 as the ini-
+tial value for the log-variance parameters, which results in
+very low initial variance in q. This makes the stochastic op-
+timizer initially resemble a point estimator method which
+quickly ﬁnds a solution for the mean parameters with good
+predictive properties on the training data. After this, the
+
+3https://bitbucket.org/jmh233/code_black_
+
+box_alpha_icml_2016
+
+Black-Box Alpha
+
+Dataset
+Ionosphere
+Madelon
+Pima
+Colon Cancer
+Avg. Rank
+
+Table 1. Probit regression experiment results
+
+Average Test Log-likelihood
+BB-α=10−6
+
+BB-α=0.5
+
+BB-α=1.0
+-0.333±0.022 -0.333±0.022 -0.333±0.022 -0.333±0.022
+-0.799±0.006 -0.920±0.008 -0.953±0.009 -0.953±0.009
+-0.501±0.010 -0.501±0.010 -0.501±0.010 -0.501±0.010
+-2.261±0.402 -2.264±0.403 -2.268±0.404 -2.268±0.404
+1.895±0.097
+2.845±0.072
+
+2.970±0.073
+
+2.290±0.038
+
+BB-VB
+
+Average Test Error
+
+BB-α=0.5
+
+BB-α=10−6
+BB-α=1.0
+0.124±0.008 0.124±0.008 0.123±0.008
+0.445±0.005 0.454±0.004 0.457±0.005
+0.234±0.006 0.234±0.006 0.235±0.006
+0.303±0.028 0.307±0.028 0.307±0.028
+2.322±0.048 2.513±0.039 2.587±0.031
+
+BB-VB
+0.123±0.008
+0.457±0.005
+0.235±0.006
+0.307±0.028
+2.578±0.031
+
+Table 2. Average Test Error and Log-likelihood in MNIST
+
+Setting
+BB-α = 1.0
+BB-α = 0.5
+BB-α = 10−6
+BB-VB
+BB-α = −1.0
+
+Error/100 Rank
+4.97
+4.03
+2.15
+2.12
+1.73
+
+1.51
+1.44
+1.36
+1.36
+1.33
+
+LL/100 Rank
+5.00
+-5.51
+4.00
+-5.09
+-4.68
+2.55
+2.45
+-4.68
+-4.47
+1.00
+
+Figure 4. Average test log-likelihood and the ranking compar-
+isons. Best viewed in color.
+
+0.5) and covering the whole probability mass (α > 0.5).
+There are no signiﬁcant differences in regression error so
+the results are not shown.
+
+4.3. Neural network classiﬁcation
+
+The next experiment considers the MNIST digit classiﬁca-
+tion problem. We use neural networks with 2 hidden layers
+with 400 hidden units per layer, ReLUs and softmax out-
+puts. In this problem, we initialize the mean parameters
+in q as recommended in Glorot & Bengio (2010) by sam-
+pling from a zero-mean Gaussian with variance given by
+2/(din+dout), where din and dout are the dimensionalities of
+the previous and the next layer in the neural network. In
+this case we also try α = −1.0 in BB-α. We use mini-
+batches of size 250 and run the different methods for 250
+epochs. BB-α and BB-VB use now K = 50 Monte Carlo
+samples to approximate the expectations with respect to q
+in each minibatch. We implemented the neural networks
+in Theano and ran the different methods on GPUs using
+Adam with its default parameter values and a learning rate
+of 0.0001. In this case, to reduce the transference of data
+from the main memory to the GPU, we update the random-
+ness in the Monte Carlo samples only after processing 10
+minibatches instead of after processing each minibatch.
+Table 2 summarizes the average test error and test log-
+likelihood obtained by each method over 20 random initial-
+izations. For non-negative alpha settings BB-VB (α = 0)
+returns the best result, and again BB-α = 10−6 per-
+forms almost identically to the variational inference ap-
+
+proach BB-VB. The best performing method is BB-α with
+α = −1, which is expected to move slightly towards ﬁt-
+ting a mode. We note here that this is different from the
+Laplace approximation, which, depending on the curvature
+at the MAP solution, might return an approximate posterior
+that also covers spaces other than the mode. On this dataset
+α = −1 returns both higher test log-likelihood and lower
+test error than all the tested non-negative settings for α.
+
+4.4. Clean energy project data
+
+We perform additional experiments with data from the Har-
+vard Clean Energy Project, which is the world’s largest ma-
+terials high-throughput virtual screening effort (Hachmann
+et al., 2014). It has scanned a large number of molecules of
+organic photovoltaics to ﬁnd those with high power conver-
+sion efﬁciency (PCE) using quantum-chemical techniques.
+The target value within this dataset is the PCE of each
+molecule. The input features for all molecules in the data
+set are 512-bit Morgan circular ﬁngerprints, calculated with
+a bond radius of 2, and derived from the canonical smiles,
+implemented in the RDkit. We use 50,000 molecules for
+training and 10,000 molecules for testing.
+We consider neural networks with 2 hidden layers with 400
+hidden units per layer, ReLUs and Gaussian additive noise
+at the output. The noise variance is ﬁxed to 0.16, which is
+the optimal value according to the results reported in Pyzer-
+Knapp et al. (2015). The initialization and training process
+is the same as with the MNIST dataset, but using the default
+learning rate in Adam.
+Table 3 summarizes the average test error and test log-
+likelihood obtained by each method over 20 random ini-
+tializations. BB-α = 10−6 obtains again very similar re-
+sults to BB-VB. In this case, the best performing method
+is BB-α with α = 0.5, both in terms of test error and test
+log-likelihood. This was also the best performing method
+
+boston−2.65−2.60−2.55−2.50average test log-likelihood/natsconcrete−3.17−3.16−3.15−3.14−3.13−3.12−3.11−3.10−3.09−3.08energy−0.79−0.78−0.77−0.76−0.75−0.74−0.73wine−0.985−0.980−0.975−0.970−0.965−0.960−0.955−0.950yacht−1.86−1.84−1.82−1.80−1.78−1.76−1.74BB-α=1.0BB-α=0.5BB-α=10−6BB-VBBlack-Box Alpha
+
+Table 3. Average Test Error and Test Log-likelihood in CEP Dataset.
+
+BB-α=1.0
+CEP Dataset
+1.28±0.01
+Avg. Error
+4.00±0.00
+Avg. Rank
+Avg. Log-likelihood -0.93±0.01
+1.95±0.05
+Avg. Rank
+
+BB-α=0.5
+1.08±0.01
+1.35±0.15
+-0.74±0.01
+1.05±0.05
+
+BB-α=10−6
+1.13±0.01
+2.05±0.15
+-1.39±0.03
+3.40±0.11
+
+BB-VB
+1.14±0.01
+2.60±0.13
+-1.38±0.02
+3.60±0.11
+
+Table 4. Average Bias.
+
+Dataset BB-α=1.0 BB-α=0.5 BB-α=10−6
+K = 1
+K = 5
+K = 10
+
+0.1214
+0.0189
+0.0013
+
+0.0460
+0.0162
+0.0001
+
+0.2774
+0.0332
+0.0077
+
+Table 5. Average Standard Deviation Gradient.
+
+Dataset BB-α=1.0 BB-α=0.5 BB-α=10−6
+K = 1
+K = 5
+K = 10
+
+14.1209
+12.7953
+12.3203
+
+14.0159
+12.8418
+12.4101
+
+13.9109
+12.8984
+12.5058
+
+in the experiments from Section 4.2, which indicates that
+α = 0.5 may be a generally good setting in neural net-
+work regression problems. Table 3 shows that α = 0.5
+attains a balance between the tendency of α = 1.0 to per-
+form well in terms of test log-likelihood and the tendency
+of α = 10−6 to perform well in terms of test squared error.
+
+4.5. Analysis of the bias and variance in the gradients
+
+We perform another series of experiments to analyze the
+bias and the variance in the gradients of (13) as a function
+of the number K of Monte Carlo samples used to obtain a
+noisy approximation of the objective function and the value
+of α used. To estimate the bias in BB-α we run the Adam
+optimizer for 100 epochs on the Boston housing dataset as
+described in Section 4.2. Then, we estimate the biased gra-
+dient using K = 1, 5, 10 Monte Carlo samples from q,
+which is repeated 1,000 times to obtain an averaged esti-
+mate. We also compute an approximation to the ground
+truth for the unbiased gradient by using K = 10, 000
+Monte Carlo samples. The whole process is performed
+across 15 minibatches of data points from each split. We
+then deﬁne the bias in the gradient as the averaged L2 norm
+between the ground truth gradient and the biased gradient
+across these 15 minibatches, divided by the square root of
+the dimension of the gradient vector. This deﬁnition of bias
+is not 0 for methods that use unbiased estimators of the gra-
+dient, such as BB-VB, because of the variance by sampling
+on each minibatch. However, we expect this procedure to
+report larger bias values for BB-α than for BB-VB. There-
+fore, we subtract from the bias values obtained for BB-α
+the corresponding bias values obtained for BB-VB. This
+eliminates from the bias values any additional variance that
+is produced by having to sample to estimate the unbiased
+and biased gradient on each minibatch.
+Table 4 shows the average bias obtained for each value of
+K and α across the 50 splits. We observe that the bias
+is reduced as we increase K and as we make α closer to
+
+zero. For K = 10 the bias is already very low. To put
+these bias numbers into context, we also computed a stan-
+dard deviation-like measure by the square root of the aver-
+age empirical variance per dimension in the noisy gradient
+vector over the 15 minibatches. Table 5 shows the aver-
+age values obtained across the 50 splits, where entries are
+almost constant as a function of α, and up to 5 orders of
+magnitude larger than the entries of Table 4 for K = 10.
+This means the bias in the gradient used by BB-α is neg-
+ligible when compared with the variability that is obtained
+in the gradient by subsampling the training data.
+
+5. Conclusions and future work
+We have proposed BB-α as a black-box inference algo-
+rithm to approximate power EP. This is done by consider-
+ing the energy function used by power EP and constrain-
+ing the form of the site approximations in this method.
+The proposed method locally minimizes the α-divergence
+that is a rich family of divergence measures between dis-
+tributions including the Kullback-Leibler divergence. Such
+a method is guaranteed to converge under certain condi-
+tions, and can be implemented by optimizing an energy
+function without having to use inefﬁcient double-loop al-
+gorithms. Scalability to large datasets can be achieved by
+using stochastic gradient descent with minibatches. Fur-
+thermore, a combination of a Monte Carlo approximation
+and automatic differentiation methods allows our technique
+to be applied in a straightforward manner to a wide range of
+probabilistic models with complex likelihood factors. Ex-
+periments with neural networks applied to small and large
+datasets demonstrate both the accuracy and the scalability
+of the proposed approach. The evaluations also indicate the
+optimal setting for α may vary for different tasks. Future
+work should provide a theoretical guide and/or automatic
+tools for modelling with different factors and different α
+values.
+
+Black-Box Alpha
+
+Acknowledgements
+
+JMHL acknowledges support from the Rafael del Pino
+Foundation. YL thanks the Schlumberger Foundation
+Faculty for the Future fellowship on supporting her PhD
+study. MR acknowledges support from UK Engineering
+and Physical Sciences Research Council (EPSRC) grant
+EP/L016516/1 for the University of Cambridge Centre
+for Doctoral Training, the Cambridge Centre for Analy-
+sis. TDB thanks Google for funding his European Doc-
+toral Fellowship. DHL acknowledge support from Plan
+National I+D+i, Grant TIN2013-42351-P and TIN2015-
+70308-REDT, and from Comunidad de Madrid, Grant
+S2013/ICE-2845 CASI-CAM-CM. RET thanks EPSRC
+grant #EP/L000776/1 and #EP/M026957/1.
+
+References
+Amari, Shun-ichi. Differential-Geometrical Methods in
+
+Statistic. Springer, New York, 1985.
+
+Barthelm´e, Simon and Chopin, Nicolas. Abc-ep: Expec-
+tation propagation for likelihoodfree Bayesian computa-
+tion. In ICML, 2011.
+
+Bastien, Fr´ed´eric, Lamblin, Pascal, Pascanu, Razvan,
+Bergstra, James, Goodfellow, Ian J., Bergeron, Arnaud,
+Bouchard, Nicolas, and Bengio, Yoshua. Theano: new
+features and speed improvements. Deep Learning and
+Unsupervised Feature Learning NIPS 2012 Workshop,
+2012.
+
+Bottou, L´eon. Online learning and stochastic approxima-
+tions. On-line learning in neural networks, 17(9):25,
+1998.
+
+Cunningham, John P, Hennig, Philipp, and Lacoste-Julien,
+Simon. Gaussian probabilities and expectation propaga-
+tion. arXiv preprint arXiv:1111.6832, 2011.
+
+Dehaene, Guillaume and Barthelm´e, Simon. Expectation
+propagation in the large-data limit. arXiv:1503.08060,
+2015.
+
+Gelman, Andrew, Vehtari, Aki, Jylnki, Pasi, Robert, Chris-
+tian, Chopin, Nicolas, and Cunningham, John P. Expec-
+tation propagation as a way of life. arXiv:1412.4869,
+2014.
+
+Glorot, Xavier and Bengio, Yoshua. Understanding the dif-
+ﬁculty of training deep feedforward neural networks. In
+AISTATS, pp. 249–256, 2010.
+
+Hachmann, Johannes, Olivares-Amaya, Roberto, Jinich,
+Adrian, Appleton, Anthony L, Blood-Forsythe, Mar-
+tin A, Seress, L´aszl´o R, Rom´an-Salgado, Carolina,
+Trepte, Kai, Atahan-Evrenk, Sule, Er, S¨uleyman, et al.
+
+Lead candidates for high-performance organic photo-
+voltaics from high-throughput quantum chemistry–the
+harvard clean energy project. Energy & Environmental
+Science, 7(2):698–704, 2014.
+
+Hern´andez-Lobato,
+
+and Hern´andez-Lobato,
+Jos´e Miguel. Scalable gaussian process classiﬁcation
+via expectation propagation. In AISTATS, 2016.
+
+Daniel
+
+Heskes, Tom and Zoeter, Onno. Expectation propaga-
+tion for approximate inference in dynamic Bayesian net-
+In UAI, pp. 216–223. Morgan Kaufmann Pub-
+works.
+lishers Inc., 2002.
+
+Jordan, M. I., Ghahramani, Z., Jaakkola, T. S., and Saul,
+L. K. An introduction to variational methods for graphi-
+cal models. Machine Learning, 37:183–233, 1999.
+
+Kingma, D. P. and Welling, M. Auto-encoding variational
+
+bayes. In ICLR, 2014.
+
+Kingma, Diederik and Ba,
+
+Jimmy.
+method for stochastic optimization.
+arXiv:1412.6980, 2014.
+
+Adam:
+
+A
+arXiv preprint
+
+Li, Yingzhen, Hernandez-Lobato, Jose Miguel, and Turner,
+Richard E. Stochastic expectation propagation. In NIPS,
+pp. 2323–2331, 2015.
+
+Lichman, M. UCI machine learning repository, 2013. URL
+
+http://archive.ics.uci.edu/ml.
+
+Minka, Thomas P. Expectation propagation for approxi-
+mate Bayesian inference. In UAI, pp. 362–369. Morgan
+Kaufmann Publishers Inc., 2001a.
+
+Minka, Thomas P. A Family of Algorithms for Approximate
+Bayesian Inference. PhD thesis, Cambridge, MA, USA,
+2001b. AAI0803033.
+
+Minka, Thomas P. Power ep. Technical report, Technical
+
+report, Microsoft Research, Cambridge, 2004.
+
+Minka, Thomas P. Divergence measures and message pass-
+ing. Technical report, Technical report, Microsoft Re-
+search, 2005.
+
+Opper, Manfred and Winther, Ole. Expectation consistent
+approximate inference. The Journal of Machine Learn-
+ing Research, 6:2177–2204, 2005.
+
+Pyzer-Knapp, Edward O, Li, Kewei, and Aspuru-Guzik,
+Alan. Learning from the harvard clean energy project:
+The use of neural networks to accelerate materials dis-
+covery. Advanced Functional Materials, 25(41):6495–
+6502, 2015.
+
+Ranganath, Rajesh, Gerrish, Sean, and Blei, David. Black
+In AISTATS, pp. 814–822,
+
+box variational inference.
+2014.
+
+Black-Box Alpha
+
+Salimans, Tim, Knowles, David A, et al. Fixed-form varia-
+tional posterior approximation through stochastic linear
+regression. Bayesian Analysis, 8(4):837–882, 2013.
+
+Seeger, Matthias. Expectation propagation for exponential
+
+families. Technical report, 2005.
+
+Teh, Yee Whye, Hasenclever, Leonard, Lienart, Thibaut,
+Vollmer, Sebastian, Webb, Stefan, Lakshminarayanan,
+Balaji, and Blundell, Charles. Distributed Bayesian
+learning with stochastic natural-gradient expectation
+propagation and the posterior server. arXiv:1512.09327,
+2015.
+
+Turner, Richard E. and Sahani, Maneesh. Two problems
+with variational expectation maximisation for time series
+models. In Bayesian Time Series Models, pp. 104–124.
+Cambridge University Press, 2011a. Cambridge Books
+Online.
+
+Turner, Richard E. and Sahani, Maneesh. Probabilistic am-
+plitude and frequency demodulation. In NIPS, pp. 981–
+989. 2011b.
+
+Winn, John M and Bishop, Christopher M. Variational
+message passing. In Journal of Machine Learning Re-
+search, pp. 661–694, 2005.
+
+Xu, Minjie, Lakshminarayanan, Balaji, Teh, Yee Whye,
+Zhu, Jun, and Zhang, Bo. Distributed Bayesian posterior
+sampling via moment sharing. In NIPS, pp. 3356–3364,
+2014.
+
+Zhu, Huaiyu and Rohwer, Richard. Information geometric
+measurements of generalisation. Technical report, Tech-
+nical Report NCRG/4350. Aston University., 1995.
+
+

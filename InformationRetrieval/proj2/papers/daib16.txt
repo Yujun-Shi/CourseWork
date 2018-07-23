@@ -1,0 +1,1589 @@
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+Hanjun Dai, Bo Dai
+Le Song
+College of Computing, Georgia Institute of Technology, Atlanta, USA
+
+{HANJUNDAI, BODAI}@GATECH.EDU
+LSONG@CC.GATECH.EDU
+
+Abstract
+
+Kernel classiﬁers and regressors designed for
+structured data, such as sequences,
+trees and
+graphs, have signiﬁcantly advanced a number
+of interdisciplinary areas such as computational
+biology and drug design. Typically, kernels are
+designed beforehand for a data type which either
+exploit statistics of the structures or make use
+of probabilistic generative models, and then a
+discriminative classiﬁer is learned based on the
+kernels via convex optimization. However, such
+an elegant two-stage approach also limited kernel
+methods from scaling up to millions of data
+points, and exploiting discriminative information
+to learn feature representations.
+We propose, structure2vec, an effective
+and scalable approach for
+structured data
+representation based on the idea of embedding
+latent variable models into feature spaces, and
+learning such feature spaces using discriminative
+information.
+Interestingly, structure2vec
+extracts features by performing a sequence of
+function mappings in a way similar to graphical
+model
+such as mean
+inference procedures,
+ﬁeld and belief propagation.
+In applications
+involving millions of data points, we showed that
+structure2vec runs 2 times faster, produces
+models which are 10, 000 times smaller, while
+at the same time achieving the state-of-the-art
+predictive performance.
+
+1. Introduction
+Structured data, such as sequences,
+trees and graphs,
+are prevalent in a number of interdisciplinary areas such
+as protein design, genomic sequence analysis, and drug
+design (Sch¨olkopf et al., 2004).
+To learn from such
+complex data, we have to ﬁrst
+transform such data
+explicitly or implicitly into some vectorial representations,
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+Later
+
+and then apply machine learning algorithms in the resulting
+vector space. So far kernel methods have emerged as one
+of the most effective tools for dealing with structured data,
+and have achieved the state-of-the-art classiﬁcation and
+regression results in many sequence (Leslie et al., 2002a;
+Vishwanathan & Smola, 2003) and graph datasets (G¨artner
+et al., 2003; Borgwardt, 2007).
+The success of kernel methods on structured data relies
+crucially on the design of kernel functions — positive
+semideﬁnite similarity measures between pairs of data
+points (Sch¨olkopf & Smola, 2002).
+By designing a
+kernel function, we have implicitly chosen a corresponding
+feature representation for each data point which can
+potentially has inﬁnite dimensions.
+learning
+algorithms for various tasks and with potentially very
+different nature can then work exclusively on these
+pairwise kernel values without the need to access the
+original data points. Such modular structure of kernel
+methods has been very powerful, making them the most
+elegant and convenient methods to deal with structured
+data. Thus designing kernel for different structured objects,
+such as strings,
+trees and graphs, has always been an
+important subject in the kernel community. However,
+in the big data era,
+this modular framework has also
+limited kernel methods in terms of their ability to scale
+up to millions of data points, and exploit discriminative
+information to learn feature representations.
+For
+instance, a class of kernels are designed based
+on the idea of “bag of structures” (BOS), where each
+structured data point is represented as a vector of counts for
+elementary structures. The spectrum kernel and variants
+for strings (Leslie et al., 2002a), subtree kernel (Ramon
+& G¨artner, 2003), graphlet kernel (Shervashidze et al.,
+2009) and Weisfeiler-lehman graph kernel (Shervashidze
+et al., 2011) all follow this design principle.
+In other
+the feature representations of these kernels are
+words,
+ﬁxed before learning, with each dimension corresponding
+to a substructure, independent of the supervised learning
+tasks at hand. Since there are many unique substructures
+which may or may not be useful for the learning tasks, the
+explicit feature space of such kernels typically has very
+high dimensions. Subsequently algorithms dealing with
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+Furthermore,
+
+the pairwise kernel values have to work with a big kernel
+matrix squared in the number of data points. The square
+dependency on the number of data points largely limits
+these BOS kernels to datasets of size just thousands.
+A second class of kernels are based on the ingenious idea
+of exploiting the ability of probabilistic graphical models
+(GM) in describing noisy and structured data to design
+kernels. For instance, one can use hidden Markov models
+for sequence data, and use pairwise Markov random ﬁelds
+for graph data. The Fisher kernel (Jaakkola & Haussler,
+1999) and probability product kernel (Jebara et al., 2004)
+are two representative instances within the family. The
+former method ﬁrst ﬁts a common generative model to
+the entire dataset, and then uses the empirical Fisher
+information matrix and the Fisher score of each data
+point to deﬁne the kernel; The latter method instead ﬁts
+a different generative model for each data point, and
+then uses inner products between distributions to deﬁne
+the kernel. Typically the parameterization of these GM
+kernels are chosen before hand. Although the process
+of ﬁtting generative models allow the kernels to adapt
+to the geometry of the input data, the resulting feature
+representations are still independent of the discriminative
+task at hand.
+the extra step of ﬁtting
+generative models to data can be a challenging computation
+and estimation task by itself, especially in the presence of
+latent variables. Very often in practice, one ﬁnds that BOS
+kernels are easier to deploy than GM kernels, although the
+latter is supposed to capture the additional geometry and
+uncertainty information of data.
+In this paper, we wish to revisit the idea of using graphical
+models for kernel or feature space design, with the goal of
+scaling up kernel methods for structured data to millions
+of data points, and allowing the kernel to learn the feature
+representation from label information. Our idea is to model
+each structured data point as a latent variable model, then
+embed the graphical model into feature spaces (Smola
+et al., 2007; Song et al., 2009), and use inner product in
+the embedding space to deﬁne kernels. Instead of ﬁxing a
+feature or embedding space beforehand, we will also learn
+the feature space by directly minimizing the empirical loss
+deﬁned by the label information.
+The resulting embedding algorithm, structure2vec,
+runs in a scheme similar to graphical model inference
+procedures, such as mean ﬁeld and belief propagation.
+Instead of performing probabilistic operations (such as
+sum, product and renormalization), the algorithm performs
+nonlinear function mappings in each step,
+inspired by
+kernel message passing algorithm in Song et al. (2010;
+2011). Furthermore, structure2vec is also different
+from the kernel message passing algorithm in several
+aspects. First, structure2vec deals with a different
+
+scenario, i.e., learning similarity measure for structured
+data. Second, structure2vec learns the nonlinear
+mappings using the discriminative information. And third,
+a variant of structure2vec can run in a mean ﬁeld
+update fashion, different from message passing algorithms.
+Besides the above novel aspects, structure2vec is also
+very scalable in terms of both memory and computation
+requirements. First, it uses a small and explicit feature
+map for the nonlinear feature space, and avoids the
+need for keeping the kernel matrix.
+This makes the
+subsequent classiﬁers or regressors order of magnitude
+smaller compared to other methods. Second, the nonlinear
+function mapping in structure2vec can be learned
+using stochastic gradient descent, allowing it to handle
+extremely large scale datasets.
+Finally in experiments, we show that structure2vec
+compares favorably to other kernel methods in terms
+of classiﬁcation accuracy in medium scale sequence and
+graph benchmark datasets including SCOP and NCI.
+Furthermore, structure2vec can handle extremely
+large data set, such as the 2.3 million molecule dataset from
+Harvard Clean Energy Project, run 2 times faster, produce
+model 10, 000 times smaller and achieve state-of-the-art
+accuracy. These strong empirical results suggest that the
+graphical models, theoretically well-grounded methods for
+capturing structure in data, combined with embedding
+techniques and discriminative training can signiﬁcantly
+improve the performance in many large scale real-world
+structured data classiﬁcation and regression problems.
+2. Backgrounds
+We denote by X a random variable with domain X , and
+refer to instantiations of X by the lower case character,
+x. We denote a density on X by p(X), and denote
+the space of all such densities by P. We will also deal
+with multiple random variables, X1, X2, . . . , X(cid:96), with joint
+density p(X1, X2, . . . , X(cid:96)). For simplicity of notation, we
+assume that the domains of all Xt, t ∈ [(cid:96)] are the same,
+but the methodology applies to the cases where they have
+different domains. In the case when X is a discrete domain,
+the density notation should be interpreted as probability,
+and integral should be interpreted as summation instead.
+Furthermore, we denote by H a hidden variable with
+domain H and distribution p(H). We use similar notation
+convention for variable H and X.
+Kernel Methods.
+Suppose the structured data is
+represented by χ ∈ G. Kernel methods owe the name to
+the use of kernel functions, k(χ, χ(cid:48)) : G × G (cid:55)→ R, which
+are symmetric positive semideﬁnite (PSD), meaning that
+for all n > 1, and χ1, . . . , χn ∈ G, and c1, . . . , cn ∈ R,
+i,j=1 cicjk(χi, χj) (cid:62) 0. A signature of kernel
+methods is that learning algorithms for various tasks and
+with potentially very different nature can work exclusively
+
+we have(cid:80)n
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+(cid:88)
+
+on these pairwise kernel values without the need to access
+the original data points.
+Kernels for Structured Data. Each kernel function will
+correspond to some feature map φ(χ), where the kernel
+function can be expressed as the inner product between
+feature maps, i.e., k(χ, χ(cid:48)) = (cid:104)φ(χ), φ(χ(cid:48))(cid:105). For structured
+input domain, one can design kernels using counts on
+substructures. For instance, the spectrum kernel for two
+sequences χ and χ(cid:48) is deﬁned as (Leslie et al., 2002a)
+
+In this case,
+
+k(χ, χ(cid:48)) =
+
+s∈S #(s ∈ χ)#(s ∈ χ(cid:48))
+
+(1)
+where S is the set of possible subsequences, #(s ∈
+x) counts the number occurrence of subsequence s in
+the feature map φ(χ) = (#(s1 ∈
+x.
+χ), #(s2 ∈ χ), ...)(cid:62) corresponds to a vector of dimension
+|S|. Similarly, the graphlet kernel (Shervashidze et al.,
+2009) for two graphs χ and χ(cid:48) can also be deﬁned as (1),
+but S is now the set of possible subgraphs, and #(s ∈ χ)
+counts the number occurrence of subgraphs. We refer to
+this class of kernels as “bag of structures” (BOS) kernel.
+Kernels can also be deﬁned by leveraging the power of
+probabilistic graphical models. For instance, the Fisher
+kernel (Jaakkola & Haussler, 1999) is deﬁned using a
+parametric model p(χ|θ∗) around its maximum likelihood
+χ I−1Uχ(cid:48), where Uχ :=
+estimate θ∗, i.e., k(χ, χ(cid:48)) = U(cid:62)
+∇θ=θ∗ log p(χ|θ) and I = EG[UGU(cid:62)
+is the Fisher
+G ]
+information matrix. Another classical example along the
+line is the probability product kernel (Jebara et al., 2004).
+Different from the Fisher kernel based on generative model
+ﬁtted with the whole dataset, the probability product kernel
+is calculated based on the models p(χ|θ) ﬁtted to individual
+G p(τ|θχ)ρp(τ|θχ(cid:48))ρdτ where
+θχ and θχ(cid:48) are the maximum likelihood parameters for data
+point χ and χ(cid:48) respectively. We refer to this class of kernels
+as the “graphical model” (GM) kernels.
+Hilbert Space Embedding of Distributions. Hilbert
+space embeddings of distributions are mappings of
+distributions into potentially inﬁnite dimensional feature
+spaces (Smola et al., 2007),
+
+data point, i.e., k(χ, χ(cid:48)) =(cid:82)
+
+(cid:90)
+
+X
+
+µX := EX [φ(X)] =
+
+φ(x)p(x)dx : P (cid:55)→ F (2)
+where the distribution is mapped to its expected feature
+map, i.e., to a point in a feature space. Kernel embedding of
+distributions has rich representational power. Some feature
+map can make the mapping injective (Sriperumbudur et al.,
+2008), meaning that if two distributions, p(X) and q(X),
+are different, they are mapped to two distinct points in
+the feature space. For instance, when X = Rd,
+the
+feature spaces of many commonly used kernels, such as
+the Gaussian RBF kernel exp(−(cid:107)x − x(cid:48)(cid:107)2
+2), can make the
+embedding injective.
+Alternatively, one can treat an injective embedding µX of
+
+(a) Represent string data as a latent variable model
+
+(b) Represent graph data as a latent variable model
+
+Figure 1. Building graphical model with hidden variables from
+structured string and general graph data. Y is the supervised
+information, which can be real number (for regression) or discrete
+integer (for classiﬁcation).
+a density p(X) as a sufﬁcient statistic of the density. Any
+information we need from the density is preserved in µX:
+with µX one can uniquely recover p(X), and any operation
+on p(X) can be carried out via a corresponding operation
+on µX with the same result. For instance, this property will
+allow us to compute a functional f : P (cid:55)→ R of the density
+using the embedding only, i.e.,
+
+(4)
+
+f (p(x)) = ˜f (µX )
+
+(3)
+where ˜f : F (cid:55)→ R is a corresponding function applied
+on µX. Similarly the property can also be generalized to
+operators. For instance, applying an operator T : P (cid:55)→ Rd
+to a density can also be equivalently carried out using its
+embedding, i.e.,
+
+where (cid:101)T : F (cid:55)→ Rd is the alternative operator working on
+
+T ◦ p(x) = (cid:101)T ◦ µX ,
+
+the embedding. In our later sections, we will extensively
+exploit this property of injective embeddings, by assuming
+that there exists a feature space such that the embeddings
+are injective. We include the discussion of other related
+work in Appendix A.
+3. Model for a Structured Data Point
+Without loss of generality, we assume each structured data
+point χ is a graph, with a set of nodes V = {1, . . . , V }
+and a set of edges E. We will use xi to denote the value
+of the attribute for node i. We note the node attributes
+are different from the label of the entire data point. For
+instance, each atom in a molecule will correspond to a
+node in the graph, and the node attribute will be the
+atomic number, while the label for the entire molecule can
+be whether the molecule is a good drug or not. Other
+structures, such as sequences and trees, can be viewed as
+special cases of general graphs.
+We will model the structured data point χ as an instance
+
+Y	  =	  active/inactive𝐻"𝐻#𝐻$𝐻%𝐻&𝑋#𝑋%𝑋$𝑋"𝑋&YAGCTAAGCTAY	  =	  Energy	  level𝑋"𝑋#𝑋$𝐻$𝐻"𝐻#𝐻&Y𝑋&Discriminative Embeddings of Latent Variable Models for Structured Data
+
+drawn from a graphical model. More speciﬁcally, we
+will model
+the label of each node in the graph with
+a variable Xi, and furthermore, associate an additional
+hidden variable Hi with it.
+Then we will deﬁne a
+pairwise Markov random ﬁeld on these collection of
+random variables
+
+p({Hi} ,{Xi}) ∝(cid:89)
+
+Ψ(Hi, Hj)
+
+(5)
+
+(cid:89)
+
+Φ(Hi, Xi)
+
+i∈V
+
+(i,j)∈E
+
+where Ψ and Φ are nonnegative node and edge potentials
+respectively.
+In this model, the variables are connected
+according to the graph structure of the input data point.
+That is to say, we use the graph structure of the input
+data directly as the conditional independence structure of
+an undirected graphical model. Figure 1 illustrates two
+concrete examples in constructing the graphical models
+for strings and graphs. One can design more complicated
+graphical models which go beyond pairwise Markov
+random ﬁelds, and consider longer range interactions
+with potentials involving more variables. We will focus
+on pairwise Markov random ﬁelds for simplicity of
+representation.
+We note that such a graphical model is built for each
+individual data point, and the conditional independence
+structures of two graphical models can be different if the
+two data points χ and χ(cid:48) are different. Furthermore, we
+do not observe the value for the hidden variables {Hi},
+which makes the learning of the graphical model potentials
+Φ and Ψ even more difﬁcult. Thus, we will not pursue
+the standard route of maximum likelihood estimation, and
+rather we will consider the sequence of computations
+needed when we try to embed the posterior of {Hi} into
+a feature space.
+4. Embedding Latent Variable Models
+We will embed the posterior marginal p(Hi|{xi}) of a
+hidden variable using a feature map φ(Hi), i.e.,
+
+φ(hi)p(hi|{xi})dhi.
+
+(6)
+
+(cid:90)
+
+µi =
+
+H
+
+The exact form of φ(Hi) and the parameters in MRF
+p(Hi|{xi}) is not ﬁxed at
+the moment, and we will
+learn them later using supervision signals for the ultimate
+discriminative target.
+For now, we will assume that
+φ(Hi) ∈ Rd is a ﬁnite dimensional feature space, and the
+exact value of d will determined by cross-validation in later
+experiments. However, compute the embedding is a very
+challenging task for general graphs: it involves performing
+an inference in graphical model where we need to integrate
+out all variables expect Hi, i.e.,
+p(Hi|{xi}) =
+
+p(Hi,{hj}|{xj})
+
+(cid:89)
+
+(cid:90)
+
+dhj.
+
+(7)
+
+HV −1
+
+j∈V\i
+
+Only when the graph structure is a tree, exact computation
+can be carried out efﬁciently via message passing (Pearl,
+1988). Thus in the general case, approximate inference
+
+algorithms, e.g., mean ﬁeld inference and loopy belief
+propagation (BP), are developed.
+In many applications,
+however,
+these variational inference algorithms exhibit
+excellent empirical performance (Murphy et al., 1999).
+Several theoretical studies have also provided insight into
+the approximations made by loopy BP, partially justifying
+its application to graphs with cycles (Wainwright & Jordan,
+2008; Yedidia et al., 2001a).
+In the following subsection, we will explain the embedding
+of mean ﬁeld and loopy BP. The embedding of other
+inference methods, e.g., double-loop BP,
+variational
+damped BP, tree-reweighted BP, and generalized BP will be
+explained in Appendix C. We show that the iterative update
+steps in these algorithms, which are essentially minimizing
+approximations to the exact free energy, can be simply
+viewed as function mappings of the embedded marginals
+using the alternative view in (3) and (4).
+4.1. Embedding Mean-Field Inference
+The vanilla mean-ﬁeld inference tries to approximate
+p({Hi}|{xi}) with a product of independent density
+i∈V qi(hi) where
+each qi(hi) ≥ 0 is a valid density,
+such that
+H qi(hi)dhi = 1. Furthermore, these density components
+are found by minimizing the following variational free
+energy (Wainwright & Jordan, 2008),
+
+components p({Hi}|{xi}) ≈ (cid:81)
+(cid:82)
+
+min
+q1,...,qd
+
+Hd
+
+i∈V
+
+qi(hi) log
+
+i∈V qi(hi)
+p({hi}|{xi})
+
+dhi.
+
+One can show that the solution to the above optimization
+problem needs to satisfy the following ﬁxed point equations
+for all i ∈ V
+
+log qi(hi) = ci + log(Φ(hi, xi))+
+
+(8)
+
+(cid:90)
+
+(cid:89)
+
+(cid:89)
+
+i∈V
+
+(cid:81)
+
+(cid:90)
+
+(cid:88)
+
+j∈N (i)
+
+H
+
+qj(hj) log(Ψ(hi, hj)Φ(hj, xj))dhj
+
+(cid:17)
+
+.
+
+(9)
+
+qi(hi) = f
+
+If for each marginal qi, we have an injective embedding
+
+where N (i) are the set of neighbors of variable Hi in the
+graphical model, and ci is a constant. The ﬁxed point
+equations in (8) imply that qi(hi) is a functional of a set
+of neighboring marginals {qj}j∈N (i), i.e.,
+
+(cid:16)
+hi, xi,{qj}j∈N (i) ,{xj}j∈N (i)
+(cid:90)
+(cid:101)µi =
+(cid:101)µi = (cid:101)T ◦(cid:16)
+
+xi,{(cid:101)µj}j∈N (i) ,{xj}j∈N (i)
+
+φ(hi)qi(hi)dhi,
+
+then, using similar reasoning as in (3), we can equivalently
+express the ﬁxed point equation from an embedding point
+
+of view, i.e., qi(hi) = ˜f (hi, xi,{(cid:101)µj}j∈N (i),{xj}j∈N (i)),
+
+and consequently using the operator view from (4), we have
+(10)
+For the embedded mean ﬁeld (10), the function ˜f and
+
+operator (cid:101)T have complicated nonlinear dependencies on
+
+the potential functions Ψ, Φ, and the feature mapping
+
+(cid:17)
+
+H
+
+.
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+i
+
+(cid:80)
+
+end for
+
+i }i∈V
+
+j∈N (i) xj)
+
+for i ∈ V do
+
+i = σ(W1xi + W2li + W3
+
+Algorithm 1 Embedding Mean Field
+
+3: for t = 1 to T do
+4:
+5:
+6:
+7:
+8: end for{ﬁxed point equation update}
+
+1: Input: parameter W in (cid:101)T
+2: Initialize(cid:101)µ(0)
+i = 0, for all i ∈ V
+li =(cid:80)
+j∈N (i)(cid:101)µ(t−1)
+(cid:101)µ(t)
+9: return {(cid:101)µT
+out (cid:101)T , we will pursue a different route where we directly
+parameterize (cid:101)T and later learn it with supervision signals.
+In terms of the parameterization, we will assume(cid:101)µi ∈ Rd
+For (cid:101)T , one can use any nonlinear function mappings. For
+(cid:101)µi = σ
+
+φ which is unknown and need to be learned from data.
+Instead of ﬁrst learning the Ψ and Φ, and then working
+
+where d is a hyperparameter chosen using cross-validation.
+
+(11)
+where σ(·) := max{0,·} is a rectiﬁed linear unit applied
+elementwisely to its argument, and W = {W1, W2, W3}.
+The number of the rows in W equals to d. With such
+parameterization, the mean ﬁeld iterative update in the
+embedding space can be carried out as Algorithm 1. We
+
+could also multiply (cid:101)µi with V to rescale the range of
+
+instance, we can parameterize it as a neural network
+
+(cid:101)µj + W3
+
+(cid:88)
+
+(cid:88)
+
+W1xi + W2
+
+j∈N (i)
+
+j∈N (i)
+
+(cid:16)
+
+(cid:17)
+
+xj
+
+message embeddings if needed. In fact, with or without V ,
+the functions will be the same in terms of the representation
+power. Speciﬁcally, for any (W , V ), we can always ﬁnd
+another ‘equivalent’ parameters (W (cid:48), I) where W (cid:48) =
+{W1, W2V, W3}.
+4.2. Embedding Loopy Belief Propagation
+Loopy belief propagation is another variational inference
+method, which essentially optimizes the Bethe free energy
+taking pairwise interactions into account (Yedidia et al.,
+2001b),
+
+i(|N (i)| − 1)(cid:82)
+min{qij}(i,j)∈E −(cid:80)
++(cid:80)
+(cid:82)
+H qij(hi, hj)dhj = qi(hi),(cid:82)
+and (cid:82)
+
+Φ(hi,xi) dhi
+Ψ(hi,hj )Φ(hi,xi)Φ(hj ,xj ) dhidhj
+H2 qij(hi, hj) log
+to pairwise marginal consistency constraints:
+H qij(hi, hj)dhj = qi(hi),
+H qi(hi)dhi = 1. One can obtain the ﬁxed point
+
+H qi(hi) log qi(hi)
+
+condition for the above optimization for all (i, j) ∈ E,
+mij(hj) ∝
+
+mki(hi)Φi(hi, xi)Ψij(hi, hj)dhi,
+
+(cid:89)
+
+subject
+
+qij (hi,hj )
+
+(cid:90)
+
+(cid:82)
+
+i,j
+
+H
+
+k∈N (i)\j
+
+qi(hi) ∝ Φ(hi, xi)
+
+(cid:89)
+
+j∈N (i)
+
+mji(hi).
+
+(12)
+
+where mij(hj) is the intermediate result called the message
+from node i to j. Furthermore, mij(hj) is a nonnegative
+
+Algorithm 2 Embedding Loopy BP
+
+1: Input: parameter W in (cid:101)T1 and (cid:101)T2
+2: Initialize(cid:101)ν(0)
+ij = 0, for all (i, j) ∈ E
+
+ij = σ(W1xi + W2
+
+end for
+
+3: for t = 1 to T do
+for (i, j) ∈ E do
+4:
+5:
+6:
+7: end for
+8: for i ∈ V do
+9:
+10: end for
+
+(cid:101)νt
+(cid:101)µi = σ(W3xi + W4
+
+11: return {(cid:101)µi}i∈V
+
+(cid:80)
+k∈N (i)\j (cid:101)ν(t−1)
+(cid:80)
+k∈N (i)\j(cid:101)ν(T )
+
+ki )
+
+ki
+
+)
+
+function which can be normalized to a density, and hence
+can also be embedded.
+Similar to the reasoning in the mean ﬁeld case, the (12)
+implies the messages mij(hj) and marginals qi(hi) are
+functionals of messages from neighbors, i.e.,
+
+(cid:1) ,
+mij(hj) = f(cid:0)hj, xi,{mki}k∈N (i)\j
+qi(hi) = g(cid:0)hi, xi,{mki}k∈N (i)
+(cid:1) .
+
+With the assumption that there is an injective embedding
+
+for each message (cid:101)νij = (cid:82) φ(hj)mij(hj)dhj and for
+each marginal (cid:101)µi = (cid:82) φ(hi)qi(hi)dhi, we can apply the
+
+reasoning from (3) and (4), and express the messages and
+marginals from the embedding view,
+
+(cid:101)νij = (cid:101)T1 ◦(cid:16)
+(cid:101)µi = (cid:101)T2 ◦(cid:16)
+
+xi,{(cid:101)νki}k∈N (i)\j
+(cid:17)
+xi,{(cid:101)νki}k∈N (i)
+
+(cid:17)
+
+(14)
+We will also use parametrization for loopy BP embedding
+similar to the mean ﬁeld case, i.e., neural network with
+
+rectiﬁed linear unit σ. Speciﬁcally, assume (cid:101)νij ∈ Rd,
+(cid:101)µi ∈ Rd
+
+.
+
+,
+
+(13)
+
+W1xi + W2
+
+(15)
+
+(cid:16)
+(cid:16)
+
+(cid:101)νij = σ
+(cid:101)µi = σ
+
+(cid:88)
+(cid:88)
+
+(cid:17)
+
+(cid:101)νki
+(cid:17)
+(cid:101)νki
+
+k∈N (i)\j
+
+k∈N (i)
+
+W3xi + W4
+
+(16)
+where W = {W1, W2, W3, W4} are matrices with
+appropriate sizes. Note that one can use other nonlinear
+
+function mappings to parameterize (cid:101)T1 and (cid:101)T2 as well.
+the parameters in (cid:101)T1 and (cid:101)T2 later with supervision signals
+
+Overall, the loopy BP embedding updates is summarized
+in Algorithm 2.
+With similar strategy as in mean ﬁeld case, we will learn
+
+from the discriminative task.
+4.3. Embedding Other Variational Inference
+In fact,
+inference
+there are many other variational
+methods, with different forms of free energies or different
+optimization algorithms,
+resulting different message
+update forms, e.g., double-loop BP (Yuille, 2002), damped
+BP (Minka, 2001), tree-reweightd BP (Wainwright et al.,
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+the transformation (cid:101)T , as well as the regressor
+
+2003), and generalized BP (Yedidia et al., 2001b). The
+proposed embedding method is a general technique which
+can be tailored to these algorithms. The major difference
+is the dependences in the messages. For the details of
+embedding of these algorithms, please refer to Appendix C.
+5. Discriminative Training
+Similar to kernel BP (Song et al., 2010; 2011) and kernel
+EP (Jitkrittum et al., 2015), our current work exploits
+feature space embedding to reformulate graphical model
+inference procedures. However, different from the kernel
+BP and kernel EP, in which the feature spaces are chosen
+beforehand and the conditional embedding operators are
+learned locally, our approach will learn both the feature
+spaces,
+or classiﬁer for the target values end-to-end using label
+information.
+Speciﬁcally, we are provided with a training dataset
+D = {χn, yn}N
+n=1, where χn is a structured data point
+and yn ∈ Y, where Y = R for regression or Y =
+{1, . . . , K} for classiﬁcation problem, respectively. With
+the feature embedding procedure introduced in Section 4,
+each data point will be represented as a set of embeddings
+{˜µn
+i }i∈Vn ∈ F. Now the goal is to learn a regression or
+classiﬁcation function f linking {˜µn
+More speciﬁcally, in the case of regression problem, we
+i ), where
+u ∈ Rd is the ﬁnal mapping from summed (or pooled)
+embeddings to output. The parameters u and those W
+involved in the embeddings are learned by minimizing the
+empirical square loss
+
+will parametrize function f (χn) as u(cid:62)σ((cid:80)Vn
+
+i }i∈Vn to yn.
+
+i=1 ˜µn
+
+(cid:88)N
+
+(cid:18)
+
+min
+u,W
+
+n=1
+
+yn − u(cid:62)σ
+
+(cid:18)(cid:88)Vn
+i=1(cid:101)µn
+
+i
+
+(cid:19)(cid:19)2
+
+.
+
+(17)
+
+Note that each data point will have its own graphical model
+and embedded features due to its individual structure, but
+the parameters u and W , are shared across these graphical
+models.
+In the case of K-class classiﬁcation problem, we denote z
+is the 1-of-K representation of y, i.e., z ∈ {0, 1}K, zk = 1
+if y = k, and zi = 0, ∀i (cid:54)= k. By adopt the softmax loss,
+we obtain the optimization for embedding parameters and
+discriminative classiﬁer estimation as,
+
+K(cid:88)
+N(cid:88)
+(18)
+k=1, uk ∈ Rd are the parameters for
+
+n log ukσ
+
+(cid:101)µn
+
+−zk
+
+i=1
+
+n
+
+k=1
+
+,
+
+i
+
+where u = {uk}K
+mapping embedding to output.
+The same idea can also be generalized to other
+discriminative tasks with different loss functions. As
+we can see from the optimization problems (17) and
+(18), the objective functions are directly related to the
+corresponding discriminative tasks, and so as to W and u.
+
+(cid:32) Vn(cid:88)
+
+min
+u={uk}K
+
+k=1,W
+
+(cid:33)
+
+Algorithm 3 Discriminative Embedding
+Input: Dataset D = {χn, yn}N
+n=1,
+l(f (χ), y).
+Initialize U 0 = {W 0, u0} randomly.
+for t = 1 to T do
+
+loss function
+
+Sample {χt, yt} uniform randomly from D.
+Construct latent variable model p({H t
+Embed p({H t
+with W t−1.
+
+i}|χn) as (5).
+by Algorithm 1 or 2
+Update U t = U t−1 + λt∇U t−1l(f ((cid:101)µn; U t−1), yn).
+
+i}|χn) as {(cid:101)µn
+
+i }i∈Vn
+
+end for
+return U T = {W T , uT}
+
+Conceptually, the procedure starts with representing each
+datum by a graphical model constructed corresponding to
+its individual structure with sharing potential functions,
+and then, we embed these graphical models with the same
+feature mappings. Finally the embedded marginals are
+aggregated with a prediction function for a discriminative
+task. The shared potential functions, feature mappings and
+ﬁnal prediction functions are all learned together for the
+ultimate task with supervision signals.
+We optimize the objective (17) or (18) with stochastic
+gradient descent for scalability consideration. However,
+other optimization algorithms are also applicable, and our
+method does not depend on this particular choice. The
+gradients of the parameters W are calculated recursively
+similar to recurrent neural network for sequence models.
+In our case, the recursive structure will correspond the
+message passing structure.
+The overall framework is
+illustrated in Algorithm 3. For details of the gradient
+calculation, please refer to Appendix D.
+6. Experiments
+Below we ﬁrst compare our method with algorithms using
+preﬁxed kernel on string and graph benchmark datasets.
+Then we focus on Harvard Clean Energy Project dataset
+which contains 2.3 million samples. We demonstrate that
+while getting comparable performance on medium sized
+datasets, we are able to handle millions of samples, and
+getting much better when more training data are given. The
+two variants of structure2vec are denoted as DE-MF
+and DE-LBP, which stands for discriminative embedding
+using mean ﬁeld or loopy belief propagation, respectively.
+Our algorithms are implemented with C++ and CUDA,
+and experiments are carried out on clusters equipped
+with NVIDIA Tesla K20.
+The code is available on
+https://github.com/Hanjun-Dai/graphnn.
+6.1. Benchmark structure datasets
+We compare our algorithm on string benchmark datasets
+with the kernel method with existing sequence kernels, i.e.,
+the spectrum string kernel (Leslie et al., 2002a), mismatch
+string kernel (Leslie et al., 2002b) and ﬁsher kernel with
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+HMM generative models (Jaakkola & Haussler, 1999).
+On graph benchmark datasets, we compare with subtree
+kernel (Ramon & G¨artner, 2003) (R&G, for short), random
+walk kernel(G¨artner et al., 2003; Vishwanathan et al.,
+2010), shortest path kernel (Borgwardt & Kriegel, 2005),
+graphlet kernel(Shervashidze et al., 2009) and the family
+of Weisfeiler-Lehman kernels (WL kernel) (Shervashidze
+et al., 2011). After getting the kernel matrix, we train SVM
+classiﬁer or regressor on top.
+Without explicitly mentioned, we perform cross validation
+for all methods, and report the average performance. We
+include the details of tuning hyper parameters for baselines
+and our methods in Appendix E.2.
+
+6.1.1. STRING DATASET
+Here we do experiments on two string binary classiﬁcation
+benchmark datasets. The ﬁrst one (denoted as SCOP)
+contains 7329 sequences obtained from SCOP (Structural
+Classiﬁcation of Proteins) 1.59 database (Andreeva et al.,
+2004). Methods are evaluated on the ability to detect
+members of a target SCOP family (positive test set)
+belonging to the same SCOP superfamily as the positive
+training sequences, and no members of the target family
+are available during training. We use the same 54 target
+families and the same training/test splits as in remote
+homology detection (Kuang et al., 2005). The second one
+is FC and RES dataset (denoted as FC RES) provided by
+CRISPR/Cas9 system, on which the task it to tell whether
+the guide RNA will direct Cas9 to target DNA. There are
+5310 guides included in the dataset. Details of this dataset
+can be found in Doench et al. (2014); Fusi et al. (2015). We
+use two variants for spectrum string kernel: 1) kmer-single,
+where the constructed kernel matrix K (s)
+only consider
+k
+patterns of length k; 2) kmer-concat, where kernel matrix
+k . We also ﬁnd the normalized kernel
+
+K (c) = (cid:80)k
+
+i=1 K (s)
+
+matrix K N orm
+
+(x, y) =
+
+k
+
+√
+
+Kk(x,y)
+
+Kk(x,x)Kk(y,y)
+
+helps.
+
+SCOP
+
+FC RES
+
+kmer-single
+kmer-concat
+mismatch
+ﬁsher
+DE-MF
+DE-LBP
+
+0.7097±0.0504
+0.8467±0.0489
+0.8637±0.1192
+0.8662±0.0879
+0.9068±0.0685
+0.9167±0.0639
+Table 1. Mean AUC on string classiﬁcation datasets
+
+0.7606±0.0187
+0.7576±0.0235
+0.7690±0.0197
+0.7332±0.0314
+0.7713±0.0208
+0.7701±0.0225
+
+Table 1 reports the mean AUC of different algorithms. We
+found two variants of structure2vec are consistently
+better than the string kernels. Also, the improvement in
+SCOP is more signiﬁcant than in FC RES. This is because
+SCOP is a protein dataset and its alphabet size |Σ| is much
+larger than that of FC RES, an RNA dataset. Furthermore,
+the dimension of the explicit features for a k-mer kernel
+is O(|Σ|k), which can make the off-diagonal entries of
+
+(a) PCE distribution
+
+(b) Sample molecules
+
+results
+
+of
+
+are
+
+baseline
+
+algorithms
+
+Figure 3. PCE value distribution and sample molecules from CEP
+dataset. Hydrogens are not displayed.
+kernel matrix very small (or even zero) with large alphabet
+size and k. That’s also the reason why kmer-concat
+performs better than kmer-single.
+structure2vec
+learns a discriminative feature space, rather than preﬁx it
+beforehand, and hence does not have this problem.
+6.1.2. GRAPH DATASETS
+We test the algorithms on ﬁve benchmark datasets for
+graph kernel: MUTAG, NCI1, NCI109, ENZYMES
+and D&D. MUTAG (Debnath et al., 1991). NCI1 and
+NCI109 (Wale et al., 2008) are chemical compounds
+dataset, while ENZYMES (Borgwardt & Kriegel, 2005)
+and D&D (Dobson & Doig, 2003) are of proteins. The
+task is to do multi-class or binary classiﬁcation. For more
+details of dataset, please refer to Appendix E.1.
+taken
+The
+from Shervashidze et al. (2011) since we use exactly
+the same setting here. From the accuracy comparison
+shown in Figure 2, we can see the proposed embedding
+methods are comparable to the alternative graph kernels,
+on different graphs with different number of labels, nodes
+and edges. Also, in dataset D&D which consists of 82
+different types of labels, our algorithm performs much
+better. As reported in Shervashidze et al. (2011),
+the
+time required for constructing dictionary for the graph
+kernel can take up to more than a year of CPU time in this
+dataset, while our algorithm can learn the discriminative
+embedding efﬁciently from structured data directly without
+the construction of the handcraft dictionary.
+6.2. Harvard Clean Energy Project(CEP) dataset
+The Harvard Clean Energy Project (Hachmann et al.,
+2011) is a theory-driven search for the next generation of
+organic solar cell materials. One of the most important
+properties of molecule for this task is the overall efﬁciency
+of the energy conversion process in a solar cell, which
+is determined by the power conversion efﬁciency (PCE).
+The Clean Energy Project (CEP) performed expensive
+simulations for the 2.3 million candidate molecules on
+IBMs World Community Grid, in order to get this property
+value. So using machine learning approach to accurately
+predict the PCE values is a promising direction for the high
+throughput screening and discovering new materials.
+In this experiment, we randomly select 90% of the data for
+
+PCE range0510#samples#10400.511.522.5PCE distributionDiscriminative Embeddings of Latent Variable Models for Structured Data
+
+Figure 2. 10-fold cross-validation accuracies on graph classiﬁcation benchmark datasets. The ‘sp’ in the ﬁgure stands for shortest-path.
+
+Mean Predictor
+WL lv-3
+WL lv-6
+DE-MF
+DE-LBP
+
+test MAE test RMSE # params
+1.9864
+0.1431
+0.0962
+0.0914
+0.0850
+
+2.4062
+0.2040
+0.1367
+0.1250
+0.1174
+
+1.6m
+1378m
+0.1m
+0.1m
+
+1
+
+Table 2. Test prediction performance on CEP dataset. WL lv-k
+stands for Weisfeiler-lehman with degree k.
+in Figure 4.
+It can see that, higher number of ﬁxed
+point iterations will lead to faster convergence, though the
+number of parameters of the model in different settings
+are the same. The mean ﬁeld embedding will get much
+worse result if only one iteration is executed. Compare to
+the loopy BP case with same setting, the latter one will
+always have one more round message passing since we
+need to aggregate the messages from edge to node in the
+last step. And also, from the quality of prediction we ﬁnd
+that, though making slightly higher prediction error for
+molecules with high PCE values due to insufﬁcient data,
+the variants of our algorithm are not overﬁtting the ‘easy’
+(i.e., the most popular) range of PCE value.
+7. Conclusion
+and
+We propose, structure2vec,
+structured data representation
+scalable approach for
+based on the
+embedding latent variable
+models into feature spaces, and learning such feature
+spaces using discriminative information.
+Interestingly,
+structure2vec extracts features by performing a
+sequence of
+to
+graphical model inference procedures, such as mean ﬁeld
+and belief propagation. In applications involving millions
+of data points, we showed that structure2vec runs 2
+times faster, produces models 10, 000 times smaller, while
+at the same time achieving the state-of-the-art predictive
+performance. structure2vec provides a nice example
+for the general strategy of combining the strength of
+graphical models, Hilbert space embedding of distribution
+and deep learning approach, which we believe will become
+common in many other learning tasks.
+Acknowledgements.
+This project was supported in
+part by NSF/NIH BIGDATA 1R01GM108341, ONR
+N00014-15-1-2340, NSF IIS-1218749, and NSF CAREER
+IIS-1350983.
+
+function mappings in a way similar
+
+an effective
+
+idea of
+
+Figure 4. Details of training and prediction results for DE-MF and
+DE-LBP with different number of ﬁxed point iterations.
+training, and the rest 10% for testing. This setting is similar
+to Pyzer-Knapp et al. (2015), except that we use the entire
+2.3m dataset here. Since the data is distributed unevenly
+(see Figure 3), we resampled the training data (but not
+the test data) to make the algorithm put more emphasis
+on molecules with higher PCE values, in order to make
+accurate prediction for promising candidate molecules.
+Since the traditional kernel methods are not scalable, we
+make the explicit feature maps for WL subtree kernel by
+collecting all the molecules and creating dictionary for the
+feature space. The other graph kernels, like edge kernel and
+shortest path kernel, are having too large feature dictionary
+to work with. We use RDKit (Landrum, 2012) to extract
+features for atoms (nodes) and bonds (edges).
+The mean absolute error (MAE) and root mean square
+error (RMSE) are reported in Table 2. We found utilizing
+graph information can accurately predict PCE values.
+Also, our proposed two methods are working equally
+well. Although WL tree kernel with degree 6 is also
+working well, it requires 10, 000 times more parameters
+than structure2vec and runs 2 times slower. The
+preprocessing needed for WL tree kernel also makes it
+difﬁcult to use in large datasets.
+To understand the effect of the inference embedding in the
+proposed algorithm framework, we further compare our
+methods with different number of ﬁxed point iterations
+
+75808590accuracyMUTAG607080accuracyNCI1607080accuracyNCI109204060accuracyENZYMES607080accuracyDDWL subtreeWL edgeWL spR&Gp-rand walkRand walkGraphletspDE-MFDE-LBP0.20.40.60.811.21.41.61.8#iterations#10600.20.40.60.8MAECEP test error024681012PCE range00.10.20.30.40.5MAEPrediction qualityDE-MF-iter-1DE-MF-iter-2DE-MF-iter-3DE-MF-iter-4DE-LBP-iter-1DE-LBP-iter-2DE-LBP-iter-3DE-LBP-iter-4Discriminative Embeddings of Latent Variable Models for Structured Data
+
+References
+Andreeva, A., Howorth, D., Brenner, S. E., Hubbard, T. J.,
+Chothia, C., and Murzin, A. G.
+Scop database in 2004:
+reﬁnements integrate structure and sequence family data.
+Nucleic acids research, 32(suppl 1):D226–D229, 2004.
+
+Borgwardt, K. M.
+
+Ludwig-Maximilians-University, Munich, Germany, 2007.
+
+Graph Kernels.
+
+PhD thesis,
+
+Borgwardt, K. M. and Kriegel, H.-P. Shortest-path kernels on
+
+graphs. In ICDM, 2005.
+
+Bruna, J., Zaremba, W., Szlam, A., and LeCun, Y. Spectral
+networks and locally connected networks on graphs. arXiv
+preprint arXiv:1312.6203, 2013.
+
+Chang, C. C. and Lin, C. J. LIBSVM: a library for support vector
+machines, 2001. Software available at http://www.csie.
+ntu.edu.tw/˜cjlin/libsvm.
+
+Chen, L. C., Schwing, A. G., Yuille, A. L., and Urtasun,
+arXiv preprint
+
+Learning deep structured models.
+
+R.
+arXiv:1407.2538, 2014.
+
+Debnath, A. K., Lopez de Compadre, R. L., Debnath, G.,
+Shusterman, A. J., and Hansch, C.
+Structure-activity
+relationship of mutagenic aromatic and heteroaromatic nitro
+compounds. correlation with molecular orbital energies and
+hydrophobicity. J Med Chem, 34:786–797, 1991.
+
+Dobson, P. D. and Doig, A. J. Distinguishing enzyme structures
+from non-enzymes without alignments. J Mol Biol, 330(4):
+771–783, Jul 2003.
+
+Doench, J. G., Hartenian, E., Graham, D. B., Tothova, Z., Hegde,
+H., Smith, I., Sullender, M., Ebert, B. L., Xavier, R. J.,
+and Root, D. E. Rational design of highly active sgrnas for
+crispr-cas9-mediated gene inactivation. Nature biotechnology,
+32(12):1262–1267, 2014.
+
+Duvenaud, D. K., Maclaurin, D., Iparraguirre, J., Bombarell, R.,
+Hirzel, T., Aspuru-Guzik, A., and Adams, R. P. Convolutional
+networks on graphs for learning molecular ﬁngerprints.
+In
+Advances in Neural Information Processing Systems, pp.
+2215–2223, 2015.
+
+Fusi, N., Smith, I., Doench, J., and Listgarten, J.
+
+In silico
+predictive modeling of crispr/cas9 guide efﬁciency. bioRxiv,
+2015. doi: 10.1101/021568. URL http://biorxiv.org/
+content/early/2015/06/26/021568.
+
+G¨artner, T., Flach, P.A., and Wrobel, S. On graph kernels:
+In Sch¨olkopf, B.
+Hardness results and efﬁcient alternatives.
+and Warmuth, M. K. (eds.), Proceedings of Annual Conference.
+Computational Learning Theory, pp. 129–143. Springer, 2003.
+
+Caruana, R., Lawrence, S., and Giles, L. Overﬁtting in neural
+nets: Backpropagation, conjugate gradient, and early stopping.
+In Advances in Neural Information Processing Systems 13,
+volume 13, pp. 402. MIT Press, 2001.
+
+Hachmann,
+
+J., Olivares-Amaya, R., Atahan-Evrenk, S.,
+Amador-Bedolla, C., S´anchez-Carrera, R. S., Gold-Parker, A.,
+Vogt, L., Brockway, A. M., and Aspuru-Guzik, A. The harvard
+clean energy project: large-scale computational screening and
+design of organic photovoltaics on the world community grid.
+The Journal of Physical Chemistry Letters, 2(17):2241–2251,
+2011.
+
+Henaff, M., Bruna, J., and LeCun, Y. Deep convolutional
+arXiv preprint
+
+networks on graph-structured data.
+arXiv:1506.05163, 2015.
+
+Hershey, J. R., Roux, J. L., and Weninger, F. Deep unfolding:
+Model-based inspiration of novel deep architectures. arXiv
+preprint arXiv:1409.2574, 2014.
+
+Heskes, T. Stable ﬁxed points of loopy belief propagation are
+local minima of the bethe free energy. Advances in Neural
+Information Processing Systems, pp. 343–350. MIT Press,
+2002.
+
+Jaakkola, T. S. and Haussler, D. Exploiting generative models in
+discriminative classiﬁers. In Kearns, M. S., Solla, S. A., and
+Cohn, D. A. (eds.), Advances in Neural Information Processing
+Systems 11, pp. 487–493. MIT Press, 1999.
+
+Jebara, T., Kondor, R., and Howard, A. Probability product
+
+kernels. J. Mach. Learn. Res., 5:819–844, 2004.
+
+Jitkrittum, W., Gretton, A., Heess, N., Eslami, S. M. A.,
+and Szab´o, Z.
+Lakshminarayanan, B., Sejdinovic, D.,
+Kernel-based just-in-time learning for passing expectation
+In Proceedings of the Thirty-First
+propagation messages.
+Conference on Uncertainty in Artiﬁcial Intelligence, UAI 2015,
+July 12-16, 2015, Amsterdam, The Netherlands, pp. 405–414,
+2015.
+
+Kuang, R., Ie, E., Wang, K., Wang, K., Siddiqi, M., Freund,
+Y., and Leslie, C. Proﬁle-based string kernels for remote
+Journal of
+homology detection and motif extraction.
+bioinformatics and computational biology, 3(03):527–550,
+2005.
+
+Landrum, G. Rdkit: Open-source cheminformatics (2013), 2012.
+
+Leslie, C., Eskin, E., and Noble, W. S. The spectrum kernel: A
+In Proceedings
+string kernel for SVM protein classiﬁcation.
+of the Paciﬁc Symposium on Biocomputing, pp. 564–575,
+Singapore, 2002a. World Scientiﬁc Publishing.
+
+Leslie, C., Eskin, E., Weston, J., and Noble, W. S. Mismatch
+In Advances
+Information Processing Systems, volume 15,
+
+string kernels for SVM protein classiﬁcation.
+in Neural
+Cambridge, MA, 2002b. MIT Press.
+
+Li, Y., Tarlow, D., Brockschmidt, M., and Zemel, R.. Gated graph
+sequence neural networks. arXiv preprint arXiv:1511.05493,
+2015.
+
+Lin, G., Shen, C., Reid, I., and van den Hengel, A. Deeply
+In
+
+learning the messages in message passing inference.
+Advances in Neural Information Processing Systems, 2015.
+
+Minka, T. The EP energy function and minimization schemes.
+See www. stat. cmu. edu/minka/papers/learning. html, August,
+2001.
+
+Mou, L., Li, G., Zhang, L., Wang, T., and Jin, Z.. Convolutional
+neural networks over tree structures for programming language
+processing. In Proceedings of the Thirtieth AAAI Conference
+on Artiﬁcial Intelligence, 2016.
+
+Murphy, K. P., Weiss, Y., and Jordan, M. I. Loopy belief
+propagation for approximate inference: An empirical study. In
+UAI, pp. 467–475, 1999.
+
+Discriminative Embeddings of Latent Variable Models for Structured Data
+
+Vishwanathan, S. V. N. and Smola, A. J. Fast kernels for string
+and tree matching. In Becker, S., Thrun, S., and Obermayer,
+K. (eds.), Advances in Neural Information Processing Systems
+15, pp. 569–576. MIT Press, Cambridge, MA, 2003.
+
+Vishwanathan, S. V. N., Schraudolph, N. N., Kondor, I. R., and
+Borgwardt, K. M. Graph kernels. Journal of Machine Learning
+Research, 2010.
+URL http://www.stat.purdue.
+edu/˜vishy/papers/VisSchKonBor10.pdf.
+In
+press.
+
+Wainwright, M., Jaakkola, T., and Willsky, A. Tree-reweighted
+belief propagation and approximate ML estimation by
+In 9th Workshop on Artiﬁcial
+pseudo-moment matching.
+Intelligence and Statistics, 2003.
+
+Wainwright, M. J. and Jordan, M. I.
+
+Graphical models,
+exponential families, and variational inference. Foundations
+and Trends in Machine Learning, 1(1 – 2):1–305, 2008.
+
+Wale, N., Watson, I. A., and Karypis, G. Comparison of descriptor
+spaces for chemical compound retrieval and classiﬁcation.
+Knowledge and Information Systems, 14(3):347–375, 2008.
+
+Yedidia, J. S., Freeman, W. T., and Weiss, Y. Generalized belief
+Advances in Neural Information Processing
+
+propagation.
+Systems, pp. 689–695. MIT Press, 2001a.
+
+Yedidia, J.S., Freeman, W.T., and Weiss, Y. Bethe free energy,
+kikuchi approximations and belief propagation algorithms.
+Technical report, Mitsubishi Electric Research Laboratories,
+2001b.
+
+Yedidia, J.S., Freeman, W.T., and Weiss, Y.
+
+Constructing
+free-energy approximations and generalized belief propagation
+algorithms. IEEE Transactions on Information Theory, 51(7):
+2282–2312, 2005.
+
+Yuille, A. L. Cccp algorithms to minimize the bethe and kikuchi
+free energies: Convergent alternatives to belief propagation.
+Neural Computation, 14:2002, 2002.
+
+Zheng, S., Jayasumana, S., Romera-Paredes, B., Vineet, B., Su,
+Z., Du, D., Huang, C., and Torr, P. Conditional random ﬁelds as
+recurrent neural networks. arXiv preprint arXiv:1502.03240,
+2015.
+
+Pearl, J. Probabilistic Reasoning in Intelligent Systems: Networks
+
+of Plausible Inference. Morgan Kaufman, 1988.
+
+Pyzer-Knapp, E. O., Li, K., and Aspuru-Guzik, A. Learning from
+the harvard clean energy project: The use of neural networks
+Advanced Functional
+to accelerate materials discovery.
+Materials, 25(41):6495–6502, 2015.
+
+Ramon, J. and G¨artner, T.
+
+Expressivity versus efﬁciency
+of graph kernels.
+International
+Workshop on Mining Graphs, Trees and Sequences (held with
+ECML/PKDD’03), 2003.
+
+Technical
+
+report, First
+
+Ross, S., Munoz, D., Hebert, M.,
+
+J. A.
+Learning message-passing inference machines for structured
+In IEEE Conference on Computer Vision and
+prediction.
+Pattern Recognition, pp. 2737–2744. IEEE, 2011.
+
+and Bagnell,
+
+Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., and
+IEEE
+
+Monfardini, G. The graph neural network model.
+Transactions on Neural Networks, 20(1):61–80, 2009.
+
+Sch¨olkopf, B., Tsuda, K., and Vert, J.-P. Kernel Methods in
+
+Computational Biology. MIT Press, Cambridge, MA, 2004.
+
+Sch¨olkopf, B., and Smola, A. J. Learning with Kernels. MIT
+
+Press, Cambridge, MA, 2002.
+
+Shervashidze, N., Vishwanathan, S. V. N., Petri, T., Mehlhorn,
+K., and Borgwardt, K. Efﬁcient graphlet kernels for large
+graph comparison. Proceedings of International Conference
+on Artiﬁcial Intelligence and Statistics. Society for Artiﬁcial
+Intelligence and Statistics, 2009.
+
+Shervashidze, N., Schweitzer, P., Van Leeuwen, E. J., Mehlhorn,
+K., and Borgwardt, K. M. Weisfeiler-lehman graph kernels.
+The Journal of Machine Learning Research, 12:2539–2561,
+2011.
+
+Smola, A. J., Gretton, A., Song, L., and Sch¨olkopf, B. A
+Hilbert space embedding for distributions. In Proceedings of
+the International Conference on Algorithmic Learning Theory,
+volume 4754, pp. 13–31. Springer, 2007.
+
+Song, L., Huang, J., Smola, A. J., and Fukumizu, K. Hilbert space
+embeddings of conditional distributions. In Proceedings of the
+International Conference on Machine Learning, 2009.
+
+Song, L., Gretton, A., and Guestrin, C. Nonparametric tree
+graphical models. In 13th Workshop on Artiﬁcial Intelligence
+and Statistics, volume 9 of JMLR workshop and conference
+proceedings, pp. 765–772, 2010.
+
+Song, L., Gretton, A., Bickson, D., Low, Y., and Guestrin,
+In Proc. Intl. Conference
+C. Kernel belief propagation.
+on Artiﬁcial Intelligence and Statistics, volume 10 of JMLR
+workshop and conference proceedings, 2011.
+
+Sriperumbudur, B., Gretton, A., Fukumizu, K., Lanckriet, G.,
+and Sch¨olkopf, B.
+Injective Hilbert space embeddings of
+probability measures. In Proceedings of Annual Conference.
+Computational Learning Theory, pp. 111–122, 2008.
+
+Sugiyama, M. and Borgwardt, K. Halting in random walk kernels.
+In Advances in Neural Information Processing Systems, pp.
+1630–1638, 2015.
+
+

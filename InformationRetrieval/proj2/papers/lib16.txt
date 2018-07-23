@@ -1,0 +1,1127 @@
+Low-Rank Matrix Approximation with Stability
+
+Dongsheng Li§
+Chao Chen†
+Qin Lv‡
+Junchi Yan§
+Li Shang‡
+Stephen M. Chu§
+§IBM Research - China, 399 Keyuan Road, Shanghai P. R. China 201203
+†Tongji University, 4800 Caoan Road, Shanghai P.R. China 201804
+‡University of Colorado Boulder, Boulder, Colorado USA 80309
+
+LDSLI@CN.IBM.COM
+CHENCH.RESCH@GMAIL.COM
+QIN.LV@COLORADO.EDU
+YANJC@CN.IBM.COM
+LI.SHANG@COLORADO.EDU
+SCHU@US.IBM.COM
+
+Abstract
+
+Low-rank matrix approximation has been widely
+adopted in machine learning applications with s-
+parse data, such as recommender systems. How-
+ever, the sparsity of the data, incomplete and
+noisy, introduces challenges to the algorithm sta-
+bility – small changes in the training data may
+signiﬁcantly change the models. As a result, ex-
+isting low-rank matrix approximation solution-
+s yield low generalization performance, exhibit-
+ing high error variance on the training dataset,
+and minimizing the training error may not guar-
+antee error reduction on the testing dataset.
+In
+this paper, we investigate the algorithm stabili-
+ty problem of low-rank matrix approximations.
+We present a new algorithm design framework,
+which (1) introduces new optimization objectives
+to guide stable matrix approximation algorithm
+design, and (2) solves the optimization problem
+to obtain stable low-rank approximation solu-
+tions with good generalization performance. Ex-
+perimental results on real-world datasets demon-
+strate that the proposed work can achieve better
+prediction accuracy compared with both state-of-
+the-art low-rank matrix approximation methods
+and ensemble methods in recommendation task.
+
+1. Introduction
+Low-rank matrix approximation (LRMA) has been widely
+adopted in machine learning applications with sparse da-
+ta, e.g., recommender systems (Paterek, 2007; Koren et al.,
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+2009).
+In LRMA-based recommender systems (Paterek,
+2007; Koren et al., 2009), a given user-item rating matrix
+is approximated using observed ratings (often sparse), then
+user ratings on unrated items are predicted using the dot
+product of corresponding user and item feature vectors. L-
+RMA methods have the capability of reducing the dimen-
+sionality of user/item rating vectors, hence are suitable to
+handle applications with sparse data (Koren et al., 2009).
+Indeed, LRMA-based solutions have been widely used in
+existing recommender systems (Paterek, 2007; Koren et al.,
+2009; Lee et al., 2013; Beutel et al., 2015).
+The sparsity of the data, incomplete and noisy (Keshavan
+et al., 2010; Cand`es & Recht, 2012), introduces challenges
+to the algorithm stability. In LRMA, models are biased to
+the limited training data (sparse), so that small changes in
+the training data (noisy) may signiﬁcantly change the mod-
+els. As demonstrated in this work, existing LRMA meth-
+ods cannot provide stable matrix approximations. Such un-
+stable matrix approximations will introduce high training
+error variance, and minimizing the training error may not
+guarantee consistent error reduction on the testing dataset,
+i.e., low generalization performance (Bousquet & Elisseeff,
+2001; Srebro et al., 2004a;b). In other words, the algorithm
+stability has direct impact on generalization performance,
+and an unstable LRMA algorithm has low generalization
+performance (Srebro et al., 2004a).
+Heuristic techniques, such as cross-validation and ensem-
+ble learning (Koren, 2008; Mackey et al., 2011; Lee et al.,
+2013; Chen et al., 2015), can be adopted to improve the
+generalization performance of LRMA. However, cross val-
+idation methods have the drawback that the amount of da-
+ta available for model learning is reduced (Kohavi, 1995;
+Bousquet & Elisseeff, 2001). Ensemble LRMA method-
+s (Lee et al., 2013; Chen et al., 2015) are computational-
+ly expensive due to the training of sub-models. Recently,
+
+Low-Rank Matrix Approximation with Stability
+
+the notion of “algorithmic stability” has been introduced
+to investigate the theoretical bound of the generalization
+performance of learning algorithms (Bousquet & Elisseef-
+f, 2001; 2002; Agarwal & Niyogi, 2009; Shalev-Shwartz
+et al., 2010; London et al., 2013). It is timely to develop
+stable algorithms with low generation errors, suitable for
+learning applications with sparse data.
+This paper presents a stable LRMA algorithm design
+framework. It formulates new optimization objectives to
+derive stable LRMA algorithms, namely SMA, and solves
+the new optimization objectives to obtain SMA solutions
+with good generalization performance. We ﬁrst introduce
+the stability notion in LRMA, and then develop theoretical
+guidelines for deriving LRMA solutions with high stability.
+Then, we formulate a new optimization problem for achiev-
+ing stable LRMA, in which minimizing the loss function
+can obtain solutions with high stability, i.e., good general-
+ization performance. Finally, we develop a stochastic gra-
+dient descent method to solve the new optimization prob-
+lem. Experimental results on real-world datasets demon-
+strate that the proposed SMA method can deliver a stable
+LRMA algorithm, which achieves better prediction accura-
+cy over state-of-the-art single LRMA methods and ensem-
+ble LRMA methods in recommendation task. The key con-
+tributions of this paper are as follows: (1) this work ﬁrst in-
+troduces the stability concept in LRMA, which can provide
+theoretical guidelines for deriving stable matrix approxi-
+mation; (2) a stable LRMA algorithm design framework is
+proposed, which can achieve high stability, i.e., high gener-
+alization performance by designing and solving new opti-
+mization objectives derived based on stability analysis; (3)
+evaluation using real-world datasets demonstrates that the
+proposed work can make signiﬁcant improvement in pre-
+diction accuracy over state-of-the-art LRMA methods and
+ensemble methods in recommendation task.
+The rest of this paper is organized as follows: Section 2
+formulates stability problem in LRMA and formally proves
+key observations. Section 3 presents details of SMA. Sec-
+tion 4 presents the experimental results. Section 5 discusses
+related work, and we conclude this work in Section 6.
+
+2. Stability of LRMA
+This section ﬁrst summarizes LRMA, and then introduces
+the deﬁnition of stability. Next, we conduct quantitative
+analysis of the relationship between algorithm stability and
+generalization error. Finally, we present key guidelines to
+developing stable LRMA, and derive theoretical proof.
+
+2.1. Low-Rank Matrix Approximation
+
+In this paper, upper case letters, such as R, U, V denote
+matrices. For a targeted matrix R ∈ Rm×n, Ω denotes
+
+the set of observed entries in R, and ˆR denotes the low-
+rank approximation of R. The objective of r-rank matrix
+approximation is to determine two feature matrices, i.e.,
+U ∈ Rm×r, V ∈ Rn×r, s.t., ˆR = U V T . The rank r is con-
+sidered low in many scenarios, because r (cid:28) min{m, n}
+can deliver good performance in many real applications.
+The feature matrices U and V cannot be determined arbi-
+trarily in low-rank matrix approximation. Generally, loss
+functions should be deﬁned towards different tasks, and
+U and V are chosen to minimize such loss functions (Lee
+& Seung, 2001; Salakhutdinov & Mnih, 2007; 2008; Yan
+et al., 2010). Let loss function Loss(R, ˆR) be the error of
+approximating R by ˆR, the optimization problem of LR-
+MA can be formally described as follows:
+
+ˆR = arg min
+X
+
+Loss(R, X), rank(X) = r.
+
+(1)
+
+The loss functions should vary for different tasks. For
+instance, Singular Value Decomposition (SVD) usually
+adopts Frobenius norm to deﬁne loss function, and Com-
+pressed Sensing adopts nuclear norm. Typically, the prob-
+lems deﬁned by Equation 1 are often difﬁcult non-convex
+optimization problems, so that iterative methods, e.g., gra-
+dient descent (GD), stochastic gradient descent (SGD), are
+adopted to ﬁnd solutions that will converge to local mini-
+mum (Lee & Seung, 2001; Salakhutdinov & Mnih, 2007).
+
+2.2. Stability w.r.t Matrix Approximation
+
+Recent work on algorithmic stability (Bousquet & Elisseef-
+f, 2001; 2002; Lan et al., 2008; London et al., 2013) demon-
+strated that a stable learning algorithm has the property that
+replacing one element in the training set does not result in
+signiﬁcant change to the algorithm’s output. Therefore, if
+we take the training error as a random variable, the training
+error of stable learning algorithm should have small vari-
+ance. This implies that stable algorithms have the property
+that the training errors are close to the test errors (Bousquet
+& Elisseeff, 2001; Lan et al., 2008; London et al., 2013).
+The rest of this section introduces and analyzes the algo-
+rithm stability problem of low-rank matrix approximation.
+Root Mean Square Error (RMSE), as a common evalua-
+(cid:80)n
+(cid:80)m
+tion metric for recommendation tasks, is adopted to mea-
+sure the stability of matrix approximation. Let D( ˆR) =
+j=1 (Ri,j − ˆRi,j)2 be the root mean square
+error of approximating R with ˆR. One of the objectives
+(cid:80)
+of matrix approximation is to approximate a given ma-
+trix R based on a set of observed entries Ω (DΩ( ˆR) =
+(i,j)∈Ω (Ri,j − ˆRi,j)2). Thus, the stability of ap-
+
+(cid:113) 1
+(cid:113) 1|Ω|
+
+proximating R is deﬁned as follows.
+Deﬁnition 1 (Stability w.r.t. Matrix Approximation). For
+any R ∈ Fm×n, choose a subset of entries Ω from R uni-
+formly. For a given  > 0, we say that DΩ( ˆR) is δ-stable if
+
+mn
+
+i=1
+
+Low-Rank Matrix Approximation with Stability
+
+the following holds:
+
+Pr[|D( ˆR) − DΩ( ˆR)| ≤ ] ≥ 1 − δ.
+
+(2)
+
+Matrix approximation with stability guarantee has the
+property that the generalization error is bounded. Minimiz-
+ing the training error will have a high probability of mini-
+mizing the test error. The stability notion introduced in this
+work deﬁnes how stable an approximation is in terms of
+the overall prediction error. It is different from the Unifor-
+m Stability deﬁnition (Bousquet & Elisseeff, 2001), which
+deﬁnes the prediction stability on individual entries. This
+new stability notion makes it possible to measure the gen-
+eralization performance between different approximation-
+s. For instance, for any two subsets of entries Ω1 and Ω2
+from R, approximating R by Ω1 and Ω2 are δ1-stable and
+δ2-stable, respectively, then DΩ1 ( ˆR) is more stable than
+DΩ2 ( ˆR) if δ1 < δ2. This implies that DΩ1( ˆR) is close
+to D( ˆR) with higher probability than DΩ2 ( ˆR), i.e., min-
+imizing DΩ1 ( ˆR) will lead to solutions that are of higher
+probabilities with better generalization performance than
+minimizing DΩ2( ˆR). In summary, using the stability no-
+tion introduced in this paper, we can deﬁne new matrix ap-
+proximation problems which can yield solutions with high
+stability, i.e., high generalization performance.
+
+2.3. Stability vs. Generalization Error
+
+Figure 1. Stability vs. generalization error with different rank r
+on MovieLens (1M) dataset.
+
+Figure 1 quantiﬁes stability changes of LRMA method with
+the generalization error when rank r increases from 5 to
+20. This experiment uses RSVD (Paterek, 2007), a popular
+LRMA-based recommendation algorithm, on the Movie-
+Lens (1M) dataset (∼106 ratings, 6,040 users, 3,706 items).
+We choose  in Deﬁnition 1 as 0.0046 to cover all error dif-
+ferences when r = 5. We compute Pr[|D( ˆR) − DΩ( ˆR)| ≤
+] with 500 different runs to measure stability (y-axis), and
+compute RMSE differences between training and test data
+to measure generalization error (x-axis).
+As shown in Figure 1, the generalization error increases
+when rank r increases, because LRMA models become
+more complex and more biased on training data with high-
+er ranks. In contrary, the stability of RSVD decreases with
+r increases. This indicates that (1) stability decreases with
+
+generalization error increases, and (2) RSVD cannot pro-
+vide stable recommendation even the rank is as low as 20.
+This study demonstrates that existing LRMA methods suf-
+fer from low generalization performance due to low algo-
+rithm stability. Therefore, it is important to develop stable
+LRMA methods with good generalization performance.
+
+2.4. Stability Analysis
+
+Next, we introduce the Hoeffding’s Lemma, and then ana-
+lyze the the Stability properties of low-rank matrix approx-
+imation problems.
+Lemma 1 (Hoeffding’s Lemma). Let X be a real-valued
+random variable with zero mean and Pr (X ∈ [a, b]) = 1.
+
+Then, for any s ∈ R, E(cid:2)esX(cid:3) ≤ exp(cid:0) 1
+
+8 s2(b − a)2(cid:1).
+
+Following the Uniform Stability (Bousquet & Elisseeff,
+2001), given a stable LRMA algorithm, the approximation
+results remain stable if the change of the training data set,
+i.e., the set of observed entries Ω from the original matrix
+R, is small. For instance, we can remove a subset of easily
+predictable entries from Ω to obtain Ω(cid:48). It is desirable that
+the solution of minimizing both DΩ and DΩ(cid:48) together will
+be more stable than the solution of minimizing DΩ only.
+The following Theorem 1 formally proves the statement.
+Theorem 1. Let Ω (|Ω| > 2) be a set of observed entries in
+R. Let ω ⊂ Ω be a subset of observed entries, which satisfy
+that ∀(i, j) ∈ ω, |Ri,j − ˆRi,j| ≤ DΩ( ˆR). Let Ω(cid:48) = Ω − ω,
+then for any  > 0 and 1 > λ0, λ1 > 0 (λ0 + λ1 = 1),
+λ0DΩ( ˆR) + λ1DΩ(cid:48)( ˆR) and DΩ( ˆR) are δ1-stable and δ2-
+stable, resp., then δ1 ≤ δ2.
+Proof. Let’s assume that D( ˆR) − DΩ( ˆR) ∈ [−a, a]
+(a = sup{D( ˆR) − DΩ( ˆR)}) and D( ˆR) − (λ0DΩ( ˆR) +
+λ1DΩ(cid:48)( ˆR)) ∈ [−a(cid:48), a(cid:48)] (a(cid:48) = sup{D( ˆR) − (λ0DΩ( ˆR) +
+λ1DΩ(cid:48)( ˆR))}) are two random variables with 0 mean.
+Based on Markov’s inequality, for any t > 0, we have
+Pr[D( ˆR) − DΩ( ˆR) ≥ ] ≤ E(et(D( ˆR)−DΩ( ˆR)))
+
+.
+
+et
+
+exp ( 1
+
+exp (t)
+
+2 t2a2)
+
+2 t2a2)
+
+Then, based on Lemma 1, we have Pr[D( ˆR) − DΩ( ˆR) ≥
+] ≤ exp ( 1
+and Pr[−D( ˆR) + DΩ( ˆR) ≥ ] ≤
+exp (t)
+. Combining above two equations, we have
+Pr[|D( ˆR)−DΩ( ˆR)| ≥ ] ≤ 2 exp ( 1
+, i.e., Pr[|D( ˆR)−
+exp (t)
+DΩ( ˆR)| ≤ ] ≥ 1 − 2 exp ( 1
+2 t2a2)
+. Similarly, we have
+Pr[|D( ˆR) − (λ0DΩ( ˆR) + λ1DΩ(cid:48)( ˆR))| ≤ ] ≥ 1 −
+
+2 t2a2)
+
+exp (t)
+
+2 t2a(cid:48)2)
+
+exp (t)
+
+2 exp ( 1
+
+. We can compare a(cid:48) with a as follows:
+a(cid:48) = sup{D( ˆR) − DΩ( ˆR) + λ1(DΩ( ˆR) − DΩ(cid:48)( ˆR))}
+
+= sup{D( ˆR) − DΩ( ˆR)} + λ1 sup{DΩ( ˆR) − DΩ(cid:48)( ˆR)}
+= a + λ1 sup{DΩ( ˆR) − DΩ(cid:48)( ˆR)}.
+
+0%20%40%60%80%100%0.030.060.090.120.15PercentageRMSE DifferenceStability vs. Gen ErrorLow-Rank Matrix Approximation with Stability
+
+1/|ω|(cid:80)
+
+(i,j)∈ω(Ri,j − ˆRi,j)2 ≤ D2
+
+Since ∀(i, j) ∈ ω, |Ri,j − ˆRi,j| ≤ DΩ( ˆR), we have
+Ω( ˆR), i.e., Dω( ˆR) ≤
+DΩ( ˆR). Then, since Ω = ω ∪ Ω(cid:48), we have DΩ(cid:48)( ˆR) ≥
+DΩ( ˆR). This means that sup{DΩ(R) − DΩ(cid:48)(R)} ≤ 0.
+Thus, we have a(cid:48) ≤ a. This turns out that 2 exp ( 1
+≤
+
+2 t2a(cid:48)2)
+
+exp (t)
+
+2 exp ( 1
+
+2 t2a2)
+
+exp (t)
+
+, i.e., δ1 ≤ δ2.
+
+DΩ2( ˆR). Thus, we have sup{DΩ1( ˆR) − DΩ2( ˆR)} ≤ 0.
+Since a1 = a2 + λ1 sup{DΩ1 ( ˆR) − DΩ2( ˆR)}, we have
+a1 ≤ a2. Then, similar to Theorem 1, we can conclude
+that δ1 ≤ δ2.
+
+i=0 λi = 1), λ0DΩ( ˆR) +(cid:80)
+
+Remark. From Theorem 2, we know that removing more
+entries that are easy to predict will yield more stable matrix
+approximation. Therefore, it is desirable to choose Ω(cid:48) as
+the whole set of entries which are harder to predict than
+average, i.e., the whole set of entries satisfying ∀(i, j) ∈
+Ω(cid:48), |Ri,j − ˆRi,j| ≥ DΩ( ˆR).
+Theorem 1 and 2 only consider choosing one Ω(cid:48) to ﬁnd
+stable matrix approximations. The next question is, is it
+possible to choose more than one Ω(cid:48) that satisfy the above
+condition, and yield more stable solutions by minimizing
+them all together. The following Theorem 3 shows that
+incorporating K such entry sets (Ω(cid:48)) will be more stable
+than incorporating any K − 1 out of the K entry sets.
+Theorem 3. Let Ω (|Ω| > 2) be a set of observed entries in
+R. ω1, ..., ωK ⊂ Ω (K > 1) satisfy that ∀(i, j) ∈ ωk (1 ≤
+k ≤ K), |Ri,j − ˆRi,j| ≤ DΩ( ˆR). Let Ωk = Ω − ωk for all
+1 ≤ k ≤ K. Then, for any  > 0 and 1 > λ0, λ1, ..., λK >
+k∈[1,K] λkDΩk ( ˆR) and
+k∈[1,K−1] λkDΩk ( ˆR) are δ1-stable
+
+0 ((cid:80)K
+(λ0 + λK)DΩ( ˆR) +(cid:80)
+and δ2-stable, resp., then δ1 ≤ δ2.
+(cid:80)
+Proof. Let’s assume that D( ˆR) − ((λ0 + λK)DΩ( ˆR) +
+((λ0+λK)DΩ( ˆR)+(cid:80)
+k∈[1,K−1] λkDΩk ( ˆR)) ∈ [−a, a] (a = sup{D( ˆR) −
+(λ0DΩ( ˆR) + (cid:80)
+k∈[1,K−1] λkDΩk ( ˆR))} and D( ˆR)−
+sup{D( ˆR)− (λ0DΩ( ˆR) +(cid:80)
+k∈[1,K] λkDΩk ( ˆR)) ∈ [−a(cid:48), a(cid:48)] (a(cid:48) =
+k∈[1,K] λkDΩk ( ˆR))} are two
+random variables with 0 mean.
+Pr[|D( ˆR) − (λ0DΩ( ˆR) +(cid:80)
+Applying Lemma 1 and the Markov’s inequality, we have
+k∈[1,K] λkDΩk ( ˆR))| ≤ ] ≥
+(cid:80)
+and Pr[|D( ˆR) − ((λ0 + λK)DΩ( ˆR) +
+k∈[1,K−1] λkDΩk ( ˆR))| ≤ ] ≥ 1 − 2 exp ( 1
+. Sim-
+ilar as the above proofs, we have DΩK ( ˆR) ≤ DΩ( ˆR),
+which means sup{DΩ( ˆR) − DΩK ( ˆR)} ≤ 0. Since a(cid:48) =
+a + λK sup{DΩ( ˆR) − DΩK ( ˆR)}, we know that a(cid:48) ≤ a.
+2 t2a2)
+Thus, we can conclude that 2 exp ( 1
+,
+i.e., δ1 ≤ δ2.
+Remark. Theorem 3 shows that minimizing DΩ together
+with the RMSEs of more than one hard predictable subsets
+of Ω will help generate more stable matrix approximation
+solutions.
+However, sometimes it is expensive to ﬁnd such “hard pre-
+dictable subsets”, because we do not know which subset of
+entries to choose without any prior knowledge. Thus, we
+
+1 − 2 exp ( 1
+
+≤ 2 exp ( 1
+
+2 t2a(cid:48)2)
+
+2 t2a(cid:48)2)
+
+2 t2a2)
+
+exp (t)
+
+exp (t)
+
+exp (t)
+
+exp (t)
+
+Remark. The above Theorem 1 indicates that, if we re-
+move a subset of entries that are easier to predict than av-
+erage from Ω to form Ω(cid:48), then λ0DΩ( ˆR) + λ1DΩ(cid:48)( ˆR) has
+a higher probability of being close to D( ˆR) than DΩ( ˆR).
+Therefore, minimizing λ0DΩ( ˆR) + λ1DΩ(cid:48)( ˆR) will lead to
+solutions that have better generalization performance than
+minimizing DΩ( ˆR). It should be noted that the condition
+that ∀(i, j) ∈ ω, |Ri,j − ˆRi,j| ≤ DΩ( ˆR) is not necessary.
+The conclusion will be the same if Dω( ˆR) ≤ DΩ( ˆR). The
+following Proposition 1 formally shows this.
+Proposition 1. Let Ω (|Ω| > 2) be a set of observed entries
+in R. Let ω ⊂ Ω be a subset of observed entries, which
+satisfy that Dω( ˆR) ≤ DΩ( ˆR). Let Ω(cid:48) = Ω − ω, then for
+any  > 0 and 1 > λ0, λ1 > 0 (λ0 + λ1 = 1), λ0DΩ( ˆR) +
+λ1DΩ(cid:48)( ˆR) and DΩ( ˆR) are δ1-stable and δ2-stable, resp.,
+then δ1 ≤ δ2.
+
+Proof. This proof is omitted as it is similar to that of The-
+orem 1.
+
+However, Theorem 1 and Proposition 1 only prove that it
+is beneﬁcial to remove easily predictable entries from Ω to
+obtain Ω(cid:48), but does not show how many entries we should
+remove from Ω. The following Theorem 2 shows that re-
+moving more entries that satisfy |Ri,j − ˆRi,j| ≤ DΩ( ˆR)
+can yield better Ω(cid:48).
+Theorem 2. Let Ω (|Ω| > 2) be a set of observed entries in
+R. Let ω2 ⊂ ω1 ⊂ Ω, and ω1 and ω2 satisfy that ∀(i, j) ∈
+ω1(ω2), |Ri,j − ˆRi,j| ≤ DΩ( ˆR). Let Ω1 = Ω − ω1 and
+Ω2 = Ω − ω2, then for any  > 0 and 1 > λ0, λ1 > 0
+(λ0 + λ1 = 1), λ0DΩ( ˆR) + λ1DΩ1( ˆR) and λ0DΩ( ˆR) +
+λ1DΩ2 ( ˆR) are δ1-stable and δ2-stable, resp., then δ1 ≤ δ2.
+Proof. Similar to Theorem 1, let’s assume that D( ˆR) −
+(λ0DΩ( ˆR) + λ1DΩ1( ˆR)) ∈ [−a1, a1] (a1 = sup{D( ˆR) −
+(λ0DΩ( ˆR) + λ1DΩ1( ˆR))}) and D( ˆR) − (λ0DΩ( ˆR) +
+λ1DΩ2( ˆR)) ∈ [−a2, a2] (a2 = sup{D( ˆR) − (λ0DΩ( ˆR) +
+λ1DΩ2( ˆR))}) are two random variables with 0 mean.
+Applying Lemma 1 and the Markov’s inequality, we have
+Pr[|D( ˆR) − (λ0DΩ( ˆR) + λ1DΩ1( ˆR))| ≤ ] ≥ 1 −
+and Pr[|D( ˆR) − (λ0DΩ( ˆR) + λ1DΩ2( ˆR))| ≤
+] ≥ 1 − 2 exp ( 1
+. Since ∀(i, j) ∈ ω1(ω2), |Ri,j −
+ˆRi,j| ≤ DΩ( ˆR) and ω2 ⊂ ω1, we have DΩ1( ˆR) ≥
+
+2 t2a2
+1)
+
+2 t2a2
+2)
+
+2 exp ( 1
+
+exp (t)
+
+exp (t)
+
+Low-Rank Matrix Approximation with Stability
+
+λ0DΩ( ˆR)+(cid:80)K
+is desirable to minimize λ0DΩ( ˆR) +(cid:80)K
+
+propose a solution to obtain hard predictable subsets of Ω
+based on only one set of easily predictable entries as fol-
+lows: 1) choose ω ⊂ Ω, which satisﬁes that ∀(i, j) ∈ ω,
+|Ri,j − ˆRi,j| ≤ DΩ( ˆR), and choose Ω0 = Ω − ω;
+2) divide ω into K non-overlapping subsets ω1, ..., ωK
+with the condition that ∪k∈[1,K]ωk = ω, and choose
+Ωk = Ω − ωk for all 1 ≤ k ≤ K; and 3) minimize
+k=1 λkDΩk ( ˆR) to ﬁnd stable matrix approx-
+imation solutions. The following Theorem 4 proves that it
+k=1 λkDΩk ( ˆR) in-
+stead of λ0DΩ( ˆR) + (1 − λ0)DΩ0( ˆR).
+Theorem 4. Let Ω (|Ω| > 2) be a set of observed entries in
+R. Choose ω ⊂ Ω, which satisﬁes that ∀(i, j) ∈ ω, |Ri,j −
+ˆRi,j| ≤ DΩ( ˆR). And divide ω into K non-overlapping
+subsets ω1, ..., ωK with the condition that ∪k∈[1,K]ωk = ω.
+Let Ω0 = Ω−ω and Ωk = Ω−ωk for all 1 ≤ k ≤ K. Then,
+i=0 λi =
+k=1 λkDΩk ( ˆR) and λ0DΩ( ˆR) + (1 −
+λ0)DΩ0( ˆR) are δ1-stable and δ2-stable, resp., then δ1 ≤
+δ2.
+(cid:80)K
+Proof. Let’s ﬁrst assume that D( ˆR) − (λ0DΩ( ˆR) +
+(λ0DΩ( ˆR)+(cid:80)K
+k=1 λkDΩk ( ˆR)) ∈ [−a1, a1] (a1 = sup{D( ˆR) −
+k=1 λkDΩk ( ˆR))} and D( ˆR)−(λ0DΩ( ˆR)+
+(1 − λ0)DΩ0( ˆR)) ∈ [−a2, a2] (a2 = sup{D( ˆR) − ((1 −
+We have Pr[|D( ˆR) − (λ0DΩ( ˆR) +(cid:80)K
+λ0)DΩ0( ˆR))} are two random variables with 0 mean.
+
+for any  > 0 and 1 > λ0, λ1, ..., λK > 0 ((cid:80)K
+1), λ0DΩ( ˆR) +(cid:80)K
+
+k=1 λkDΩk ( ˆR))| ≤
+and Pr[|D( ˆR)−((1−λ0)DΩ0( ˆR))| ≤
+] ≥ 1− 2 exp ( 1
+] ≥ 1 − 2 exp ( 1
+. ∀k ∈ [1, K] ωk ⊂ ω and ∀(i, j) ∈
+ω, |Ri,j − ˆRi,j| ≤ DΩ( ˆR), we have for all k ∈ [1, K],
+DΩk ≤ DΩ0. Sum the above inequation over all k ∈ [1, K],
+k=1 λkDΩ0 = (1 − λ0)DΩ0.
+k=1 λkDΩk ( ˆR))} ≤
+sup{D( ˆR) − ((1 − λ0)DΩ0( ˆR))}, i.e., a1 ≤ a2. Thus, we
+can conclude that δ1 ≤ δ2.
+
+we have(cid:80)K
+Thus, sup{D( ˆR) − (λ0DΩ( ˆR) +(cid:80)K
+
+k=1 λkDΩk ≤(cid:80)K
+
+2 t2a2
+2)
+
+exp (t)
+
+2 t2a2
+1)
+
+exp (t)
+
+Remark. Theorem 4 shows that if we can ﬁnd only one
+subset of entries that are easier to predict than average, then
+we can probe this subset of entries to increase the stability
+of matrix approximations.
+
+3. SMA Algorithm
+This section presents the algorithm stability optimization
+problem for matrix approximation. Then, we propose a
+method to ﬁnd out entry sets that are harder to predict than
+average, which is a key step for constructing this optimiza-
+tion problem. Finally, we present how to solve the algorith-
+m stability optimization problem using a stochastic gradi-
+ent descent method.
+
+3.1. Model Formulation
+
+Singular value decomposition (SVD) is one of the com-
+monly used methods for low-rank matrix approxima-
+tion (Cand`es & Plan, 2010). Based on the analysis of
+stable matrix approximation described in the previous sec-
+tion, it is desirable to minimize the loss functions that will
+lead to solutions with good generalization performance.
+Let {Ω1, ..., ΩK} be subsets of Ω which satisfy that ∀s ∈
+[1, K], DΩs ≥ DΩ. Then, following Theorem 4, we next
+describe a new extension of SVD. Note that, extensions to
+other LRMA methods can be similarly derived.
+
+K(cid:88)
+
+ˆR = arg min
+
+X
+
+λ0DΩ(X) +
+
+s.t. rank(X) = r.
+
+λsDΩs (X)
+
+s=1
+
+(3)
+
+where λ0, λ1, ..., λK deﬁne the contributions of each com-
+ponent in the loss function.
+
+3.2. Hard Predictable Subsets Selection
+
+The key step in Equation 3 is to obtain subsets of Ω —
+{Ω1, ..., ΩK} which satisfy that ∀s ∈ [1, K], DΩs ≥ DΩ.
+To obtain such Ωs is not trivial, because we can only check
+if the condition is satisﬁed with the ﬁnal model. But the ﬁ-
+nal model cannot be known before we deﬁne and optimize
+a given loss function. Here, we address this issue using the
+following idea: 1) approximate the targeted matrix R with
+existing LRMA solutions, e.g., RSVD (Paterek, 2007); 2)
+for each entry (i, j) ∈ Ω, it is chosen with large probabil-
+ity if |Ri,j − ˆRi,j| < DΩ and small probability otherwise;
+and 3) obtain Ω(cid:48) by removing the chosen entries to satisfy
+the condition of Proposition 1, or probe Ω(cid:48) to ﬁnd hard pre-
+dictable subsets that satisfy the condition of Theorem 4. By
+assuming that other LRMA methods will not dramatically
+differ from the ﬁnal model of SMA, we can ensure that Ω(cid:48)
+will satisfy DΩ(cid:48) ≥ DΩ with high probability.
+
+3.3. The SMA Learning Algorithm
+
+The pseudo-code of the proposed SMA learning algorithm
+to solve the optimization problem deﬁned in Equation 3 is
+presented in Algorithm 1. From Step 1 to 9, we obtain K
+different hard predictable entry sets. In Step 10, the opti-
+mization is performed by stochastic gradient descent, the
+details of which are trivial and thus omitted. Also, L2 reg-
+ularization is adopted in Step 10. Note that, other types of
+optimization methods and regularization can also be used
+in Algorithm 1. The complexity of Step 1 to 9 is O(|Ω|),
+where |Ω| is the number of the observed entries in R. The
+complexity of Step 10 is O(rmn) per-iteration, where r is
+the rank and m, n is the matrix size. Thus, the computation
+complexity of SMA is similar to classic LRMA methods,
+such as regularized SVD (Paterek, 2007).
+
+Low-Rank Matrix Approximation with Stability
+
+Algorithm 1 The SMA Learning Algorithm
+Require: R is the targeted matrix, Ω is the set of entries
+in R, and ˆR is an approximation of R by existing L-
+RMA methods. p > 0.5 is the predeﬁned probability
+for entry selection. µ1 and µ2 are the coefﬁcients for
+L2-regularization.
+
+1: Ω(cid:48) = ∅;
+2: for each (i, j) ∈ Ω do
+3:
+4:
+
+randomly generate ρ ∈ [0, 1];
+if (|Ri,j − ˆRi,j| ≤ DΩ & ρ ≤ p) or (|Ri,j − ˆRi,j| >
+DΩ & ρ ≤ 1 − p) then
+Ω(cid:48) ← Ω(cid:48) ∪ {(i, j)};
+
+k=1ωi = Ω(cid:48));
+
+5:
+end if
+6:
+7: end for
+8: randomly divide Ω(cid:48) into ω1, ..., ωK (∪K
+9: for all k ∈ [1, K], Ωk = Ω − ωk;
+
+10: ( ˆU , ˆV ) : = arg minU,V [(cid:80)K
+
+k=1 λkDΩk (U T V )
++λ0DΩ(U V T ) + µ1 (cid:107) U (cid:107)2 +µ2 (cid:107) V (cid:107)2]
+
+11: return ˆR = ˆU ˆV T
+
+4. Experiments
+In this section, we ﬁrst analyze the generalization perfor-
+mance of SMA, and then evaluate the performance of S-
+MA with different parameters, e.g., rank r and the num-
+ber of non-overlapping subsets K. Next, SMA is com-
+pared against seven state-of-then-art matrix approximation
+based recommendation algorithms, including four single
+MA methods and three ensemble methods. At last, we an-
+alyze SMA’s accuracy in different data sparsity settings.
+
+4.1. Experiment Setup
+
+Two widely used datasets are adopted to evaluate SMA:
+MovieLens 10M (∼70k users, 10k items, 107 ratings) and
+Netﬂix (∼480k users, 18k items, 108 ratings). For each
+dataset, we randomly split it into training and test sets and
+keep the ratio of training set to test set as 9:1. All exper-
+imental results are presented by averaging the results over
+ﬁve different random train-test splits.
+In this study, we use learning rate v = 0.001 for stochastic
+gradient decent method, µ1 = 0.06 for L2-regularization
+coefﬁcient,  = 0.0001 for gradient descent convergence
+threshold, and T = 250 for maximum number of itera-
+tions. Optimal parameters of the compared methods are
+chosen from their original papers. The source codes of all
+the experiments are publicly available 1.
+We compare the performance of SMA with four single MA
+models and three ensemble MA models as follows:
+• Regularized SVD [Paterek et al., KDD’ 07]:
+
+is one
+
+1https://github.com/ldscc/StableMA.git.
+
+of the most widely used matrix factorization methods, in
+which user/item features are estimated by minimizing the
+sum-squared error using L2 regularization.
+• BPMF [Salakhutdinov et al., ICML’ 08]: is a Bayesian
+extension of PMF with model parameters and hyperparam-
+eters estimated using Markov chain Monte Carlo method.
+• APG [Toh et al., PJO’ 2010]: computes the approxi-
+mation by solving a nuclear norm regularized linear least
+squares problem.
+• GSMF [Yuan et al., AAAI’ 14]: can transfer informa-
+tion among multiple types of user behaviors by modeling
+the shared and private latent factors with group sparsity reg-
+ularization.
+• DFC [Mackey et al., NIPS’ 11]: is an ensemble method,
+which divides a large-scale matrix factorization task into
+smaller subproblems, solves each other in parallel, and ﬁ-
+nally combines the subproblem solutions.
+• LLORMA [Lee et al., ICML’ 13]:
+is an ensemble
+method, which assumes that the original matrix is de-
+scribed by multiple low-rank submatrices constructed by
+non-parametric kernel smoothing techniques.
+• WEMAREC [Chen et al., SIGIR’ 15]: is an ensemble
+method, which constructs biased model by weighting strat-
+egy to address the insufﬁcient data issue in each submatrix.
+
+4.2. Generalization Performance
+
+Figure 2 compares training/test errors of SMA and RSVD
+with different epochs on MovieLens 10M dataset (rank
+r = 20 and subset number K = 3). As we can see, the dif-
+ferences between training and test error of SMA are much
+smaller than RSVD. Moreover, the training error and test
+error are very close when epoch is less than 100. This re-
+sult demonstrates that SMA can indeed ﬁnd models that
+have good generalization performance and yield small gen-
+eralization error during the training process.
+
+4.3. Sensitivity Analysis
+
+Figure 3 investigates how SMA performs by varying num-
+ber of non-overlapping subsets K (rank r = 200) and the
+optimal RMSEs of all compared methods on both Movie-
+lens 10M (left) and Netﬁlx (right) datasets. As we can see,
+SMA outperforms all these state-of-the-art methods with
+K varying from 1 to 5.
+It should be noted that, when
+K = 0, SMA is degraded to RSVD. Thus, the fact that S-
+MA can produce better recommendations than RSVD con-
+s=1 λsDΩs( ˆR),
+we can improve the stability of MA models. In addition,
+we can see the RMSEs on both two datasets decrease as K
+increases. This further conﬁrms Theorem 4: probing easily
+predictable entries to form harder predictable entry sets can
+better increase the model performance.
+
+ﬁrms Theorem 1: with additional terms(cid:80)K
+
+Low-Rank Matrix Approximation with Stability
+
+Figure 2. Training and test errors vs. epochs
+of RSVD and SMA on MovieLens 10M
+dataset.
+
+Figure 3. Effect of subset number K on MovieLens 10M dataset (left) and Netﬂix dataset
+(right). SMA models are indicated by solid line and other compared methods are indicated
+by dot lines.
+
+Figure 4. Effect of rank r on MovieLens 10M dataset (left) and Netﬂix dataset (right).
+SMA and RSVD models are indicated by solid line and other compared methods are indi-
+cated by dot lines.
+
+Figure 5. RMSEs of SMA and four single
+methods with varying training set size on
+MovieLens 10M dataset (rank r = 50).
+
+Figure 4 analyzes the effect of rank r on MovieLens 10M
+(left) and Netﬂix (right) datasets by ﬁxing K = 3. It can
+be seen that for any rank r from 50 to 250, SMA always
+outperform the other seven compared methods in recom-
+mendation accuracy. And higher ranks for SMA will lead
+to better accuracy when the rank r increases from 50 to 250
+on both two datasets. It is interesting to see that the rec-
+ommendation accuracies of RSVD decrease slightly when
+r > 50 due to over-ﬁtting and SMA can consistently in-
+crease recommendation accuracy even when r > 200. This
+indicates that SMA is less prone to over-ﬁtting than RSVD,
+i.e., SMA is more stable than RSVD.
+
+4.4. Accuracy Comparisons
+
+Table 1 presents the performance of SMA with rank r =
+200 and subset number K = 3. The compared methods are
+as follows: RSVD (r = 50) (Paterek, 2007), BPMF (r =
+300) (Salakhutdinov & Mnih, 2008), APG (r = 100) (Toh
+& Yun, 2010), GSMF (r = 20) (Yuan et al., 2014), DFC
+(r = 30) (Mackey et al., 2011), LLORMA (r = 20) (Lee
+et al., 2013) and WEMAREC (r = 20) (Chen et al., 2015)
+on MovieLens 10M and Netﬂix datasets. Notably, DFC,
+LLORMA and WEMAREC are ensemble methods, which
+have been shown to be more accurate than single method-
+s due to better generalization performance. However, as
+shown in Table 1, the SMA method signiﬁcantly outper-
+
+Netﬂix
+
+Table 1. RMSEs of SMA and the seven compared methods on
+MovieLens (10M) and Netﬂix datasets.
+MovieLens (10M)
+0.8256 ± 0.0006
+0.8197 ± 0.0004
+0.8101 ± 0.0003
+0.8012 ± 0.0011
+0.8067 ± 0.0002
+0.7855 ± 0.0002
+0.7775 ± 0.0007
+0.7682 ± 0.0003
+
+0.8534 ± 0.0001
+0.8421 ± 0.0002
+0.8476 ± 0.0003
+0.8420 ± 0.0006
+0.8453 ± 0.0003
+0.8275 ± 0.0004
+0.8143 ± 0.0001
+0.8036 ± 0.0004
+
+RSVD
+BPMF
+APG
+GSMF
+DFC
+
+LLORMA
+WEMAREC
+
+SMA
+
+forms all seven compared methods on both two datasets.
+This conﬁrms that SMA can indeed achieve better general-
+ization performance than both state-of-the-art single meth-
+ods and ensemble methods. The main reason is that SMA
+can minimize objective functions that lead to solutions with
+good generalization performance, but other methods can-
+not guarantee low gap between training error and test error.
+
+4.5. Performance under Data Sparsity
+
+Figure 5 presents the RMSEs of SMA vs. the size of train-
+ing set size as compared with four single LRMA methods
+(RSVD, BPMF, APG and GSMF). The rank r of all ﬁve
+
+0.650.700.750.800.850.900.95 0 20 40 60 80 100 120 140 160 180RMSEEpochsMovieLens 10MRSVD(train set)RSVD(test set)SMA(train set)SMA(test set)0.780.800.820.84 1 2 3 4 5RMSE#SubsetsMovieLens 10MRSVDBPMFAPGGSMFDFCLLORMAWEMARECSMA0.800.820.840.86 1 2 3 4 5RMSE#SubsetsNetflixRSVDBPMFAPGGSMFDFCLLORMAWEMARECSMA0.770.780.790.800.810.820.830.84 50 100 150 200 250RMSERankMovieLens 10MRSVDBPMFAPGGSMFDFCLLORMAWEMARECSMA0.800.810.820.830.840.850.860.87 50 100 150 200 250RMSERankNetflixRSVDBPMFAPGGSMFDFCLLORMAWEMARECSMA0.800.850.900.951.001.0520%40%60%80%RMSETraning Set RatioMovieLens 10MRSVD(r=50)BPMF(r=50)APG(r=50)GSMF(r=50)SMA(r=50)Low-Rank Matrix Approximation with Stability
+
+methods are ﬁxed to 50. Note that, the rating density be-
+comes more sparse when the training set ratio decreases.
+The results show that all methods can improve accuracy
+with the training set size increasing, but the proposed SMA
+method always outperforms the compared methods. This
+demonstrates that SMA can still provide stable matrix ap-
+proximation even on very sparse dataset.
+
+5. Related Work
+Algorithmic stability has been analyzed and applied in
+several popular problems, such as regression (Bousquet
+& Elisseeff, 2001), classiﬁcation (Bousquet & Elisseeff,
+2001), ranking (Lan et al., 2008), marginal inference (Lon-
+don et al., 2013), etc. Bousquet & Elisseeff (2001) ﬁrst
+proposed a method of obtaining bounds on generalization
+errors of learning algorithms, and formally proved that reg-
+ularization networks posses the uniform stability proper-
+ty. Then, Bousquet & Elisseeff (2002) extends the algo-
+rithmic stability concept from regression to classiﬁcation.
+Kutin & Niyogi (2002) generalized the work of Bousquet
+& Elisseeff (2001) and proposed the notion of training sta-
+bility, which can ensure good generalization error bounds
+even when the learner has inﬁnite VC dimension. Lan et al.
+(2008) proposed query-level stability and gave query-level
+generalization bounds to learning to rank algorithms. A-
+garwal & Niyogi (2009) derived generalization bounds for
+ranking algorithms that have good properties of algorith-
+mic stability. Shalev-Shwartz et al. (2010) considered the
+general learning setting including most statistical learning
+problems as special cases, and identiﬁed that stability is the
+necessary and sufﬁcient condition for learnability. London
+et al. (2013) proposed the concept of collective stability for
+structure prediction, and established generalization bounds
+for structured prediction. This work differs from the above
+works by (1) this work introduces the stability concept to
+low-rank matrix approximation problem, and proves that
+matrix approximations with high stability will have high
+probability to generalize well and (2) most existing works
+focus on theoretical analysis, but this work provides prac-
+tical framework for achieving solutions with high stability.
+Low-rank matrix approximation methods have been exten-
+sively studied recently. Lee & Seung (2001) analyzed the
+optimization problems of Non-negative Matrix Factoriza-
+tion (NMF). Srebro et al. (2004b) proposed Maximum-
+Margin Matrix Factorization (MMMF), which can learn
+low-norm factorizations by solving a semi-deﬁnite pro-
+gram to achieve collaborative prediction. Salakhutdinov
+& Mnih (2007) viewed matrix factorization from a proba-
+bilistic perspective and proposed Probabilistic Matrix Fac-
+torization (PMF). Later, they proposed Bayesian Proba-
+bilistic Matrix Factorization (BPMF) (Salakhutdinov & M-
+nih, 2008) by giving a fully Bayesian treatment to PMF.
+
+Lawrence & Urtasun (2009) also extends PMF and devel-
+oped a non-linear PMF using Gaussian process latent vari-
+able models. Paterek (2007) applied regularized singular
+value decomposition (RSVD) in the Netﬂix Prize contest.
+Koren (2008) combined matrix factorization and neighbor-
+hood model and built a more accurate combined model
+named SVD++. Many of the above methods tried to solve
+overﬁtting problems in model training, e.g., regularization
+in most of the above methods and Bayesian treatment in
+BPMF. However, alleviating overﬁtting cannot decrease the
+lower bound of generalization errors, and thus cannot fun-
+damentally solve the low generalization performance prob-
+lem. Different from the above works, this work proposes
+a new optimization problem with smaller lower bound of
+generalization error. Minimizing the new loss function can
+substantially improve generalization performance of matrix
+approximation as demonstrated in the experiments. Srebro
+et al. (2004a) analyzed the generalization error bounds of
+collaborative prediction with low-rank matrix approxima-
+tion for “0-1” recommendation. Cand`es & Plan (2010) es-
+tablished error bounds of matrix completion problem with
+noises. However, those works did not consider how to
+achieve LRMA with small generalization error.
+Ensemble matrix approximation methods, such as ensem-
+ble MMMF (DeCoste, 2006), DFC (Mackey et al., 2011),
+LLORMA (Lee et al., 2013), WEMAREC (Chen et al.,
+2015), ACCAMS (Beutel et al., 2015) etc., have been pro-
+posed, which aimed to provide matrix approximations with
+high generalization performance by ensemble learning.
+However, those ensemble methods need to train a num-
+ber of biased weak matrix approximation models, which
+require much more computations than SMA. In addition,
+weak models in those methods are generated by heuristics
+which are not directly related to minimizing generalization
+error. Therefore, the optimality of generalization perfor-
+mance of those methods cannot be proved as in this work.
+
+6. Conclusion
+Low-rank matrix approximation methods are widely adopt-
+ed in machine learning applications. However, similar to
+other machine learning techniques, many existing low-rank
+matrix approximation methods suffer from the low gener-
+alization performance issue. This paper introduces the sta-
+bility notion to low-rank matrix approximation problem, in
+which models achieve high stability will have better gen-
+eralization performance. Then, SMA, a new low-rank ma-
+trix approximation framework, is proposed to achieve high
+stability, i.e., high generalization performance. Experimen-
+tal results on real-world datasets demonstrate that the pro-
+posed SMA method can achieve better prediction accura-
+cy than both state-of-the-art matrix approximation methods
+and ensemble methods in recommendation task.
+
+Low-Rank Matrix Approximation with Stability
+
+Acknowledgement
+This work was supported in part by the National Natural
+Science Foundation of China under Grant No. 61233016,
+and the National Science Foundation of USA under Grant
+Nos. 0954157, 1251257, 1334351, and 1442971.
+
+References
+Agarwal, Shivani and Niyogi, Partha. Generalization bounds for
+ranking algorithms via algorithmic stability. Journal of Ma-
+chine Learning Research, 10:441–474, 2009.
+
+Beutel, Alex, Ahmed, Amr, and Smola, Alexander J. ACCAM-
+S: additive co-clustering to approximate matrices succinctly.
+In Proceedings of the 24th International Conference on World
+Wide Web, pp. 119–129, 2015.
+
+Bousquet, Olivier and Elisseeff, Andr´e. Algorithmic stability and
+generalization performance. In Advances in Neural Informa-
+tion Processing Systems, pp. 196–202, 2001.
+
+Bousquet, Olivier and Elisseeff, Andr´e. Stability and generaliza-
+tion. Journal of Machine Learning Research, 2:499–526, 2002.
+
+Cand`es, Emmanuel J. and Plan, Yaniv. Matrix completion with
+
+noise. Proceedings of the IEEE, 98(6):925–936, 2010.
+
+Cand`es, Emmanuel J. and Recht, Benjamin. Exact matrix com-
+pletion via convex optimization. Communications of ACM, 55
+(6):111–119, 2012.
+
+Chen, Chao, Li, Dongsheng, Zhao, Yingying, Lv, Qin, and
+Shang, Li. WEMAREC: Accurate and scalable recommen-
+dation through weighted and ensemble matrix approximation.
+In Proceedings of the 38th International ACM SIGIR Confer-
+ence on Research and Development in Information Retrieval,
+pp. 303–312, 2015.
+
+DeCoste, Dennis. Collaborative prediction using ensembles of
+maximum margin matrix factorizations. In Proceedings of the
+23rd International Conference on Machine Learning, pp. 249–
+256, 2006.
+
+Keshavan, Raghunandan H., Montanari, Andrea, and Oh, Se-
+woong. Matrix completion from a few entries. IEEE Trans-
+actions on Information Theory, 56(6):2980–2998, 2010.
+
+Kohavi, Ron. A study of cross-validation and bootstrap for ac-
+curacy estimation and model selection. In Proceedings of the
+Fourteenth International Joint Conference on Artiﬁcial Intelli-
+gence, pp. 1137–1145, 1995.
+
+Koren, Yehuda. Factorization meets the neighborhood: a mul-
+tifaceted collaborative ﬁltering model. In Proceedings of the
+14th ACM SIGKDD international conference on Knowledge
+discovery and data mining, pp. 426–434, 2008.
+
+Koren, Yehuda, Bell, Robert, and Volinsky, Chris. Matrix fac-
+torization techniques for recommender systems. Computer, 42
+(8):30–37, 2009.
+
+Kutin, Samuel and Niyogi, Partha. Almost-everywhere algorith-
+In Proceedings of the
+mic stability and generalization error.
+18th Conference in Uncertainty in Artiﬁcial Intelligence, pp.
+275–282, 2002.
+
+Lan, Yanyan, Liu, Tie-Yan, Qin, Tao, Ma, Zhiming, and Li, Hang.
+Query-level stability and generalization in learning to rank. In
+Proceedings of the 25th international conference on Machine
+learning, pp. 512–519, 2008.
+
+Lawrence, Neil D. and Urtasun, Raquel. Non-linear matrix fac-
+torization with gaussian processes. In Proceedings of the 26th
+International Conference on Machine Learning, pp. 601–608,
+2009.
+
+Lee, Daniel D and Seung, H Sebastian. Algorithms for non-
+negative matrix factorization. In Advances in Neural Informa-
+tion Processing Systems, pp. 556–562, 2001.
+
+Lee, Joonseok, Kim, Seungyeon, Lebanon, Guy, and Singer, Y-
+oram. Local low-rank matrix approximation. In Proceedings
+of the 30th International Conference on Machine Learning, pp.
+82–90, 2013.
+
+London, Ben, Huang, Bert, Taskar, Ben, and Getoor, Lise. Collec-
+tive stability in structured prediction: Generalization from one
+example. In Proceedings of the 30th International Conference
+on Machine Learning, pp. 828–836, 2013.
+
+Mackey, Lester W, Jordan, Michael I, and Talwalkar, Ameet.
+Divide-and-conquer matrix factorization. In Advances in Neu-
+ral Information Processing Systems, pp. 1134–1142, 2011.
+
+Paterek, Arkadiusz. Improving regularized singular value decom-
+position for collaborative ﬁltering. In Proceedings of KDD cup
+and workshop, volume 2007, pp. 5–8, 2007.
+
+Salakhutdinov, Ruslan and Mnih, Andriy. Probabilistic matrix
+factorization. In Advances in Neural Information Processing
+Systems, pp. 1257–1264, 2007.
+
+Salakhutdinov, Ruslan and Mnih, Andriy. Bayesian probabilis-
+tic matrix factorization using markov chain monte carlo.
+In
+Proceedings of the 25th international conference on Machine
+learning, pp. 880–887. ACM, 2008.
+
+Shalev-Shwartz, Shai, Shamir, Ohad, Srebro, Nathan, and Sridha-
+ran, Karthik. Learnability, stability and uniform convergence.
+Journal of Machine Learning Research, 11:2635–2670, 2010.
+
+Srebro, Nathan, Alon, Noga, and Jaakkola, Tommi S. General-
+ization error bounds for collaborative prediction with low-rank
+matrices. In Advances in Neural Information Processing Sys-
+tems, pp. 1321–1328, 2004a.
+
+Srebro, Nathan, Rennie, Jason D. M., and Jaakkola, Tommi S.
+Maximum-margin matrix factorization. In Advances in Neural
+Information Processing Systems, pp. 1329–1336, 2004b.
+
+Toh, Kim-Chuan and Yun, Sangwoon. An accelerated proximal
+gradient algorithm for nuclear norm regularized linear least
+squares problems. Paciﬁc Journal of Optimization, 6(615-640):
+15, 2010.
+
+Yan, Junchi, Zhu, Mengyuan, Liu, Huanxi, and Liu, Yuncai. Vi-
+sual saliency detection via sparsity pursuit. IEEE Signal Pro-
+cessing Letters, 17(8):739–742, 2010.
+
+Yuan, Ting, Cheng, Jian, Zhang, Xi, Qiu, Shuang, and Lu, Han-
+qing. Recommendation by mining multiple user behaviors with
+group sparsity. In Proceedings of the 28th AAAI Conference on
+Artiﬁcial Intelligence, pp. 222–228, 2014.
+
+

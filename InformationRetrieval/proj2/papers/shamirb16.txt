@@ -1,0 +1,1837 @@
+Convergence of Stochastic Gradient Descent for PCA
+
+Ohad Shamir
+Weizmann Institute of Science, Israel
+
+OHAD.SHAMIR@WEIZMANN.AC.IL
+
+Abstract
+
+We consider the problem of principal component
+analysis (PCA) in a streaming stochastic setting,
+where our goal is to ﬁnd a direction of approx-
+imate maximal variance, based on a stream of
+i.i.d. data points in Rd. A simple and compu-
+tationally cheap algorithm for this is stochastic
+gradient descent (SGD), which incrementally up-
+dates its estimate based on each new data point.
+However, due to the non-convex nature of the
+problem, analyzing its performance has been a
+challenge. In particular, existing guarantees rely
+on a non-trivial eigengap assumption on the co-
+variance matrix, which is intuitively unnecessary.
+In this paper, we provide (to the best of our
+knowledge) the ﬁrst eigengap-free convergence
+guarantees for SGD in the context of PCA. This
+also partially resolves an open problem posed
+in (Hardt & Price, 2014). Moreover, under an
+eigengap assumption, we show that the same
+techniques lead to new SGD convergence guar-
+antees with better dependence on the eigengap.
+
+1. Introduction
+Principal component analysis (PCA)
+(Pearson, 1901;
+Hotelling, 1933) is a fundamental tool in data analysis and
+visualization, designed to ﬁnd the subspace of largest vari-
+ance in a given dataset (a set of points in Euclidean space).
+We focus on a simple stochastic setting, where the data
+x1, x2, . . . ∈ Rd is assumed to be drawn i.i.d.
+from an
+unknown underlying distribution, and our goal is to ﬁnd a
+direction of approximately maximal variance. This can be
+written as the optimization problem
+
+−w(cid:62)E[xx(cid:62)]w,
+
+min
+
+w:(cid:107)w(cid:107)=1
+
+(1)
+
+or equivalently, ﬁnding an approximate leading eigenvector
+of the covariance matrix E[xx(cid:62)].
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+(cid:80)m
+i=1 xix(cid:62)
+
+The conceptually simplest method for this task, given m
+sampled points x1, . . . , xm, is to construct the empirical
+covariance matrix 1
+i , and compute its leading
+m
+eigenvector by an eigendecomposition. Based on concen-
+tration of measure arguments, it is not difﬁcult to show
+
+that this would result in an O((cid:112)1/m)-optimal solution
+
+to Eq. (1). Unfortunately, the runtime of this method is
+O(md2 + d3). In large-scale applications, both m and d
+might be huge, and even forming the d × d covariance ma-
+trix, let alone performing an eigendecomposition, can be
+computationally prohibitive. A standard alternative to ex-
+act eigendecomposition is iterative methods, such as power
+iterations or the Lanczos method, which require perform-
+ing multiple products of a vector with the empirical covari-
+ance matrix. Although this doesn’t require computing and
+storing the matrix explicitly, it still requires multiple passes
+over the data, whose number may scale with eigengap pa-
+rameters of the matrix or the target accuracy (Kuczynski &
+Wozniakowski, 1992; Musco & Musco, 2015). Recently,
+new randomized algorithms for this problem were able to
+signiﬁcantly reduce the required number of passes, while
+maintaining the ability to compute high-accuracy solutions
+(Shamir, 2015b;a; Garber & Hazan, 2015; Jin et al., 2015).
+In this work, we consider the efﬁcacy of algorithms which
+perform a single pass over the data, and in particular,
+stochastic gradient descent (SGD). For solving Eq. (1),
+SGD corresponds to initializing at some unit vector w0,
+and then at each iteration t perform a stochastic gradient
+step with respect to xtx(cid:62)
+(which is an unbiased estimate
+of E[xx(cid:62)]), followed by a projection to the unit sphere:
+
+t
+
+wt := (I + ηxtx(cid:62)
+
+t )wt−1 , wt := wt/(cid:107)wt(cid:107).
+
+Here, η is a step size parameter. In the context of PCA,
+this is also known as Oja’s method (Oja, 1982; Oja &
+Karhunen, 1985). The algorithm is highly efﬁcient in terms
+of memory and runtime per iteration, requiring storage of
+a single d-dimensional vector, and performing only vector-
+vector and a vector-scalar products in each iteration.
+In the world of convex stochastic optimization and learn-
+ing, SGD has another remarkable property: Despite it being
+a simple, one-pass algorithm, it is essentially (worst-case)
+statistically optimal, attaining the same statistical estima-
+
+Convergence of SGD for PCA
+
+tion error rate as exact empirical risk minimization (Bous-
+quet & Bottou, 2008; Shalev-Shwartz et al., 2009; Shalev-
+Shwartz & Ben-David, 2014). Thus, it is quite natural to
+ask whether SGD also performs well for the PCA problem
+in Eq. (1), compared to statistically optimal but computa-
+tionally heavier methods.
+The study of SGD (or variants thereof) for PCA has gained
+interest in recent years, with some notable examples includ-
+ing (Arora et al., 2012; Balsubramani et al., 2013; Arora
+et al., 2013; Mitliagkas et al., 2013; Hardt & Price, 2014;
+De Sa et al., 2015; Jin et al., 2015; Jain et al., 2016). While
+experimentally SGD appears to perform quite well, its the-
+oretical analysis has proven difﬁcult, due to the non-convex
+nature of the objective function in Eq. (1). Remarkably,
+despite this non-convexity, ﬁnite-time convergence guaran-
+tees have been obtained under an eigengap assumption –
+namely, that the difference between the largest and 2nd-
+largest eigenvalues of E[xx(cid:62)] are separated by some ﬁxed
+value λ > 0. For example, (De Sa et al., 2015) requires
+O(d/λ2) iterations to ensure with high probability that
+one of the iterates is -optimal. Very recently, (Jain et al.,
+2016) improved this to O(1/λ2) with constant probabil-
+ity. (Jin et al., 2015) requires O(1/λ2 + 1/λ) iterations,
+provided we begin close enough to an optimal solution.
+Nevertheless, one may ask whether such eigengap depen-
+dencies are indeed necessary, if our goal is simply to ﬁnd
+an approximately optimal solution of Eq. (1). Intuitively, if
+E[xx(cid:62)] has two equal (or near equal) top eigenvalues, then
+we may still expect to get a solution which lies close to the
+subspace of these two top eigenvalues, and approximately
+minimizes Eq. (1), with the runtime not dependent on any
+eigengap. Unfortunately, existing results tell us nothing
+about this regime, and not just for minor technical reasons:
+These results are based on tracking the geometric conver-
+gence of the SGD iterates wt to a leading eigenvector of the
+covariance matrix. When there is no eigengap, there is also
+no single eigenvector to converge to, and such a geometric
+approach does not seem to work. Getting an eigengap-free
+analysis has also been posed as an open problem in (Hardt
+& Price, 2014). We note that while there are quite a few
+other single-pass, eigengap-free methods for this problem,
+such as (Warmuth & Kuzmin, 2006; 2008; Nie et al., 2013;
+Boutsidis et al., 2015; Garber et al., 2015; Kotłowski &
+Warmuth, 2015), their memory and runtime-per iteration
+requirements are much higher than SGD, often O(d2) or
+worse.
+In this work, we study the convergence of SGD for PCA,
+using a different technique than those employed in previous
+works, with the following main results:
+
+• We provide the ﬁrst (to the best of our knowledge)
+SGD convergence guarantee which does not pose an
+eigengap assumption. Roughly speaking, we prove
+
+that if the step size is chosen appropriately, then af-
+ter T iterations starting from random initialization,
+
+with positive probability, SGD returns an ˜O((cid:112)p/T )-
+
+optimal1 solution of Eq. (1), where p is a parameter
+depending on how the algorithm is initialized:
+
+1
+
+– If the algorithm is initialized from a warm-start
+(cid:104)v,w0(cid:105)2 ≤ O(1) for some
+point w0 such that
+leading eigenvector v of the covariance matrix,
+then p = O(1).
+– Under uniform random initialization on the unit
+Euclidean sphere, p = O(d), where d is the di-
+mension.
+– Using a more sophisticated initialization (requir-
+ing the usage of the ﬁrst O(d) iterations, but no
+warm-start point), p = ˜O(nA), where nA is the
+numerical rank of the covariance matrix. The nu-
+merical rank is a relaxation of the standard notion
+of rank, is always at most d and can be consid-
+ered a constant under some mild assumptions.
+
+• In the scenario of a positive eigengap λ > 0, and us-
+ing a similar proof technique, we prove an SGD con-
+vergence guarantee of O(p/λT ) (where p is as above)
+with positive probability. This guarantee is optimal
+in terms of dependence on T, λ, and in particular,
+has better dependence on λ compared to all previous
+works on SGD-like methods we are aware of (1/λ as
+opposed to 1/λ2).
+
+Unfortunately, a drawback of our guarantees is that they
+only hold with rather low probability: Ω(1/p), which can
+be small if p is large. Formally, this can be overcome by re-
+peating the algorithm ˜O(p) times, which ensures that with
+high probability, at least one of the outputs will be close to
+optimal. However, we suspect that these low probabilities
+are an artifact of our proof technique, and resolving it is left
+to future work.
+
+2. Setting
+We use bold-faced letters to denote vectors, and capital let-
+ters to denote matrices. Given a matrix M, we let (cid:107)M(cid:107)
+denote its spectral norm, and (cid:107)M(cid:107)F its Frobenius norm.
+We now present the formal problem setting, in a somewhat
+more general way than the PCA problem considered earlier.
+Speciﬁcally, we study the problem of solving
+
+min
+
+w∈Rd:(cid:107)w(cid:107)=1
+
+−w(cid:62)Aw,
+
+(2)
+
+where d > 1 and A is a positive semideﬁnite matrix, given
+access to a stream of i.i.d. positive semideﬁnite matrices ˜At
+1Throughout, we use O, Ω to hide constants, and ˜O, ˜Ω to hide
+
+constants and logarithmic factors.
+
+Convergence of SGD for PCA
+
+(cid:110)(cid:107) ˜At(cid:107),(cid:107) ˜At − A(cid:107)(cid:111)
+
+where b(cid:48) is a bound on max
+. Also,
+note that the choice of η in the theorem is not crucial, and
+similar bounds (with different c, c(cid:48)) can be shown for other
+√
+η = Θ(1/b
+
+pT ).
+
+1
+
+√
+
+The value of p in the theorem depends on how the initial
+point w0 is chosen. One possibility, of course, is if we can
+initialize the algorithm from a “warm-start” point w0 such
+(cid:104)v,w0(cid:105)2 ≤ O(1), in which case the bound in the theo-
+that
+rem becomes O(log(T )/
+T ) with probability Ω(1). Such
+a w0 may be given by some other algorithm, or alterna-
+tively, if we are interested in analyzing SGD in the regime
+where it is close to one of the leading eigenvectors.
+Of course, such an assumption is not always relevant, so let
+us turn to consider the performance without such a “warm-
+start”. For example, the simplest and most common way to
+initialize w0 is by picking it uniformly at random from the
+unit sphere. In that case, for any v, (cid:104)v, w0(cid:105)2 = Θ(1/d)
+with high constant probability2, so the theorem above ap-
+plies with p = O(d):
+Corollary 1. If w0 is chosen uniformly at random from the
+unit sphere in Rd, then Thm. 1 applies with p = O(d), and
+the returned w satisﬁes, with probability at least Ω(1/d),
+
+where E[ ˜At] = A (e.g. xtx(cid:62)
+t in the PCA case). Notice that
+the gradient of Eq. (2) at a point w equals 2Aw, with an
+unbiased stochastic estimate being 2 ˜Atw. Therefore, ap-
+plying SGD to Eq. (2) reduces to the following: Initialize at
+some unit-norm vector w0, and for t = 1, . . . , T , perform
+wt = (I + η ˜At)wt−1, wt = wt/(cid:107)wt(cid:107), returning wT . In
+fact, for the purpose of the analysis, it is sufﬁcient to con-
+sider a formally equivalent algorithm, which only performs
+the projection to the unit sphere at the end:
+
+• Initialize by picking a unit norm vector w0
+• For t = 1, . . . , T , perform wt = (I + η ˜At)wt−1
+• Return wT(cid:107)wT (cid:107)
+It is easy to verify that the output of this algorithm is math-
+ematically equivalent to the original SGD algorithm, since
+the stochastic gradient step amounts to multiplying wt−1
+by a matrix independent of wt−1, and the projection just
+amounts to re-scaling. In both cases, we can write the al-
+gorithm’s output in closed form as
+
+(cid:16)(cid:81)1
+(cid:13)(cid:13)(cid:13)(cid:16)(cid:81)1
+
+t=T (I + η ˜At)
+t=T (I + η ˜At)
+
+(cid:17)
+(cid:17)
+
+(cid:13)(cid:13)(cid:13) .
+
+w0
+
+w0
+
+3. Convergence Without an Eigengap
+
+Assumption
+
+Our main result is the following theorem, which analyzes
+the performance of SGD for solving Eq. (2).
+Theorem 1. Suppose that
+
+• For some leading eigenvector v of A,
+
+some p (assumed to be ≥ 8 for simplicity).
+
+(cid:104)v,w0(cid:105)2 ≤ p for
+
+1
+
+• For some b ≥ 1, both (cid:107) ˜At(cid:107)
+
+(cid:107)A(cid:107) and (cid:107) ˜At−A(cid:107)
+(cid:107)A(cid:107)
+
+with probability 1.
+
+are at most b
+
+If we run the algorithm above for T iterations with η =
+pT (assumed to be ≤ 1), then with probability at least
+√
+1
+b
+cp , the returned w satisﬁes
+1
+1 − w(cid:62)Aw
+
+√
+√
+(cid:107)A(cid:107) ≤ c(cid:48) log(T )b
+
+p
+
+,
+
+T
+
+where c, c(cid:48) are positive numerical constants.
+
+The proof appears in Subsection 5.1. Note that this is a
+multiplicative guarantee on the suboptimality of Eq. (2),
+since we normalize by (cid:107)A(cid:107), which is the largest magnitude
+Eq. (2) can attain. By multiplying both sides by (cid:107)A(cid:107), we
+can convert this to an additive bound of the form
+
+(cid:107)A(cid:107) − w(cid:62)Aw ≤ c(cid:48) log(T )b(cid:48)√
+
+√
+
+p
+
+,
+
+T
+
+(cid:32)
+
+(cid:33)
+
+,
+
+√
+
+d
+
+1 − w(cid:62)Aw
+
+(cid:107)A(cid:107) ≤ O
+
+√
+
+log(T )b
+T
+
+While providing some convergence guarantee, note that the
+probability of success is low, scaling down linearly with
+d. One way to formally solve this is to repeat the algo-
+rithm Ω(d) times, which ensures that with high probabil-
+ity, at least one output will succeed (and ﬁnding it can be
+done empirically by testing the outputs on a validation set).
+However, it turns out that by picking w0 in a smarter way,
+we can substantially improve those factors (at least in the
+analysis).
+Speciﬁcally, we consider the following method, parameter-
+ized by number of iterations T0, which are implemented
+before the main algorithm above:
+
+• Sample w from a standard Gaussian distribution on
+
+Rd
+
+T0
+
+˜Atw
+
+• Let w0 = 0.
+• For t = 1, . . . , T0, let w0 := w0 + 1
+• Return w0 := w0(cid:107)w0(cid:107).
+2One way to see this is by assuming w.l.o.g.
+1/(cid:80)
+
+that v = e1
+and noting that the distribution of w0 is the same as w/(cid:107)w(cid:107)
+where w has a standard Gaussian distribution, hence (cid:104)v, w0(cid:105)2 =
+j , and by using standard concentration tools it can be
+w2
+shown that the numerator is Θ(1) and the denominator is Θ(d)
+with high probability.
+
+j w2
+
+Convergence of SGD for PCA
+
+Essentially, instead of initializing from a random point w,
+we initialize from
+
+˜Aw
+(cid:107) ˜Aw(cid:107) , where ˜A =
+
+1
+T0
+
+T0(cid:88)
+
+t=1
+
+˜At.
+
+Since ˜A is a mean of T0 random matrices with mean A,
+this amounts to performing a single approximate power it-
+eration. Recently, it was shown that a single exact power
+iteration can improve the starting point of stochastic meth-
+ods for PCA (Shamir, 2015a). The method above extends
+this idea to a purely streaming setting, where we only have
+access to stochastic approximations of A.
+The improved theoretical properties of w0 with this initial-
+ization is formalized in the following lemma (where (cid:107)A(cid:107)F
+denotes the Frobenius norm of A):
+Lemma 1. The following holds for some numerical con-
+if T0 ≥
+stants c, c(cid:48) > 0: For w0 as deﬁned above,
+10 − 2
+d −
+cdb2 log(d),
+exp(−d/8),
+
+then with probability at
+
+least
+
+7
+
+• When ˜At is of rank 1 (which is the case, for instance,
+in PCA, where ˜At equals the outer product of the t-
+th datapoint xt), we have nA ≤ b2, where we recall
+that b upper bounds the scaled spectral norm of ˜At. In
+machine learning application, the data norm is often
+assumed to be bounded, hence b is not too large. To
+see why this holds, note that for rank 1 matrices, the
+spectral and Frobenius norms coincide, hence
+
+(cid:19)2
+(cid:18)(cid:107)A(cid:107)F(cid:107)A(cid:107)
+(cid:34)(cid:107) ˜A1(cid:107)F
+(cid:32)
+
+E
+
+(cid:107)A(cid:107)
+
+(cid:32)(cid:107)E[ ˜A1](cid:107)F
+(cid:32)
+(cid:35)(cid:33)2
+
+(cid:107)A(cid:107)
+
+(cid:33)2
+(cid:34)(cid:107) ˜A1(cid:107)
+
+=
+
+E
+
+=
+
+(cid:107)A(cid:107)
+
+nA =
+
+≤
+
+(cid:35)(cid:33)2
+
+≤ b2,
+
+where we used Jensen’s inequality.
+
+Similar to Corollary 1, we can also convert the bound of
+Corollary 2 into a high-probability bound, by repeating the
+algorithm ˜O(nA) times.
+
+1
+
+(cid:104)v, w0(cid:105)2 ≤ c(cid:48) log(d)nA,
+
+4. Convergence under an Eigengap
+
+Assumption
+
+where nA =
+
+(cid:107)A(cid:107)2
+(cid:107)A(cid:107)2 is the numerical rank of A.
+
+F
+
+The proof is provided in Subsection 5.2. Combining this
+with Thm. 1, we immediately get the following corollary:
+Corollary 2. If w0 is initialized as described above, then
+Thm. 1 applies with p = O(log(d)nA), and the returned w
+satisﬁes, with probability at least Ω(1/nA log(d)),
+
+1 − w(cid:62)Aw
+
+(cid:107)A(cid:107) ≤ O
+
+(cid:32)
+
+log(T )b(cid:112)log(d)nA
+
+(cid:33)
+
+,
+
+√
+
+T
+
+The improvement of Corollary 2 compared to Corollary 1
+depends on how much smaller is nA, the numerical rank
+of A, compared to d. We argue that in most cases, nA is
+much smaller, and often can be thought of as a moderate
+
+constant, in which case Corollary 2 provides an ˜O(cid:16) b√
+
+(cid:17)
+
+error bound with probability ˜Ω(1), at the cost of ˜O(db2)
+additional iterations at the beginning. Speciﬁcally:
+
+T
+
+• nA is always in [1, d], and in particular, can never be
+
+larger than d.
+
+• nA is always upper bounded by the rank of A, and is
+small even if A is only approximately low rank. For
+example, if the spectrum of A has polynomial decay
+i−α where α > 1, then nA will be a constant inde-
+pendent of d. Moreover, to begin with, PCA is usually
+applied in situations where we hope A is close to be-
+ing low rank.
+
+Although our main interest so far has been the convergence
+of SGD without any eigengap assumptions, we show in this
+section that our techniques also imply new bounds for PCA
+with an eigengap assumptions, which in certain aspects are
+stronger than what was previously known.
+Speciﬁcally, we consider the same setting as before, but
+where the ratio s1−s2
+, where s1, s2 are the leading singular
+values of the covariance matrix A is assumed to be strictly
+positive and lower bounded by some ﬁxed λ > 0. Us-
+ing this assumption and a proof largely similar to that of
+Thm. 1, we have the following theorem:
+Theorem 2. Under the same conditions as Thm. 1, suppose
+furthermore that
+
+s1
+
+• The top two eigenvalues of A have a gap λ(cid:107)A(cid:107) > 0
+• log2(T )b2p
+
+≤ log(T )b
+√
+
+√
+
+p
+
+λT
+
+T
+
+If we run the algorithm above for T > 1 iterations with
+(assumed to be ≤ 1), then with probability at
+η = log(T )
+least 1
+
+cp , the returned w satisﬁes
+
+λT
+
+1 − w(cid:62)Aw
+
+(cid:107)A(cid:107) ≤ c(cid:48) log2(T )b2p
+where c, c(cid:48) are positive numerical constants.
+
+λT
+
+,
+
+The proof (which uses techniques similar to the proof of
+Thm. 1) appears in the supplementary material. Consider-
+ing ﬁrst the technical conditions of the theorem, we note
+
+Convergence of SGD for PCA
+
+p
+
+T
+
+that assuming log2(T )b2p
+
+saying that T is sufﬁciently large so that the O(cid:16) log2(T )b2p
+bound provided by Thm. 2 is better than the O(cid:16) log(T )b
+
+≤ log(T )b
+√
+
+simply amounts to
+
+(cid:17)
+(cid:17)
+
+λT
+√
+
+√
+
+√
+
+λT
+
+T
+
+p
+
+1
+
+bound provided by Thm. 1, by more than a constant. This
+is the interesting regime, since otherwise we might as well
+choose η as in Thm. 1 and get a better bound without
+any eigengap assumptions. Moreover, as in Thm. 1, a
+similar proof would hold if the step size is replaced by
+c log(T )/λT for some constant c ≥ 1.
+As in Thm. 1, we note that p can be as large as d under
+random initialization, but this can be improved to the nu-
+merical rank of A using an approximate power iteration, or
+by analyzing the algorithm starting from a warm-start point
+(cid:104)v,w0(cid:105)2 ≤ O(1) for a leading eigenvector
+w0 for which
+v of A. Also, note that under an eigengap assumption, if
+1− w(cid:62)Aw(cid:107)A(cid:107) goes to 0 with the number of iterations T , it must
+hold that (cid:104)v, w(cid:105)2 goes to 1 for a leading eigenvector of A,
+so the analysis with p = O(1) is also relevant for analyzing
+SGD for sufﬁciently large T , once we’re sufﬁciently close
+to the optimum.
+Comparing the bound to previous bounds in the literature
+for SGD-like methods (which all assume an eigengap, e.g.
+(Balsubramani et al., 2013; Hardt & Price, 2014; De Sa
+et al., 2015; Jin et al., 2015)), an interesting difference is
+that the dependence on the eigengap λ is only 1/λ, as op-
+posed to 1/λ2 or worse.
+Intuitively, we are able to im-
+prove this dependence since we track the suboptimality di-
+rectly, as opposed to tracking how wT converges to a lead-
+ing eigenvector, say in terms of the Euclidean norm. This
+has an interesting parallel in the analysis of SGD for λ-
+strongly convex functions, where the suboptimality of wT
+decays as ˜O(1/λT ), although E[(cid:107)wT − w∗(cid:107)2] can only be
+bounded by O(1/λ2T ) (compare for instance Lemma 1 in
+(Rakhlin et al., 2012) and Theorem 1 in (Shamir & Zhang,
+2013)). Quite recently, Jin et al. ((Jin et al., 2015)) pro-
+posed another streaming algorithm which does have only
+1/λ dependence (at least for sufﬁciently large T ), and a
+high probability convergence rate which is even asymptoti-
+cally optimal in some cases. However, their formal analysis
+is from a warm-start point (which implies p = O(1) in our
+notation), whereas the analysis here applies to any starting
+point. Moreover, the algorithm in (Jin et al., 2015) is dif-
+ferent and more complex, whereas our focus here is on the
+simple and practical SGD algorithm. Finally, we remark
+that although an O(1/λT ) convergence rate is generally
+optimal (using any algorithm), we do not know whether the
+dependence on b and p in the convergence bound of Thm. 2
+for SGD is optimal, or whether it can be improved.
+
+5. Proofs
+5.1. Proof of Thm. 1
+
+The proof is based on a combination of several lemmas,
+whose proofs are rather technical. Due to lack of space,
+these proofs are deferred to the supplementary material.
+To simplify things, we will assume that we work in a coor-
+dinate system where A is diagonal, A = diag(s1, . . . , sd),
+where s1 ≥ s2 ≥ . . . ≥ sd ≥ 0, and s1 is the eigenvalue
+corresponding to v. This is without loss of generality, since
+the algorithm and the theorem conditions are invariant to
+the choice of coordinate system. Moreover, since the ob-
+jective function in the theorem is invariant to (cid:107)A(cid:107), we shall
+assume that (cid:107)A(cid:107) = s1 = 1. Under these assumptions, the
+theorem’s conditions reduce to:
+≤ p, for some p ≥ 8
+
+•
+• b ≥ 1 is an upper bound on (cid:107) ˜At(cid:107),(cid:107) ˜At − A(cid:107)
+
+1
+w2
+
+0,1
+
+Let  ∈ (0, 1) be a parameter to be determined later. The
+proof works by lower bounding the probability of the ob-
+jective function (which under the assumption (cid:107)A(cid:107) = 1,
+equals 1 − w(cid:62)Aw) being suboptimal by at most . This
+can be written as
+
+Pr
+
+T (I − A)wT
+(cid:107)wT(cid:107)2
+
+(cid:18) w(cid:62)
+(cid:19)
+T ((1 − )I − A)wT ≤ 0(cid:1) .
+Pr(cid:0)w(cid:62)
+
+≤ 
+
+,
+
+or equivalently,
+
+Letting
+
+VT = w(cid:62)
+
+T ((1 − )I − A)wT ,
+
+we need to lower bound Pr(VT ≤ 0).
+In analyzing the convergence of stochastic gradient de-
+scent, a standard technique to bound such probabilities is
+via a martingale analysis, showing that after every itera-
+tion, the objective function decreases by a certain amount.
+Unfortunately, due to the non-convexity of the objective
+function here, the amount of decrease at iteration t criti-
+cally depends on the current iterate wt, and in the worst
+case may even be 0 (e.g. if wt is orthogonal to the leading
+eigenvector, and there is no noise). Moreover, analyzing
+the evolution of wt is difﬁcult, especially without eigen-
+gap assumptions, where there isn’t necessarily some ﬁxed
+direction which wt converges to. Hence, we are forced to
+take a more circuitous route.
+In a nutshell, the proof is composed of three parts. First, we
+prove that if  and the step size η are chosen appropriately,
+then E[VT ] ≤ − ˜Ω
+. If we could also prove
+
+(cid:16)
+
+(cid:17)
+
+(1 + η)2T 
+p
+
+a concentration result, namely that VT is not much larger
+than its expectation, this would imply that Pr(VT ≤ 0) is
+indeed large. Unfortunately, we do not know how to prove
+such concentration. However, it turns out that it is possi-
+ble to prove that VT is not much smaller than its expected
+
+value: More precisely, that VT ≥ − ˜O(cid:0)(1 + η)2T (cid:1) with
+
+high probability. We then show that given such a high-
+probability lower bound on VT , and a bound on its expec-
+tation, we can produce an upper bound on VT which holds
+with probability ˜Ω(1/p), hence leading to the result stated
+in the theorem.
+We begin with a preliminary technical lemma:
+Lemma 2. For any , η ∈ (0, 1), and integer k ≥ 0,
+
+(1 + ηs)k(1 −  − s) ≤ 1 + 2
+
+max
+s∈[0,1]
+
+(1 + η(1 − ))k
+
+η(k + 1)
+
+.
+
+T ((1− )I −
+Using this lemma, we now prove that VT = w(cid:62)
+A)wT has a large negative expected value. To explain the
+intuition, note that if we could have used the exact A in-
+stead of the stochastic approximations ˜At in deriving wT ,
+then we would have
+T ((1 − )I − A)wT
+w(cid:62)
+
+= w(cid:62)
+
+0 (I + ηA)T ((1 − )I − A)(I + ηA)T w0
+d(cid:88)
+(1 + ηsj)2T (1 −  − sj)w2
+
+=
+
+0,j
+
+j=1
+
+(1 + ηs1)2T (1 −  − s1)
+
+≤ 1
+p
+
+≤ 1
+p
+
+j=2
+
+d(cid:88)
+ d(cid:88)
+
+j=2
+
+0,j is at most
+
+(cid:80)d
+
+j=1 w2
+− 
+p
+
++
+
+(1 + ηsj)2T (1 −  − sj)w2
+
+0,j
+
+(1 + ηs1)2T (1 −  − s1)
+
+ max
+
+s∈[0,1]
+
++
+
+w2
+0,j
+
+(1 + ηs)2T (1 −  − s),
+
+which by the assumptions s1 = 1 and 1 = (cid:107)w0(cid:107)2 =
+
+(1 + η)2T + max
+s∈[0,1]
+
+(1 + ηs)2T (1 −  − s).
+
+(cid:16) 
+p (1 + η)2T(cid:17)
+
+Applying Lemma 2 and picking η,  appropriately, it can be
+shown that the above is at most −Ω
+Unfortunately, this calculation doesn’t apply in practice,
+since we use the stochastic approximations ˜At instead of
+A. However, using more involved calculations, we prove
+in the lemma below that the expectation is still essentially
+the same, provided , η are chosen appropriately.
+
+.
+
+Convergence of SGD for PCA
+
+(cid:113) 1
+pT ≤ 1 and  = c log(T )b
+√
+
+√
+
+Lemma 3. If η = 1
+b
+some sufﬁciently large constant c, then it holds that
+
+T
+
+p
+
+≤ 1 for
+
+E[VT ] ≤ − (1 + η)2T 
+4p
+
+.
+
+Having proved an upper bound on E[VT ], we now turn to
+prove a high-probability lower bound on VT . The proof
+is based on relating VT to (cid:107)wT(cid:107)2, and then performing a
+rather straightforward martingale analysis of log((cid:107)wT(cid:107)2).
+Lemma 4. Suppose that ˜At is positive semideﬁnite for all
+t, and Pr((cid:107) ˜At(cid:107) ≤ b) = 1. Then for any δ ∈ (0, 1), we
+have with probability at least 1 − δ that
+VT > − exp
+
+ηb(cid:112)T log(1/δ) + (b2 + 3)T η2(cid:17)
+
+(1+η)2T .
+
+(cid:16)
+
+We now have most of the required components to prove
+Thm. 1. First, we showed in Lemma 3 that if η = 1
+pT ,
+b
+then
+
+(cid:113) 1
+for  = O(b log(T )(cid:112)p/T ). Using the same step size η,
+(cid:33)
+(cid:32)
+
+E[VT ] ≤ −(1 + η)2T 
+4p
+
+Lemma 4 implies that
+
+(cid:32)(cid:115)
+
+(cid:33)
+
+(3)
+
+.
+
+log(1/δ)
+
+1 + 3/b2
+
+Pr
+
+VT ≤ − exp
+
+(1 + η)2T 
+
++
+
+p
+
+is at most δ, and since we assume b ≥ 1 (hence 1 + 3/b2 ≤
+4), this implies that
+
+(cid:33)(cid:33)
+
+≤ δ.
+(4)
+
+,
+
+(cid:27)
+(cid:21)
+
+(cid:32)
+
+(cid:32)
+
+and
+
+Pr
+
+Pr
+
+−
+
+VT
+
+exp(4/p)(1 + η)2T 
+
+≥ exp
+
+log(1/δ)
+
+p
+
+Now, deﬁne the non-negative random variable
+
+RT = max
+
+0,−
+
+exp(4/p)(1 + η)2T 
+
+and note that by its deﬁnition,
+
+(cid:26)
+
+(cid:20)
+
+E[RT ] ≥ E
+
+−
+
+exp(4/p)(1 + η)2T 
+
+(cid:32)(cid:115)
+
+(cid:33)(cid:33)
+
+RT ≥ exp
+
+(cid:32)
+
+log(1/δ)
+
+p
+
+= Pr
+
+−
+
+VT
+
+exp(4/p)(1 + η)2T 
+
+≥ exp
+
+(cid:32)(cid:115)
+
+(cid:33)(cid:33)
+
+.
+
+log(1/δ)
+
+p
+
+Using Eq. (3) and Eq. (4), this implies that
+E[RT ] ≥ 1/ (4p exp(4/p))
+
+p
+
+(cid:32)(cid:115)
+
+VT
+
+VT
+
+Convergence of SGD for PCA
+
+and
+
+(cid:32)
+
+Pr
+
+RT ≥ exp
+
+(cid:32)(cid:115)
+
+(cid:33)(cid:33)
+
+log(1/δ)
+
+p
+
+≤ δ.
+
+To summarize the development so far, we deﬁned a non-
+negative random variable RT , which is bounded with high
+probability, yet its expectation is at least Ω(1/p). The fol-
+lowing lemma shows that for a bounded non-negative ran-
+dom variable with “large” expectation, the probability of it
+being on the same order as its expectation cannot be too
+small:
+Lemma 5. Let X be a non-negative random variable such
+that for some α, β ∈ [0, 1], we have E[X] ≥ α, and for any
+δ ∈ (0, 1],
+
+(cid:16)
+(cid:16)
+
+(cid:17)(cid:17) ≤ δ.
+(cid:16)
+β(cid:112)log(1/δ)
+(cid:16)− 2
+(cid:17)
+(cid:17) ≥ α − exp
+
+β2
+
+.
+
+15
+
+X ≥ exp
+
+X >
+
+α
+2
+
+Then
+
+Pr
+
+Pr
+
+Before sketching the proof of the lemma, let us show to use
+it to prove Thm. 1. Applying it on the random variable RT ,
+4p exp(4/p),
+which satisﬁes the lemma conditions with α =
+
+1
+
+rather than just bounded with high probability. Then we
+would have
+
+(cid:105)
+
+(cid:105)
+
++ Pr
+
+= Pr
+
+(cid:16)
+
+(cid:16)
+(cid:16)
+(cid:16)
+
+α ≤ E[X]
+
+X ≥ α
+2
+
+(cid:17) E(cid:104)
+(cid:17) E(cid:104)
+(cid:17) · 1 + Pr
+(cid:16)
+(cid:17)
+which implies that α ≤ (cid:0)1 − α
+(cid:1) ≥
+therefore Pr(cid:0)X ≥ α
+
+X <
+X ≥ α
+2
+X ≥ α
+2
+
+≤ Pr
+
+= Pr
+
+α
+2
+
++
+
+X|X ≥ α
+2
+
+X|X ≤ α
+2
+
+α
+2
+
+X <
+
+(cid:16)
+(cid:17) · α
+(cid:17)(cid:17) α
+(cid:16)
+(cid:1) Pr(cid:0)X ≥ α
+(cid:1) + α
+
+X ≥ α
+2
+
+2
+
+2
+
+,
+
+1 − Pr
+
+2
+
+2
+
+2
+
+α/2
+
+1−α/2 ≥ α
+
+2 , and
+2 . As a result,
+X is at least one-half its expectation lower bound (α) with
+probability at least α/2. The proof of Lemma 5, presented
+below, follows the same intuition, but uses a more delicate
+analysis since X is actually only upper bounded with high
+probability.
+
+5.2. Proof of Lemma 1
+Deﬁne ∆ = (cid:107) ˜A − A(cid:107). Also, let s1 ≥ s2 ≥ . . . ≥ sd ≥ 0
+be the d eigenvalues of A, with eigenvectors v1, . . . , vd,
+where we assume that v = v1. Using the facts (x + y)2 ≤
+2x2 + 2y2 and (cid:107)v1(cid:107) = 1, we have
+
+1
+
+(cid:104)v1, w0(cid:105)2 =
+
+(cid:107) ˜Aw(cid:107)2
+(cid:104)v1, ˜Aw(cid:105)2
+
+(cid:107)Aw + ( ˜A − A)w(cid:107)2
+
+(cid:16)(cid:104)v1, Aw(cid:105) + (cid:104)v1, ( ˜A − A)w(cid:105)(cid:17)2
+
+2(cid:107)Aw(cid:107)2 + 2(cid:107)( ˜A − A)w(cid:107)2
+
+(cid:104)v1, Aw(cid:105)2 + 2(cid:104)v1, Aw(cid:105)(cid:104)v1, ( ˜A − A)w(cid:105)
+
+2(cid:107)Aw(cid:107)2 + 2(cid:107)w(cid:107)2∆2
+
+(cid:104)v1, Aw(cid:105)2 − 2|(cid:104)v1, Aw(cid:105)|(cid:107)w(cid:107)∆
+
+,
+
+=
+
+≤
+
+≤
+
+where we implicitly assume that ∆ is sufﬁciently small for
+the denominator to be positive (eventually, we will pick T0
+large enough to ensure this).
+Recall that v1, . . . , vd forms an orthonormal basis for Rd,
+i=1 vi(cid:104)vi, w(cid:105). Therefore, we can write the
+
+above as
+
+so w = (cid:80)d
+i=1 sivi(cid:104)vi, w(cid:105)(cid:17)2
+(cid:16)(cid:80)d
+2(cid:80)d
+(cid:16)(cid:80)d
+
++ 2(cid:107)w(cid:107)2∆2
+2
+(s1(cid:104)v1, w(cid:105))2 − 2|s1(cid:104)v1, w(cid:105)|(cid:107)w(cid:107)∆
+i(cid:104)vi, w(cid:105)2 + 2(cid:107)w(cid:107)2∆2
+1(cid:104)v1, w(cid:105)2 − 2|s1(cid:104)v1, w(cid:105)|(cid:107)w(cid:107)∆
+s2
+≤ 2
+
+(cid:17)(cid:0)maxi(cid:104)vi, w(cid:105)2(cid:1) + 2(cid:107)w(cid:107)2∆2
+
+i=1 s2
+i
+1(cid:104)v1, w(cid:105)2 − 2|s1(cid:104)v1, w(cid:105)|(cid:107)w(cid:107)∆
+s2
+
+i=1 s2
+
+=
+
+.
+
+(cid:27)
+
+>
+
+1
+
+(cid:19)
+
+1
+
+(cid:19)
+
+β =
+
+p, we have
+
+1
+
+− exp (−2p)
+
+4p exp(4/p)
+
+RT >
+
+(cid:26)
+
+8p exp(4/p)
+
+−VT
+
+= Pr
+
+max
+
+0,
+
+1
+
+VT
+
+1
+15
+≤ Pr
+
+(cid:113) 1
+(cid:18)
+(cid:18)
+(cid:18)
+(cid:18)
+(cid:18)
+
+= Pr
+
+−
+
+= Pr
+
+(cid:19)
+
+(cid:19)
+
+(cid:19)
+
+exp(4/p)(1 + η)2T 
+
+8p exp(4/p)
+
+>
+
+8p
+
+8p exp(4/p)
+≤ Pr (VT ≤ 0)
+
+exp(4/p)(1 + η)2T 
+VT ≤ − (1 + η)2T 
+(cid:16)
+100p for any p ≥ 8, hence we obtained
+
+(cid:17)
+4p exp(4/p) − exp (−2p)
+
+1
+
+1
+
+The term 1
+15
+be at least
+
+can be veriﬁed to
+
+Pr(VT ≤ 0) ≥ 1
+100p
+
+.
+
+√
+
+(cid:107)wT (cid:107)2
+
+≤ , where  = c log(T )b
+√
+
+As discussed at the beginning of the proof, VT ≤ 0 implies
+that wT (I−A)wT
+is the value
+chosen in Lemma 3, and the theorem is established.
+We now turn to sketch the proof of Lemma 5 (like all lem-
+mas in this subsection, the formal proof appears in the sup-
+plementary material). To explain the intuition, suppose that
+X in the lemma was actually at most 1 with probability 1,
+
+T
+
+p
+
+Convergence of SGD for PCA
+
+(cid:115)
+
+(cid:115)
+(cid:17)
+1 − 2s2
+
+To simplify notation, since w is drawn from a standard
+Gaussian distribution, which is rotationally invariant, we
+can assume without loss of generality that (v1, . . . , vd) =
+(e1, . . . , ed), the standard basis, so the above reduces to
+
+(cid:16)(cid:80)d
+
+2
+
+(cid:17)
+1 − 2|s1w1|(cid:107)w(cid:107)∆
+
+maxi w2
+
+i=1 s2
+i
+1w2
+s2
+
+i + 2(cid:107)w(cid:107)2∆2
+
+.
+
+Recall that ∆ = (cid:107) ˜A − A(cid:107), where ˜A is the average of T0
+independent random matrices with mean A, and spectral
+norm at most (cid:107)A(cid:107)b. Using a Hoeffding matrix bound (e.g.
+(Tropp, 2012)), and the fact that (cid:107)A(cid:107) = s1, it follows that
+with probability at least 1 − δ,
+
+∆ ≤ (cid:107)A(cid:107)b
+
+8 log(d/δ)
+
+= s1
+
+T0
+
+8b2 log(d/δ)
+
+T0
+
+.
+
+(cid:16)(cid:80)d
+
+2
+
+Plugging into the above, we get an upper bound of
+
+i=1 s2
+i
+
+s2
+1w2
+
+maxi w2
+
+i + (cid:107)w(cid:107)2s2
+
+1|w1|(cid:107)w(cid:107)(cid:113) 8b2 log(d/δ)
+
+1
+
+T0
+
+T0
+
+16b2 log(d/δ)
+
+,
+
+holding with probability at least 1 − δ. Dividing both nu-
+merator and denominator by s2
+1, and recalling that nA =
+(cid:107)A(cid:107)2
+(cid:107)A(cid:107)2 =
+
+, the above equals
+
+(cid:80)d
+
+F
+
+i=1 s2
+s2
+1
+
+i
+
+T0
+
+T0
+
+=
+
+w2
+
+2nA maxi w2
+
+i + (cid:107)w(cid:107)2 16b2 log(d/δ)
+
+2nA maxi w2
+|w1|
+
+1 − 2|w1|(cid:107)w(cid:107)(cid:113) 8b2 log(d/δ)
+(cid:19) .
+(cid:18)
+|w1| − 2(cid:107)w(cid:107)(cid:113) 8b2 log(d/δ)
+i + (cid:107)w(cid:107)2 16b2 log(d/δ)
+that Pr(cid:0)w2
+(cid:1)
+(cid:16)(cid:107)w(cid:107) ≥ √
+
+(cid:17) ≤
+i ≥ 18 log(d)(cid:1) ≤ 1
+(cid:1) (see for instance the proof of Lemma 1 in
+
+standard Gaussian
+holds
+
+concentration
+1 ≤ 1
+≤
+
+d, and Pr
+
+ar-
+10,
+3
+
+(5)
+
+2d
+
+it
+
+T0
+
+T0
+
+8
+
+on
+
+Based
+guments,
+
+Pr(cid:0)maxi w2
+exp(cid:0)− d
+
+8
+
+(Shamir, 2015a), and Corollary 2.3 in (Barvinok, 2005)).
+Combining the above with a union bound, it holds that
+10 − 1
+d − exp(−d/8),
+with probability at least 1 − δ − 3
+Eq. (5) is at most
+(cid:19) .
+(cid:113) 8db2 log(d/δ)
+
+36 log(d)nA + 32db2 log(d/δ)
+
+(cid:18)
+
+T0
+
+√
+8 − 2
+
+1
+
+2
+
+1
+8
+
+T0
+
+1
+
+(cid:104)v1,w0(cid:105)2 , pick-
+Recalling that this is an upper bound on
+ing δ = 1/d for simplicity, and slightly simplifying, we
+10 − 2
+d − exp(−d/8),
+showed that with probability at least 7
+(cid:19) .
+(cid:113) db2 log(d)
+(cid:104)v1, w0(cid:105)2 ≤ 36 log(d)nA + 64b2 log(d)
+
+(cid:18)
+
+√
+
+T0
+
+1
+
+1
+
+8 − 8
+
+2
+
+1
+8
+
+T0
+
+Since nA ≥ 1, then by picking T0 ≥ cdb2 log(d) for a sufﬁ-
+(cid:104)v1,w0(cid:105)2 ≤ c(cid:48) log(d)nA
+ciently large constant c, we get that
+for a numerical constant c(cid:48), as required.
+
+1
+
+6. Discussion
+In this paper, we studied the convergence of plain-vanilla
+stochastic gradient descent (SGD) for the PCA optimiza-
+
+tion problem (Eq. (1)) in Rd. We proved an O((cid:112)p/T ) con-
+
+vergence rate after T iterations, with probability Ω(1/p),
+where p is a parameter depending on the quality of the ini-
+tialization point. To the best of our knowledge, this is the
+ﬁrst eigengap-free bound for SGD in the context of PCA.
+Moreover, the proof technique is quite different than stan-
+dard SGD convergence proofs, and instead directly anal-
+yses the probability of convergence after a given number
+of iterations. In the case of a ﬁxed eigengap λ > 0, the
+same techniques yield a new O(p/λT ) convergence bound,
+which has better dependence on λ compared to previous
+works. Although p can be as large as O(d) with random
+initialization, we showed how a more sophisticated initial-
+ization strategy can improve it to O(nA) where nA is the
+numerical rank of the covariance matrix.
+The paper leaves open several questions. First, the prob-
+abilities at which the bounds above hold are rather small,
+and depend on the initialization point. We conjecture that it
+is possible to improve these to at least a universal constant
+(without the need to repeat the algorithm several times),
+possibly using a tighter large deviation analysis. A second
+question is whether SGD is worst-case optimal for PCA in
+a streaming setting, or whether there is an inherent price to
+pay for using such an O(d)-memory method (e.g. the p fac-
+tors in our bounds). In a very recent and elegant work, (Jain
+et al., 2016) showed that standard SGD is indeed essentially
+optimal, but for a different performance metric than ours,
+and under an eigengap assumption. Whether this can be ex-
+tended to our setting remains to be seen. Finally, it would
+be interesting to extend the analysis here to block methods,
+where k > 1 eigenvectors are to be extracted simultane-
+ously.
+
+Acknowledgments: This research is supported in part by
+an FP7 Marie Curie CIG grant, the Intel ICRI-CI Institute,
+and Israel Science Foundation grant 425/13. We thank Ofer
+Zeitouni for several illuminating discussions.
+
+References
+Arora, R., Cotter, A., Livescu, K., and Srebro, N. Stochas-
+In 2012 50th An-
+tic optimization for PCA and PLS.
+nual Allerton Conference on Communication, Control,
+and Computing, 2012.
+
+Arora, R., Cotter, A., and Srebro, N. Stochastic optimiza-
+
+Convergence of SGD for PCA
+
+tion of PCA with capped MSG. In NIPS, 2013.
+
+Balsubramani, A., Dasgupta, S., and Freund, Y. The fast
+
+convergence of incremental PCA. In NIPS, 2013.
+
+Barvinok, A.
+
+Measure
+
+lecture
+http://www.math.lsa.umich.edu/
+
+concentration
+
+notes.
+˜barvinok/total710.pdf, 2005.
+
+Bousquet, Olivier and Bottou, L´eon. The tradeoffs of large
+scale learning. In Advances in neural information pro-
+cessing systems, pp. 161–168, 2008.
+
+Boutsidis, C., Garber, D., Karnin, Z., and Liberty, E. On-
+
+line principal components analysis. In SODA, 2015.
+
+De Sa, C., Olukotun, K., and R´e, C. Global convergence of
+stochastic gradient descent for some nonconvex matrix
+problems. In ICML, 2015.
+
+Garber, D. and Hazan, E. Fast and simple pca via convex
+
+optimization. arXiv preprint arXiv:1509.05647, 2015.
+
+Garber, D., Hazan, E., and Ma, T. Online learning of eigen-
+
+vectors. In ICML, 2015.
+
+Nie, J., Kotłowski, W., and Warmuth, M. Online pca with
+In Algorithmic Learning Theory, pp.
+
+optimal regrets.
+98–112. Springer, 2013.
+
+Oja, E. Simpliﬁed neuron model as a principal component
+analyzer. Journal of mathematical biology, 15(3):267–
+273, 1982.
+
+Oja, E. and Karhunen, J. On stochastic approximation of
+the eigenvectors and eigenvalues of the expectation of a
+random matrix. Journal of mathematical analysis and
+applications, 106(1):69–84, 1985.
+
+Pearson, K. Liii. on lines and planes of closest ﬁt to systems
+of points in space. The London, Edinburgh, and Dublin
+Philosophical Magazine and Journal of Science, 2(11):
+559–572, 1901.
+
+Rakhlin, A., Shamir, O., and Sridharan, K. Making gradi-
+ent descent optimal for strongly convex stochastic opti-
+mization. In ICML, 2012.
+
+Shalev-Shwartz, S. and Ben-David, S. Understanding Ma-
+chine Learning: From Theory to Algorithms. Cambridge
+University Press, 2014.
+
+Hardt, M. and Price, E. The noisy power method: A meta
+
+algorithm with applications. In NIPS, 2014.
+
+Shalev-Shwartz, S., Shamir, O., Srebro, N., and Sridharan,
+
+K. Stochastic convex optimization. In COLT, 2009.
+
+Hotelling, H. Analysis of a complex of statistical variables
+into principal components. Journal of educational psy-
+chology, 24(6):417, 1933.
+
+Shamir, O. Fast stochastic algorithms for svd and pca:
+Convergence properties and convexity. arXiv preprint
+arXiv:1507.08788, 2015a.
+
+Shamir, O. A stochastic PCA and SVD algorithm with an
+
+exponential convergence rate. In ICML, 2015b.
+
+Shamir, O. and Zhang, T. Stochastic gradient descent for
+non-smooth optimization: Convergence results and opti-
+mal averaging schemes. In ICML, 2013.
+
+Tropp, J. User-friendly tail bounds for sums of random
+matrices. Foundations of Computational Mathematics,
+12(4):389–434, 2012.
+
+Warmuth, M. and Kuzmin, D. Online variance minimiza-
+
+tion. In Learning theory, pp. 514–528. Springer, 2006.
+
+Warmuth, M. and Kuzmin, D. Randomized online pca al-
+gorithms with regret bounds that are logarithmic in the
+dimension. Journal of Machine Learning Research, 9
+(10):2287–2320, 2008.
+
+Jain, Prateek, Jin, Chi, Kakade, Sham M, Netrapalli, Pra-
+neeth, and Sidford, Aaron. Matching matrix bern-
+stein with little memory: Near-optimal ﬁnite sam-
+arXiv preprint
+ple guarantees for oja’s algorithm.
+arXiv:1602.06929, 2016.
+
+Jin, C., Kakade, S., Musco, C., Netrapalli, P., and Sidford,
+A. Robust shift-and-invert preconditioning: Faster and
+more sample efﬁcient algorithms for eigenvector com-
+putation. arXiv preprint arXiv:1510.08896, 2015.
+
+Kotłowski, W. and Warmuth, M. Pca with gaussian pertur-
+
+bations. arXiv preprint arXiv:1506.04855, 2015.
+
+Kuczynski, J. and Wozniakowski, H. Estimating the largest
+eigenvalue by the power and lanczos algorithms with a
+random start. SIAM journal on matrix analysis and ap-
+plications, 13(4):1094–1122, 1992.
+
+Mitliagkas, I., Caramanis, C., and Jain, P. Memory limited,
+
+streaming PCA. In NIPS, 2013.
+
+Musco, C. and Musco, C. Stronger approximate singular
+value decomposition via the block lanczos and power
+methods. arXiv preprint arXiv:1504.05477, 2015.
+
+

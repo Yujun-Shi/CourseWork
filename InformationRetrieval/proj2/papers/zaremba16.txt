@@ -1,0 +1,1341 @@
+Learning Simple Algorithms from Examples
+
+Wojciech Zaremba§
+New York University
+Tomas Mikolov Armand Joulin Rob Fergus
+Facebook AI Research
+
+WOJ.ZAREMBA@GMAIL.COM
+
+{TMIKOLOV,AJOULIN,ROBFERGUS}@FB.COM
+
+Abstract
+
+We present an approach for learning simple al-
+gorithms such as copying, multi-digit addition
+and single digit multiplication directly from ex-
+amples. Our framework consists of a set of in-
+terfaces, accessed by a controller. Typical inter-
+faces are 1-D tapes or 2-D grids that hold the in-
+put and output data. For the controller, we ex-
+plore a range of neural network-based models
+which vary in their ability to abstract the under-
+lying algorithm from training instances and gen-
+eralize to test examples with many thousands of
+digits. The controller is trained using Q-learning
+with several enhancements and we show that the
+bottleneck is in the capabilities of the controller
+rather than in the search incurred by Q-learning.
+
+1. Introduction
+Many every day tasks require a multi-step interaction with
+the world. For example, picking an apple from a tree re-
+quires visual localization of the apple; extending the arm
+and then ﬁne muscle control, guided by visual feedback,
+to pluck it from the tree. While each individual procedure
+is not complex, the task nevertheless requires careful se-
+quencing of operations across both visual and motor sys-
+tems.
+This paper explores how machines can learn algorithms in-
+volving a similar compositional structure. Since our em-
+phasis is on learning the correct sequence of operations,
+we consider the domain of arithmetic where the operations
+themselves are very simple. For example, although learn-
+ing to add two digits is straightforward, solving addition
+of two multi-digit numbers requires precise coordination
+of this operation with movement over the sequence and
+
+§The author is now at OpenAI.
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+recording of the carry. We explore a variety of algorithms
+in this domain, including complex tasks involving addition
+and multiplication.
+Our approach formalizes the notion of a central controller
+that interacts with the world via a set of interfaces, ap-
+propriate to the task at hand. The controller is a neural
+network model which must learn to control the interfaces,
+via a set of discrete actions (e.g. “move input tape left”,
+“read”, “write symbol to output tape”, “write nothing this
+time step” ) to produce the correct output for given input
+patterns. Speciﬁcally, we train the controller from large
+sets of examples of input and output patterns using rein-
+forcement learning. Our reward signal is sparse, only being
+received when the model emits the correct symbol on the
+output tape.
+We consider two separate settings. In the ﬁrst, we provide
+supervision in the form of ground truth actions. In the sec-
+ond, we train only with input-output pairs (i.e. no supervi-
+sion over actions). While we are able to solve all the tasks
+in the latter case, the supervised setting provides insights
+about the model limitations and an upper bound on the per-
+formance. We evaluate our model on sequences far longer
+than those present during training. Surprisingly, we ﬁnd
+that controllers with even modest capacity to recall previ-
+ous states can easily overﬁt the short training sequences
+and not generalize to the test examples, even if the correct
+actions are provided. Even with an appropriate controller,
+off-the-shelf Q-learning fails on the majority of our tasks.
+We therefore introduce a series of modiﬁcations that dra-
+matically improve performance. These include: (i) a novel
+dynamic discount term that makes the reward invariant to
+the sequence length; (ii) an extra penalty that aids general-
+ization and (iii) the deployment of Watkins Q-lambda (Sut-
+ton & Barto, 1998).
+
+2. Model
+Our model consists of an RNN-based controller that ac-
+cesses the environment through a series of pre-deﬁned in-
+
+Learning Simple Algorithms from Examples
+
+Input Interface
+
+Output Interface Memory Interface
+
+Past State
+
+Controller Output
+
+Controller
+
+Controller Input
+
+Future State
+
+(a)
+
+Input Interface
+
+Output Interface Memory Interface
+
+(c)
+
+(b)
+
+Figure 1. (a): The input tape and grid interfaces. Both have a sin-
+gle head (gray box) that reads one character at a time, in response
+to a read action from the controller. It can also move the location
+of the head with the left and right (and up, down) actions. (b) An
+overview of the model, showing the abstraction of controller and
+a set of interfaces (in our experiments the memory interface is not
+used). (c) An example of the model applied to the addition task.
+At time step t1, the controller, a form of RNN, reads the symbol
+4 from the input grid and outputs a no-operation symbol ((cid:11)) on
+the output tape and a down action on the input interface, as well
+as passing the hidden state to the next timestep.
+
+terfaces. Each interface has a speciﬁc structure and set of
+actions it can perform. The interfaces are manually selected
+according to the task (see Section 3). The controller is the
+only part of the system that learns and has no prior knowl-
+edge of how the interfaces operate. Thus the controller
+must learn the sequence of actions over the various inter-
+faces that allow it to solve a task. We make use of three
+different interfaces:
+Input Tape: This provides access to the input data symbols
+stored on an “inﬁnite” 1-D tape. A read head accesses a
+single character at a time through the read action. The head
+can be moved via the left and right actions.
+Input Grid: This is a 2D version of the input tape where
+the read head can now be moved by actions up, down, left
+and right.
+Output Tape: This is similar to the input tape, except that
+the head now writes a single symbol at a time to the tape,
+as provided the controller. The vocabulary includes a no-
+operation symbol (NOP) enabling the controller to defer
+output if it desires. During training, the written and target
+symbols are compared using a cross-entropy loss. This pro-
+vides a differentiable learning signal that is used in addition
+to the sparse reward signal provided by the Q-learning.
+Fig. 1(a) shows examples of the input tape and grid in-
+terfaces. Fig. 1(b) gives an overview of our controller–
+interface abstraction and Fig. 1(c) shows an example of this
+on the addition task (for two time steps).
+For the controller, we explore several recurrent neural net-
+work architectures:
+two different sizes of 1-layer LSTM
+(Hochreiter & Schmidhuber, 1997), a gated-recurrent unit
+
+(GRU)(Cho et al., 2014) and a vanilla feed-forward net-
+work. Note that RNN-based models are able to remem-
+ber previous network state, unlike the the feed-forward net-
+work. This is important because some tasks explicitly re-
+quire some form of memory, e.g. the carry in addition.
+The simple algorithms we consider (see Section 3) have de-
+terministic solutions that can be expressed as a ﬁnite state
+automata. Thus during training we hope the controller will
+implicitly learn the correct automata from the training sam-
+ples, since this would ensure generalization to sequences of
+arbitrary length. On some tasks like reverse, we observe a
+higher-order form of over-ﬁtting: the model learns to solve
+the training tasks correctly and generalizes successfully to
+test sequences of the same length (thus is not over-ﬁtting in
+the standard sense). However, when presented with longer
+test sequences the model fails completely. This suggests
+that the model has converged to an incorrect local minima,
+one corresponding to an alternate automata which have an
+implicit awareness of the sequence length of which they
+were trained. See Fig. 4 for an example of this on the re-
+verse task. Note that this behavior results from the con-
+troller, not the learning scheme, since it is present in both
+the supervised (Section 5) and Q-learning settings (Sec-
+tion 6). These experiments show the need to carefully ad-
+just the controller capacity to prevent it learning any depen-
+dencies on the length of training sequences, yet ensuring it
+has enough state to implement the algorithm in question.
+As illustrated in Fig. 1(c), the controller passes two signals
+to the output tape: a discrete action (move left, move right,
+write something) and a symbol from the vocabulary. This
+symbol is produced by taking the max from the softmax
+output on the top of the controller.
+In training, two dif-
+ferent signals are computed from this: (i) a cross-entropy
+loss is used to compare the softmax output to the target
+symbol and (ii) a discrete 1/0 reward if the symbol is cor-
+rect/incorrect. The ﬁrst signal gives a continuous gradi-
+ent to update the controller parameters via backpropaga-
+tion. Leveraging the reward requires reinforcement learn-
+ing, since many actions might occur before a symbol is
+written to the output tape. Thus the action output of the
+controller is trained with reinforcement learning and the
+symbol output is trained by backpropagation.
+
+3. Tasks
+We consider six different tasks: copy, reverse, walk, multi-
+digit addition, 3 number addition and single digit multipli-
+cation. The input interface for copy and reverse is an input
+tape, but an input grid for the others. All tasks use an output
+tape interface. Unless otherwise stated, all arithmetic oper-
+ations use base 10. Examples of the six tasks are shown in
+Fig. 2.
+
+Learning Simple Algorithms from Examples
+
+Copy: This task involves copying the symbols from the in-
+put tape to the output tape. Although simple, the model still
+has to learn the correspondence between input and output
+symbols, as well as executing the move right action on the
+input tape.
+Reverse: Here the goal is to reverse a sequence of symbols
+on the input tape. We provide a special character “r” to
+indicate the end of the sequence. The model must learn to
+move right multiple times until it hits the “r” symbol, then
+move to the left, copying the symbols to the output tape.
+Walk: The goal is to copy symbols, according to the di-
+rections given by an arrow symbol. The controller starts by
+moving to the right (suppressing prediction) until reaching
+one of the symbols ↑,↓,←. Then it should change it’s di-
+rection accordingly, and copy all symbols encountered to
+the output tape.
+Addition: The goal is to add two multi-digit sequences,
+provided on an input grid. The sequences are provided in
+two adjacent rows, with their right edges aligned. The ini-
+tial position of the read head is the last digit of the top num-
+ber (i.e. upper-right corner). The model has to: (i) memo-
+rize an addition table for pairs of digits; (ii) learn how to
+move over the input grid and (iii) discover the concept of a
+carry.
+3 Number Addition: As for the addition task, but now
+three numbers are to be added. This is more challenging
+as the reward signal is less frequent (since more correct
+actions must be completed before a correct output digit can
+be produced). Also the carry now can take on three states
+(0, 1 and 2), compared with two for the 2 number addition
+task.
+Single Digit Multiplication: This involves multiplying a
+single digit with a long multi-digit number. It is of similar
+complexity to the 2 number addition task, except that the
+carry can take on more values ∈ [0, 8].
+
+Copy
+
+Reverse
+
+Walk
+
+Addition
+
+Single digit
+multiplication
+
+3 number
+addition
+
+Figure 2. Examples of the six tasks, presented in their initial state.
+The yellow box indicates the starting position of the read head on
+the Input Interface. The gray characters on the Output Tape are
+target symbols used in training.
+
+In Table 1, we examine the feasibility of solving them by
+exhaustively searching over all possibile automata. For
+tasks involving addition and multiplication, this approach
+is not practical. We thus explore a range of learning-based
+approaches.
+
+Task
+Copying
+Reverse
+Walk
+Addition
+3-rows Addition
+Single Digit Multiplication
+
+#states #possible automata
+
+1
+2
+4
+30
+50
+20
+
+1
+4
+
+4096
+10262
+10737
+10114
+
+Table 1. All six of our tasks can be solved by a ﬁnite-state au-
+tomata. We estimate size of the automata for each task, and the
+time necessary to ﬁnd it by exhaustive search. The model is in a
+single state at any given time and the current input, together with
+model state, determines the output actions and new state. For in-
+stance, addition has to store: (i) the current position on the grid
+(up, down after coming from the top, down after coming from
+the right) and (ii) the previous number with accumulated curry.
+All combinations of these properties can occur, and the automata
+must have sufﬁcient number of states to distinguish them. The
+number of possible directed graphs for a given number of states is
+4n∗(n−1)/2. Thus exhaustive search is impractical for all but the
+simplest tasks.
+
+4. Related Work
+A variety of recent work has explored the learning of sim-
+ple algorithms. Many of them are different embodiments
+of the controller-interface abstraction formalized in our
+model. The Neural Turing Machine (NTM) (Graves et al.,
+2014) uses a modiﬁed LSTM (Hochreiter & Schmidhuber,
+1997; Gers et al., 2003) as the controller, and has three
+inferences: sequential input, delayed output and a differ-
+entiable memory. The model is able to learn simple al-
+gorithms including copying and sorting. The Stack RNN
+(Joulin & Mikolov, 2015) has an RNN controller and three
+interfaces: sequential input, a stack memory and sequential
+output. The learning of simple binary patterns and regu-
+lar expressions is demonstrated. A closely related work to
+this is (Das et al., 1992), which was recently extended in
+the Neural DeQue (Grefenstette et al., 2015) to use a list
+instead. End-to-End Memory Networks (Sukhbaatar et al.,
+2015) use a feed-forward network as the controller and in-
+terfaces consisting of a soft-attention input, plus a delayed
+output (by a ﬁxed number of “hops”). The model is ap-
+plied to simple Q&A tasks, some of which involve logical
+reasoning. In contrast, our model automatically determines
+when to produce output and uses more general interfaces.
+Williams and Zipser (Williams & Zipser, 1989) proposed
+one of the ﬁrst approaches that aimed to directly learn
+a Turing Machine, demonstrating that it could solve the
+parenthesis balancing problem. However, all these models
+are not directly comparable as they are tightly coupled with
+their interfaces. For instance, the Stack RNN is based on a
+stack, therefore it cannot be executed with a grid interface.
+However, most of these approaches use continuous inter-
+faces that permit training via back-propagation of gradi-
+ents. Our approach differs in that it uses discrete inter-
+faces thus is more challenging to train since as we must rely
+
+Learning Simple Algorithms from Examples
+
+on reinforcement learning instead. A notable exception is
+the Reinforcement Learning Neural Turing Machine (RL-
+NTM) (Zaremba & Sutskever, 2015) which is a version of
+the NTM with discrete interfaces. The Stack-RNN (Joulin
+& Mikolov, 2015) also uses a discrete search procedure for
+its interfaces but it is unclear how this would scale to larger
+problems.
+The problem of learning algorithms has its origins in the
+ﬁeld of program induction (Nordin, 1997; Liang et al.,
+2013; Wineberg & Oppacher, 1994; Solomonoff, 1964). In
+this domain, the model has to infer the source code of a pro-
+gram that solves a given problem. This is a similar goal to
+ours, but in quite a different setting. I.e. we do not produce
+a computer program, but rather a neural net that can op-
+erate with interfaces such as tapes and so implements the
+program without being human-readable. A more relevant
+work is (Schmidhuber, 2004) which learns an algorithms
+for the Hanoi tower problem, using a simple form of pro-
+gram induction and incremental learning components (this
+method has strong asymptotic guarantees). Genetic pro-
+gramming (Holland, 1992; Goldberg, 1989; Gomez et al.,
+2008) also can be considered a form of program induction,
+but the underlying algorithm relies on random mutations
+rather than gradient information.
+Similar to (Mnih et al., 2013), we train the controller to ap-
+proximate the Q-function. However, we introduce several
+modiﬁcations on top of the classical Q-learning. First, we
+use Watkins Q(λ) (Watkins, 1989; Sutton & Barto, 1998).
+This helps to overcome a non-stationary environment (pre-
+viously pointed out by (Loch & Singh, 1998)). Second,
+we reparametrized Q function, to become invariant to the
+sequence length. Finally, we penalize ||Q(s,•)||, which
+might help to remove positive bias (Hasselt, 2010).
+
+5. Supervised Experiments
+To understand the behavior of our model and to provide
+an upper bound on performance, we train our model in a
+supervised setting, i.e. where the ground truth actions are
+provided. Note that the controller must still learn which
+symbol to output. But this now can be done purely with
+backpropagation since the actions are known.
+To facilitate comparisons of difﬁculty between tasks, we
+use a common measure of complexity, corresponding to the
+number of time steps required to solve each task (using the
+ground truth actions*). For instance, a reverse task involv-
+ing a sequence of length 10 requires 20 time-steps (10 steps
+to move to the “r” and 10 steps to move back to the start).
+The conversion factors between sequence lengths and com-
+plexity are as follows: copy=1; reverse=2; walk=1; addi-
+
+*In practice, multiple solutions can exist (see Section 6.5),
+
+thus the measure is approximate.
+
+tion=2; 3 row addition=3 and single digit multiplication=1.
+For each task, we train a separate model, starting with se-
+quences of complexity 6 and incrementing by 4 once it
+achieves 100% accuracy on held-out examples of the cur-
+rent length. Training stops once the model successfully
+generalizes to examples of complexity 1000. Three dif-
+ferent cores for the controllers are explored: (i) a 200 unit,
+1-layer LSTM; (iii) a 200 unit, 1-layer GRU model and (iii)
+a 200 unit, 1-layer feed-forward network. An additional
+linear layer is placed on top of these model that maps the
+hidden state to either action for a given interface, or the
+target symbol.
+In Fig. 3 we show the accuracy of the different controllers
+on the six tasks for test instances of increasing complex-
+ity, up to 20, 000 time-steps. The simple feed-forward con-
+troller generalizes perfectly on the copy, reverse and walk
+tasks but completely fails on the remaining ones, due to
+a lack of required memory†. The RNN-based controllers
+succeed to varying degrees, although some variability in
+performance is observed.
+Further insight can be obtained by examining the internal
+state of the controller. To do this, we compute the autocor-
+relation matrix‡ A of the network state over time when the
+model is processing a reverse task example of length 35,
+having been trained on sequences of length 10 or shorter.
+For this problem there should be two distinct states: move
+right until “r” is reached and then move left to the start.
+Fig. 2 plots A for models with three different controllers.
+The larger the controller capacity, the less similar the states
+are within the two phases of execution, showing how it has
+not captured the correct algorithm. The ﬁgure also shows
+the conﬁdence in the two actions over time. In the case of
+the high capacity models, the initial conﬁdence in the move
+left action is high, but this drops off after moving along the
+sequence. This is because the controller has learned dur-
+ing training that it should change direction after at most 10
+steps. Consequently, the unexpectedly long test sequence
+makes it unsure of what the correct action is. By contrast,
+the simple feed-forward controller does not show this be-
+havior since it is stateless, thus has no capacity to know
+where it is within a sequence. The equivalent automata
+is shown in Fig. 4(a), while Fig. 4(b) shows the incorrect
+
+†Ammending the interfaces to allow both reading and writ-
+ing on the same interface would provide a mechanism for long-
+term memory, even with a feed-forward controller. But then the
+same lack of generalization issues (encountered with more pow-
+erful controllers) would become an issue.
+
+‡Let hi be the controller state at time i, then the autocor-
+relation Ai,j between time-steps i and j is given by Ai,j =
+(cid:104)hi−E,hj−E(cid:105)
+(cid:80)T
+, σ2 =
+k=1(cid:104)hk−E,hk−E(cid:105)
+. T is the number of time steps (i.e. com-
+
+, i, j = 1, . . . , T where E =
+
+(cid:80)T
+
+k=1 hk
+
+T
+
+σ2
+
+plexity).
+
+T
+
+Learning Simple Algorithms from Examples
+
+time-dependent automata learned by the over-expressive
+RNN-based controllers. We note that this argument is em-
+pirically supported by our results in Table 3, as well as
+related work such as (Graves et al., 2014) and (Joulin &
+Mikolov, 2015) which found limited capacity controllers
+to be most effective. For example, in the latter case, the
+counting and memorization tasks used controllers with just
+40 and 100 units respectively.
+
+Table 2. Three models with different controllers (feed-forward,
+200 unit LSTM and 400 unit LSTM) trained on the reverse task
+and applied to a 20 digit test example. The top row shows con-
+ﬁdence values for the two actions on the input tape: move left
+(green) and move right (red) as a function of time. The correct
+model should be equivalent to a two-state automata (Fig. 4), thus
+we expect to see the controller hidden state occupy two distinct
+values. The autocorrelation matrices (whose axes are also time)
+show this to be the case for the feed-forward model – two distinct
+blocks of high correlation. However, for the LSTM controllers,
+this structure is only loosely present in the matrix, indicating that
+they have failed to learn the correct algorithm.
+
+Figure 3. Test accuracy for all tasks with supervised actions over
+10 runs for feed-forward (green), GRU (red) and LSTM (yellow)
+controllers. In this setting the optimal policy is provided. Com-
+plexity is the number of time steps required to compute the solu-
+tion. Every task has slightly different conversion factor between
+complexity and the sequence length: a complexity of 104 for copy
+and walk would mean 104 input symbols; for reverse would cor-
+respond to 104
+input symbols; for addition would involve two
+long numbers; for 3 row addition would involve three 104
+104
+2
+3
+long numbers and for single digit multiplication would involve a
+single 104 long number.
+
+2
+
+learned via backpropagation. We now consider the setting
+where the actions are also learned, to test the true capabili-
+ties of the models to learn simple algorithms from pairs of
+input and output sequences.
+We use Q-learning, a standard reinforcement learning al-
+gorithm to learn a sequence of discrete actions that solves
+a problem. A function Q, the estimated sum of future re-
+wards, is updated during training according to:
+
+Qt+1(s, a) = Qt(s, a)
+
+− α(cid:2)Qt(s, a) −(cid:0)R(s(cid:48)) + γ max
+
+a
+
+Qn(s(cid:48), a)(cid:1)(cid:3)
+
+(1)
+
+(2)
+
+right
+
+left
+
+right1
+
+right2
+
+right3
+
+right4
+
+left
+
+(a)
+
+(b)
+
+Figure 4. (a): The automata describing the correct solution to the
+reverse problem. The model ﬁrst has to go to the right while sup-
+pressing prediction. Then, it has to go to the left and predict what
+it sees at the given moment (this ﬁgure illustrates only actions
+over the Input Tape). (b) Another automata that solves the reverse
+problem for short sequences, but does not generalize to arbitrary
+length sequences, unlike (a). Expressive models like LSTMs tend
+to learn such incorrect automata.
+
+6. Q-Learning
+In the previous section, we assumed that the optimal con-
+troller actions were given during training. This meant only
+the output symbols need to be predicted and these could be
+
+Taking the action a in state s causes a transition to state
+s(cid:48), which in our case is deterministic. R(s(cid:48)) is the reward
+experienced in the state s(cid:48). The discount factor is γ and
+α is the learning rate. The another commonly considered
+quantity is V (s) = maxa Q(s, a). V is called the value
+function, and V (s) is the expected sum of future rewards
+starting from the state s. Moreover, Q∗ and V ∗ are function
+values for the optimal policy.
+Our controller receives a reward of 1 every time it correctly
+predicts a digit (and 0 otherwise). Since the overall solu-
+tion to the task requires all digits to be correct, we termi-
+nate a training episode as soon as an incorrect prediction is
+made. This learning environment is non-stationary, since
+even if the model initially picks the right actions, the sym-
+bol prediction is unlikely to be correct, so the model re-
+ceives no reward. But further on in training, when the sym-
+bol prediction is more reliable, the correct action will be re-
+
+Walk TaskAutocorrelation matrixFeed-ForwardSmall LSTMLarge LSTMLearning Simple Algorithms from Examples
+
+warded§. This is important because reinforcement learning
+algorithms assume stationarity of the environment, which
+is not true in our case. Learning in non-stationary envi-
+ronments is not well understood and there are no deﬁnitive
+methods to deal with it. However, empirically we ﬁnd that
+this non-stationarity can be partially addressed by the use of
+Watkins Q(λ) (Watkins, 1989), as detailed in Section 6.2.
+
+6.1. Dynamic Discount
+
+The purpose of the reinforcement learning is to learn a pol-
+icy that yields the highest sum of the future rewards. Q-
+learning does it by learning a Q-function. The optimal pol-
+icy can be extracted by taking argmax over Q(s,•). Note
+that shifting or scaling Q induces the same policy. We pro-
+pose to dynamically rescale Q so (i) it is independent of
+the length of the episode and (ii) Q is within a small range,
+making it easier to predict.
+We deﬁne ˆQ to be our reparametrization. ˆQ(s, a) should
+be roughly in range [0, 1], and it should correspond to how
+close we are to V ∗(s). Q could be decomposed multiplica-
+tively as Q(s, a) = ˆQ(s, a)V ∗(s). However, in practice,
+we do not have access to V ∗(s), thus instead we use an es-
+timate of future rewards based on the total number of digits
+left in the sequence. Since every correct prediction yields
+a reward of 1, the optimal policy should achieve sum of
+future rewards equal to the number of remaining symbols
+to predict. The number of remaining symbols to predict is
+known and we denote it by ˆV (s). Note that this is a form
+of supervision, albeit a weak one.
+Therefore, we normalize the Q-function by the remaining
+sum of rewards left in the task:
+
+ˆQ(s, a) :=
+
+Q(s, a)
+ˆV (s)
+
+We assume that s transitions to s(cid:48), and we re-write the Q-
+learning update equations:
+R(s(cid:48))
+ˆV (s)
+
+ˆV (s(cid:48))
+ˆV (s)
+
+ˆQ(s(cid:48), a)
+
+a
+
+ˆQ(s, a) =
+
++ γ max
+
+ˆQt+1(s, a) = ˆQt(s, a) − α(cid:2) ˆQt(s, a)
+
+−(cid:0) R(s(cid:48))
+
+ˆV (s)
+
++ γ max
+
+a
+
+ˆV (s(cid:48))
+ˆV (s)
+
+ˆQt(s(cid:48), a)(cid:1)(cid:3)
+
+Note that ˆV (s) ≥ ˆV (s(cid:48)), with equality if no digit was pre-
+dicted at the current time-step. As the episode progresses,
+the discount factor ˆV (s(cid:48))
+decreases, making the model my-
+2.
+opic. At the end of the sequence, the discount drops to 1
+§If we were to use reinforcement to train the symbol output
+as well as the actions, then the environment would be stationary.
+However, this would mean ignoring the reliable signal available
+from direct backpropagation of the symbol output.
+
+ˆV (s)
+
+6.2. Watkins Q(λ)
+
+The update to Q(s, a) in Eqn. 2 comes from two parts:
+the observed reward R(s(cid:48)) and the estimated future reward
+Q(s(cid:48), a). In our setting, there are two factors that make the
+former far more reliable than the latter: (i) rewards are de-
+terministic and (ii) the non-stationarity (induced by the on-
+going learning of the symbol output by backpropagation)
+means that estimates of Q(s, a) are unreliable as environ-
+ment evolves. Consequently, the single action recurrence
+used in Eqn. 2 can be improved upon when on-policy ac-
+tions are chosen. More precisely, let at, at+1, . . . , at+T be
+consecutive actions induced by Q:
+
+at+i = argmax
+
+a
+
+Q(st+i, a)
+at+i−−−→ st+i+1
+
+st+i
+
+Then the optimal Q∗ follows the following recursive equa-
+tion:
+
+Q∗(st, at) =
+
+γi−1R(st+i) + γT max
+
+a
+
+Q∗(st+n+1, a)
+
+and the update rule corresponding to Eqn. 2 becomes:
+
+Qt+1(st, at) = Qt(st, at) − α(cid:2)Qt(st, at)−
+
+T(cid:88)
+
+i=1
+
+(cid:0) T(cid:88)
+
+i=1
+
+γi−1R(st+i) + γT max
+
+a
+
+Qt(st+n+1, a)(cid:1)(cid:3)
+
+This is a special form of Watkins Q(λ) (Watkins, 1989)
+where λ = 1. The classical applications of Watkins Q(λ)
+suggest choosing a small λ, which trades-off estimates
+based on various numbers of future rewards. λ = 0 rolls
+back to the classical Q-learning. Due to reliability of our
+rewards, we found λ = 1 to be better than λ < 1, however
+this needs further study.
+Note that this unrolling of rewards can only take place un-
+til a non-greedy action is taken. When using an -greedy
+policy, this means we would expect to be able to unroll −1
+steps, on average. For the value of  = 0.05 used in our
+experiments, this corresponds to 20 steps on average.
+
+on incorrect actions: κ(cid:107)(cid:80)
+
+6.3. Penalty on Q-function
+After reparameterizing the Q-function to ˆQ (Section 6.1),
+the optimal ˆQ∗(s, a) should be 1 for the correct action and
+zero otherwise. To encourage our estimate ˆQ(s, a) to con-
+verge to this, we introduce a penalty that “pushes down”
+ˆQ(s, a)− 1(cid:107)2. This has the ef-
+fect of introducing a margin between correct and incorrect
+actions, greatly improving generalization. We commence
+training with κ = 0 and make it non-zero once good ac-
+curacy is reached on short samples (introducing it from the
+outset hurts learning).
+
+a
+
+Learning Simple Algorithms from Examples
+
+6.4. Reinforcement Learning Experiments
+
+We apply our enhancements to the six tasks in a series of
+experiments designed to examine the contribution of each
+of them. Unless otherwise speciﬁed, the controller is a 1-
+layer GRU model with 200 units. This was selected on the
+basis of its mean performance across the six tasks in the su-
+pervised setting (see Section 5). As the performance of re-
+inforcement learning methods tend to be highly stochastic,
+we repeat each experiment 10 times with a different ran-
+dom seed. Each model is trained using 3 × 107 characters
+which takes ∼ 4 hrs. A model is considered to have suc-
+cessfully solved the task if it able to give a perfect answer
+to 50 test instances, each 100 digits in length. The GRU
+model is trained with a batch size of 20, a learning rate of
+α = 0.1, using the same initialization as (Glorot & Bengio,
+2010) but multiplied by 2. All tasks are trained with the
+same curriculum used in the supervised experiments (and
+in (Joulin & Mikolov, 2015)), whereby the sequences are
+initially of complexity 6 (corresponding to 2 or 3 digits, de-
+pending on the task) and once 100% accuracy is achieved,
+increased by 4 until the model is able to solve validation
+sequences of length 100. For 3-row addition, a more elab-
+orate curriculum was needed which started with examples
+that did not involve a carry and contained many zero. The
+test distribution was unaffected.
+We show results for various combinations of terms in Ta-
+ble 3. The experiments demonstrate that standard Q-
+learning fails on most of our tasks (ﬁrst six columns).
+Each of our additions (dynamic discount, Watkins Q(λ)
+and penalty term) give signiﬁcant improvements. When all
+three are used our model is able to succeed at all tasks, pro-
+viding the appropriate curriculum and controller are used.
+We also explored alternate reinforcement learning algo-
+rithms, in particular, REINFORCE (Williams, 1992) with
+the architectural modiﬁcations described in (Zaremba &
+Sutskever, 2015). This could solve the Copy and Reverse
+tasks, but was sensitive to the hyper-parameter settings.
+For the reverse and walk tasks, the default GRU controller
+failed completely. However, using a feed-forward con-
+troller instead enabled the model to succeed, when dynamic
+discount and Watkins Q(λ) was used. As noted above, the
+3-row addition required a more careful curriculum before
+the model was able to learn successfully. Increasing the ca-
+pacity of the controller (columns 2-4) hurts performance,
+echoing Fig. 2. The last two columns of Table 3 show re-
+sults on test sequences of length 1000. Except for multipli-
+cation, the models still generalized successfully.
+Fig. 5 shows accuracy as a function of test example com-
+plexity for standard Q-learning and our enhanced version.
+The difference in performance is clear. At very high com-
+plexity, corresponding to 1000’s of digits, the accuracy
+starts to drop on the more complicated tasks. We note that
+
+these trends are essentially the same as those observed in
+the supervised setting (Fig. 3), suggesting that Q-learning
+is not to blame. Instead, the inability of the controller to
+learn an automata seems to be the cause. Potential solutions
+to this might include (i) noise injection, (ii) discretization of
+state, (iii) a state error correction mechanism or (iv) regu-
+larizing the learned automata using MDL principles. How-
+ever, this issue, the inability of RNN to perfectly represent
+an automata can be examined separately from the setting
+where actions have to be learnt (i.e. in the supervised do-
+main).
+
+Figure 5. Test accuracy as a function of task complexity (10 runs)
+for standard Q-learning (blue) and our enhanced version (dy-
+namic discount, Watkins Q(λ) and penalty term). Accuracy cor-
+responds to the fraction of correct test cases (all digits must be
+predicted correctly for the instance to be considered correct).
+
+6.5. Multiple Solutions
+On examination of the models learned on the addition task,
+we notice that three different solutions were discovered.
+While they all give the correct answer, they differ in their
+actions over the input grid, as shown in Fig. 6.
+
+Figure 6. Our model found three different solutions to the addition
+task, all of which give the correct answer. The arrows show the
+trajectory of the read head over the input grid.
+6.6. Reward Frequency vs Reward Reliability
+We explore how learning time varies as the size of the target
+vocabulary is varied. This trades off reward frequency and
+reliability. For small vocabularies, the reward occurs more
+often but is less reliable since the chance of the wrong ac-
+tion sequence yielding the correct result is relatively high
+(and vice-versa for for larger vocabularies). For copying
+and reverse tasks, altering the vocabulary size just alters the
+variety of symbols on the tape. However, for the arithmetic
+operations this involves a change of base, which inﬂuences
+the task in a more complex way. For instance, addition in
+
+(FF)(FF)Learning Simple Algorithms from Examples
+
+Test length
+#Units
+Discount γ
+Watkins Q(λ)
+Penalty
+
+Task
+Copying
+Reverse
+Reverse (FF controller)
+Walk
+Walk (FF controller)
+2-row Addition
+3-row Addition
+3-row Addition (extra curriculum)
+Single Digit Multiplication
+
+100
+600
+1
+×
+×
+30%
+0%
+0%
+0%
+0%
+10%
+0%
+0%
+0%
+
+100
+400
+1
+×
+×
+60%
+0%
+0%
+0%
+0%
+70%
+0%
+50%
+0%
+
+100
+200
+1
+×
+×
+90%
+0%
+0%
+0%
+0%
+70%
+0%
+80%
+0%
+
+100
+200
+0.99
+×
+×
+50%
+0%
+0%
+0%
+0%
+70%
+0%
+40%
+0%
+
+100
+200
+0.95
+×
+×
+70%
+0%
+0%
+0%
+0%
+80%
+0%
+50%
+0%
+
+100
+200
+D
+×
+×
+90%
+0%
+0%
+0%
+0%
+60%
+0%
+50%
+100%
+
+100
+200
+D
+(cid:88)
+×
+100%
+0%
+100%
+10%
+100%
+60%
+0%
+80%
+100%
+
+100
+200
+D
+(cid:88)
+(cid:88)
+100%
+0%
+90%
+90%
+100%
+100%
+0%
+80%
+100%
+
+1000
+200
+D
+(cid:88)
+×
+100%
+0%
+100%
+10%
+100%
+40%
+0%
+10%
+0%
+
+1000
+200
+D
+(cid:88)
+(cid:88)
+100%
+0%
+90%
+80%
+100%
+100%
+0%
+60%
+0%
+
+Table 3. Success rates for classical Q-learning (columns 2-5) versus our enhanced Q-learning. A GRU-based controller is used on all
+tasks, except reverse and walk which use a feed-forward network. Curriculum learning was also used for the 3-row addition task (see
+text for details). When dynamic discount (D), Watkins Q(λ) and the penalty term are all used the model consistently succeeds on all
+tasks. The model still performs well on test sequences of length 1000, apart from the multiplication task. Increasing the capacity of the
+controller results in worse performance (columns 2-4).
+
+base 4 requires the memorization of digit-to-digit addition
+table of size 16 instead of 100 for the base 10. Table 4
+shows the median training time as a function of vocabu-
+lary size. The results suggest that an infrequent but reliable
+reward is preferred to a frequent but noisy one.
+
+Task
+Copying
+Reverse (FF)
+Walk (FF)
+Addition
+3-number +
+Single Digit ×
+
+2
+1.4
+6.5
+8.7
+250.0
+250.0
+-
+
+3
+0.6
+23.8
+6.9
+30.9
+61.5
+6.2
+
+4
+0.6
+3.1
+6.8
+14.5
+250.0
+17.8
+
+Vocabulary Size
+7
+5
+0.5
+0.6
+2.5
+3.6
+5.3
+4.0
+21.9
+26.1
+250.0
+178.2
+21.5
+20.9
+
+6
+0.6
+3.8
+6.2
+21.8
+112.2
+21.4
+
+8
+0.6
+2.8
+4.4
+25.0
+93.8
+22.3
+
+9
+0.6
+2.0
+3.9
+23.4
+79.1
+23.3
+
+10
+0.6
+3.1
+11.1
+21.1
+81.9
+24.7
+
+Table 4. Median training time (mins) over 10 runs as we vary the
+base used (hence vocabulary size). Training stops when the model
+successfully generalizes to test sequences of length 100. The re-
+sults show the relative importance of reward frequency versus re-
+liability (the latter being more important).
+
+6.7. Reward Structure
+Reward in reinforcement learning systems drives the learn-
+ing process. In our setting we control the rewards, deciding
+when, and how much to give. We now examine various
+kinds of rewards and their inﬂuence on the learning time
+of our system. Our vanilla setting gives a reward of 1 for
+every correct prediction, and reward 0 for every incorrect
+one. We refer to this setting as “0/1 reward”. We consider
+two other settings in addition to this, both of which rely on
+the probabilities of the correct prediction. Let y be the tar-
+get symbol and pi = p(y = i), i ∈ [0, 9] be the probability
+of predicting label i. In setting “Discretized reward”, we
+sort pi. That gives us an order on indices a1, a2, . . . , a10,
+i.e. pa1 ≥ pa2 ≥ pa3 ··· ≥ pa10. “Discretized reward”
+2 iff a2 ≡ y, and reward
+yields reward 1 iff a1 ≡ y, reward 1
+3 iff a3 ≡ y. Otherwise, environment gives a reward 0. In
+1
+the “Continuous reward” setting, a reward of py is given for
+every prediction. One could also consider reward log(py),
+however this quantity is unbounded, and further processing
+might be necessary to make it work. Table 5 gives results
+for the three different reward structures, showing training
+
+time for the ﬁve tasks (training is stopped once the model
+generalizes to test sequences of length 100). One might ex-
+pect that a continuous reward would convey more informa-
+tion than a discrete one, thus result in faster training. How-
+ever, the results do not support this hypothesis, as training
+seems harder with continuous reward than a discrete one.
+We hypothesize, that the continuous reward makes envi-
+ronment less stationary, which might make Q-learning less
+efﬁcient, although this needs further veriﬁcation.
+
+Reward Type
+
+Task
+Copying
+Reverse (FF controller)
+Walk (FF controller)
+Addition
+3-number Addition (extra curriculum)
+Single Digit Multiplication
+
+0/1 reward
+
+Discretized
+
+Continuous
+
+0.6
+3.1
+11.1
+21.1
+81.9
+24.7
+
+0.6
+3.1
+9.5
+21.6
+77.9
+26.5
+
+0.8
+59.7
+250.0
+24.2
+131.9
+26.6
+
+Table 5. Median training time (minutes) for the ﬁve tasks for the
+three different reward structures. “0/1 reward”: the model gets a
+reward of 1 for every correct prediction, and 0 otherwise. “Dis-
+cretized” reward provides a few more values of reward prediction,
+if sufﬁciently close to the correct one. “Continuous” reward gives
+a probability of correct answer as the reward. See text for details.
+
+7. Discussion
+We have explored the ability of neural network models to
+learn algorithms for simple arithmetic operations. Through
+experiments with supervision and reinforcement learning,
+we have shown that they are able to do this successfully,
+albeit with caveats. Q-learning was shown to work as well
+as the supervised case. But, disappointingly, we were not
+able to ﬁnd a single controller that could solve all tasks.
+We found that for some tasks, generalization ability was
+sensitive to the memory capacity of the controller: too lit-
+tle and it would be unable to solve more complex tasks that
+rely on carrying state across time; too much and the re-
+sulting model would overﬁt the length of the training se-
+quences. Finding automatic methods to control model ca-
+pacity would seem to be important in developing robust
+models for this type of learning problem.
+
+Learning Simple Algorithms from Examples
+
+Liang, Percy, Jordan, Michael I, and Klein, Dan. Learning
+dependency-based compositional semantics. Computa-
+tional Linguistics, 39(2):389–446, 2013.
+
+Loch, John and Singh, Satinder P. Using eligibility traces
+to ﬁnd the best memoryless policy in partially observ-
+able markov decision processes. In ICML, pp. 323–331,
+1998.
+
+Mnih, Volodymyr, Kavukcuoglu, Koray, Silver, David,
+Graves, Alex, Antonoglou, Ioannis, Wierstra, Daan, and
+Riedmiller, Martin. Playing atari with deep reinforce-
+ment learning. arXiv preprint arXiv:1312.5602, 2013.
+
+Nordin, Peter. Evolutionary program induction of binary
+machine code and its applications. Krehl Munster, 1997.
+
+Schmidhuber, J¨urgen. Optimal ordered problem solver.
+
+Machine Learning, 54(3):211–254, 2004.
+
+Solomonoff, Ray J. A formal theory of inductive inference.
+
+Part I. Information and control, 7(1):1–22, 1964.
+
+Sukhbaatar, Sainbayar, Szlam, Arthur, Weston, Jason, and
+Fergus, Rob. Weakly supervised memory networks.
+arXiv preprint arXiv:1503.08895, 2015.
+
+Sutton, Richard S and Barto, Andrew G. Reinforcement
+learning: An introduction, volume 1. MIT press Cam-
+bridge, 1998.
+
+Watkins, Chris. Learning from Delayed Rewards. PhD
+
+thesis, Cambrdige University, 1989.
+
+Williams, Ronald J. Simple statistical gradient-following
+learning.
+
+algorithms for connectionist reinforcement
+Machine learning, 8(3):229256, 1992.
+
+Williams, Ronald J and Zipser, David. Experimental anal-
+ysis of the real-time recurrent learning algorithm. Con-
+nection Science, 1(1):87–111, 1989.
+
+Wineberg, Mark and Oppacher, Franz. A representation
+scheme to perform program induction in a canonical ge-
+netic algorithm. In Parallel Problem Solving from Na-
+turePPSN III, pp. 291–301. Springer, 1994.
+
+Zaremba, Wojciech and Sutskever,
+
+Reinforce-
+ment learning neural turing machines. arXiv preprint
+arXiv:1505.00521, 2015.
+
+Ilya.
+
+References
+Cho, Kyunghyun, van Merrienboer, Bart, Gulcehre, Caglar,
+Bougares, Fethi, Schwenk, Holger, and Bengio, Yoshua.
+Learning phrase representations using RNN encoder-
+arXiv
+decoder for statistical machine translation.
+preprint arXiv:1406.1078, 2014.
+
+Das, Sreerupa, Giles, C Lee, and Sun, Guo-Zheng. Learn-
+ing context-free grammars: Capabilities and limitations
+of a recurrent neural network with an external stack
+In In Proceedings of The Fourteenth Annual
+memory.
+Conference of Cognitive Science Society, 1992.
+
+Gers, Felix A, Schraudolph, Nicol N, and Schmidhuber,
+J¨urgen. Learning precise timing with lstm recurrent net-
+works. The Journal of Machine Learning Research, 3:
+115–143, 2003.
+
+Glorot, Xavier and Bengio, Yoshua. Understanding the
+difﬁculty of training deep feedforward neural networks.
+In International conference on artiﬁcial intelligence and
+statistics, pp. 249–256, 2010.
+
+Goldberg, David E. Genetic Algorithms in Search, Opti-
+mization and Machine Learning. Addison-Wesley Long-
+man Publishing Co., Inc., Boston, MA, USA, 1st edition,
+1989. ISBN 0201157675.
+
+Gomez, Faustino, Schmidhuber, J¨urgen, and Miikkulainen,
+Risto. Accelerated neural evolution through cooper-
+atively coevolved synapses. The Journal of Machine
+Learning Research, 9:937–965, 2008.
+
+Graves, Alex, Wayne, Greg, and Danihelka, Ivo. Neural
+turing machines. arXiv preprint arXiv:1410.5401, 2014.
+
+Grefenstette, Edward, Hermann, Karl Moritz, Suleyman,
+Mustafa, and Blunsom, Phil. Learning to transduce with
+unbounded memory. arXiv preprint arXiv:1506.02516,
+2015.
+
+Hasselt, Hado V. Double Q-learning.
+
+In Advances in
+Neural Information Processing Systems, pp. 2613–2621,
+2010.
+
+Hochreiter, Sepp and Schmidhuber, J¨urgen. Long short-
+term memory. Neural computation, 9(8):1735–1780,
+1997.
+
+Holland, John H. Adaptation in Natural and Artiﬁcial Sys-
+tems: An Introductory Analysis with Applications to Bi-
+ology, Control and Artiﬁcial Intelligence. MIT Press,
+Cambridge, MA, USA, 1992. ISBN 0262082136.
+
+Joulin, Armand and Mikolov, Tomas.
+
+Inferring algorith-
+mic patterns with stack-augmented recurrent nets. arXiv
+preprint arXiv:1503.01007, 2015.
+
+

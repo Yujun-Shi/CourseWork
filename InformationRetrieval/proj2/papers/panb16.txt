@@ -1,0 +1,1211 @@
+Expressiveness of Rectiﬁer Networks
+
+Xingyuan Pan
+Vivek Srikumar
+The University of Utah, Salt Lake City, UT 84112, USA
+
+XPAN@CS.UTAH.EDU
+SVIVEK@CS.UTAH.EDU
+
+Abstract
+
+Rectiﬁed Linear Units (ReLUs) have been shown
+to ameliorate the vanishing gradient problem, al-
+low for efﬁcient backpropagation, and empiri-
+cally promote sparsity in the learned parameters.
+They have led to state-of-the-art results in a va-
+riety of applications. However, unlike threshold
+and sigmoid networks, ReLU networks are less
+explored from the perspective of their expressive-
+ness. This paper studies the expressiveness of
+ReLU networks. We characterize the decision
+boundary of two-layer ReLU networks by con-
+structing functionally equivalent threshold net-
+works. We show that while the decision bound-
+ary of a two-layer ReLU network can be captured
+by a threshold network, the latter may require
+an exponentially larger number of hidden units.
+We also formulate sufﬁcient conditions for a cor-
+responding logarithmic reduction in the number
+of hidden units to represent a sign network as a
+ReLU network. Finally, we experimentally com-
+pare threshold networks and their much smaller
+ReLU counterparts with respect to their ability to
+learn from synthetically generated data.
+
+1. Introduction
+A neural network is characterized by its architecture, the
+choices of activation functions, and its parameters. We
+see several activation functions in the literature – the most
+common ones being threshold, logistic, hyperbolic tan-
+gent and rectiﬁed linear units (ReLUs).
+In recent years,
+deep neural networks with rectifying neurons – deﬁned as
+R (x) = max(0, x) – have shown state-of-the-art perfor-
+mance in several tasks such as image and speech classiﬁca-
+tion (Glorot et al., 2011; Nair & Hinton, 2010; Krizhevsky
+et al., 2012; Maas et al., 2013; Zeiler et al., 2013).
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+ReLUs possess several attractive computational properties.
+First, compared to deep networks with sigmoidal activation
+units, ReLU networks are less affected by the vanishing
+gradient problem (Bengio et al., 1994; Hochreiter, 1998;
+Glorot et al., 2011). Second, rectifying neurons encourage
+sparsity in the hidden layers (Glorot et al., 2011). Third,
+gradient back propagation is efﬁcient because of the piece-
+wise linear nature of the function. For example, Krizhevsky
+et al. (2012) report that a convolutional neural network with
+ReLUs is six times faster than an equivalent one with hy-
+perbolic tangent neurons. Finally, they have been empiri-
+cally been shown to generalize very well.
+Despite these clear computational and empirical advan-
+tages, the expressiveness of rectiﬁer units is less studied
+unlike sigmoid and threshold units. In this paper, we ad-
+dress the following question: Which Boolean functions do
+ReLU networks express? We analyze the expressiveness
+of shallow ReLU networks by characterizing their equiva-
+lent threshold networks. The goal of our analysis is to of-
+fer a formal understanding for the successes of ReLUs by
+comparing them to threshold functions that are well stud-
+ied (e.g. Hajnal et al., 1993). To this end, the contributions
+of this paper are:
+
+1. We provide a constructive proof that two layer ReLU
+networks are equivalent to exponentially larger thresh-
+old networks. Furthermore, we show that there exist
+two layer ReLU networks that cannot be represented
+by any smaller threshold networks.
+
+2. We use this characterization to deﬁne a sufﬁcient con-
+dition for compressing an arbitrary threshold network
+into a logarithmically smaller ReLU network.
+
+3. We identify a relaxation of this condition that is appli-
+cable if we treat hidden layer predictions as a multi-
+class classiﬁcation, thus requiring equivalence of hid-
+den layer states instead of the output state.
+
+1.1. Expressiveness of Networks: Related Work
+
+From the learning point of view, the choice of an activa-
+tion function is driven by two related aspects: the expres-
+
+Expressiveness of Rectiﬁer Networks
+
+siveness of a given network using the activation function,
+and the computational complexity of learning. Though this
+work studies the former, we brieﬂy summarize prior work
+along both these lines.
+Any continuous function can be approximated to arbitrary
+accuracy with only one hidden layer of sigmoid units (Cy-
+benko, 1989), leading to neural networks being called “uni-
+versal approximators”. With two layers, even discontinu-
+ous functions can be represented. Moreover, the approxi-
+mation error (for real-valued outputs) is insensitive to the
+choice of activation functions from among several com-
+monly used ones (DasGupta & Schnitger, 1993), provided
+we allow the size of the network to increase polynomially
+and the number of layers to increase by a constant factor.
+Similarly, two layer threshold networks are capable of rep-
+resenting any Boolean function. However, these are exis-
+tence statements; for a general target function, the number
+of hidden units may be exponential in the input dimension-
+ality. Maass et al. (1991; 1994) compare sigmoid networks
+with threshold networks and point out that the former can
+be more expressive than similar-sized threshold networks.
+There has been some recent work that looks at the ex-
+pressiveness of feed-forward ReLU networks. Because the
+rectiﬁer function is piece-wise linear, any network using
+only ReLUs can only represent piece-wise linear functions.
+Thus, the number of linear partitions of input space by the
+network can be viewed as a measure of its expressiveness.
+Pascanu et al. (2014) and Montufar et al. (2014) show that
+for the same number of ReLUs, a deep architecture can
+represent functions with exponentially more linear regions
+than a shallow architecture. While more linear regions in-
+dicate that more complex functions can be represented, it
+does not directly tell us how expressive a function is; at
+prediction time, we cannot directly correlate the number of
+regions to the way we make the prediction. Another way of
+measuring the expressiveness of a feed-forward networks
+is by considering its classiﬁcation error; Telgarsky (2015)
+compares shallow and deep ReLU networks in this manner.
+The learning complexity of neural networks using vari-
+ous activation functions has also been studied. For in-
+puts from the Boolean hypercube, the two-layer networks
+with threshold activation functions is not efﬁciently learn-
+able (e.g. Blum & Rivest, 1992; Klivans & Sherstov, 2006;
+Daniely et al., 2014). Without restricting the weights, two
+layer networks with sigmoid or ReLU activations are also
+not efﬁciently learnable. We also refer the reader to Livni
+et al. (2014) that summarizes and describes positive and
+negative learnability results for various activations.
+
+2. What do ReLUs express?
+To simplify our analysis, we primarily focus on shallow
+networks with one hidden layer with n units and a single
+binary output. In all cases, the hidden layer neurons are the
+object of study. The output activation function is always the
+threshold function. In the rest of the paper, we use bold-
+faced letters to denote vectors. Input feature vectors and
+output binary labels are represented by x and y ∈ {±1}
+respectively. The number of hidden units is n. The weights
+and bias for the kth rectiﬁer are uk and bk; the weights and
+bias for the kth sign units are vk and dk. The weights for
+the output unit are w1 through wn, and its the bias is w0.
+
+2.1. Threshold networks
+
+Before coming to the main results, we will ﬁrst review the
+expressiveness of threshold networks. Assuming there are
+n hidden units and one output unit, the output of the net-
+work can be written as
+
+y = sgn
+
+w0 +
+
+wk sgn (vk · x + dk)
+
+.
+
+(1)
+
+(cid:32)
+
+n(cid:88)
+
+k=1
+
+(cid:33)
+
+Here, both hidden and output activations are the sign func-
+tion, which is deﬁned as sgn (x) = 1 if x ≥ 0, and −1
+otherwise. Each hidden unit represents one hyperplane (pa-
+rameterized by vk and dk) that bisects the input space into
+two half spaces. By choosing different weights in the hid-
+den layer we can obtain arbitrary arrangement of n hyper-
+planes. The theory of hyperplane arrangement (Zaslavsky,
+1975) tells us that for a general arrangement of n hyper-
+
+planes in d dimensions, the space is divided into(cid:80)d
+
+s
+regions. The output unit computes a linear combination of
+the hidden output (using the w’s) and thresholds it. Thus,
+for various values of the w’s, threshold networks can ex-
+press intersections and unions of those regions. Figure 1
+shows an example of the decision boundary of a two-layer
+network with three threshold units in the hidden layer.
+
+(cid:0)n
+
+(cid:1)
+
+s=0
+
+v1
+
+v2
+
+v3
+
+Figure 1. An example of the decision boundary of a two-layer net-
+work in two dimensions, with three threshold units in the hidden
+layer. The arrows point towards the half-space that is classiﬁed as
+positive (the green checked region).
+
+Expressiveness of Rectiﬁer Networks
+
+2.2. Rectiﬁer networks
+
+In this section, we will show that the decision boundary
+of every two-layer neural network with rectiﬁer activations
+can be represented using a network with threshold activa-
+tions with two or three layers. However, the number of
+hidden threshold units can be exponential compared to the
+number of hidden rectiﬁer units.
+Consider a network with one hidden layer of n ReLUs, de-
+noted by R (·). For a d dimensional input x, the output y is
+computed as
+
+y = sgn
+
+w0 +
+
+wkR (uk · x + bk)
+
+.
+
+(2)
+
+(cid:32)
+
+n(cid:88)
+
+k=1
+
+(cid:33)
+
+(cid:17)
+
+(cid:16)
+
+k∈[n] wkR (ak(x))
+
+w0 +(cid:80)
+
+Here uk and bk are weight and bias parameters for the Re-
+LUs in the hidden layer, and the wk’s parameterize the out-
+put unit. To simplify notation, we will use ak to denote
+the the pre-activation input of the kth hidden unit. That is,
+ak(x) = uk · x + bk. This allows us to simplify the output
+as sgn
+. Here, [n] is the set
+of positive integers not more than n. Note that even when
+not explicitly mentioned, each ak depends on the uk and
+the bk parameters.
+By deﬁnition of the rectiﬁer, for any real number c, we have
+cR (x) = sgn(c)R (|c|x). Thus, we can absorb |wk| into
+the rectiﬁer function in Eq. (2) without losing generality.
+That is, other than w0, all the other output layer weights
+are only relevant up to sign because their magnitude can
+be absorbed into hidden layer weights. We can partition
+the hidden units into two sets P and N , depending on the
+sign of the corresponding wk. That is, let P = {k : k ∈
+[n] and wk = +1} and let N = {k : k ∈ [n] and wk =
+−1}. We will refer to these partitions as the positive and
+negative hidden units respectively.
+This observation lets us state the general form of two-layer
+ReLU networks as:
+
+(cid:32)
+
+(cid:88)
+
+k∈P
+
+R (ak(x)) −(cid:88)
+
+k∈N
+
+y = sgn
+
+w0 +
+
+R (ak(x))
+
+. (3)
+
+(cid:33)
+
+The following two layer rectiﬁer network will serve as our
+running example through the paper:
+y = sgn (w0 + R (a1(x)) − R (a2(x)) − R (a3(x))) .
+(4)
+This network consists of three ReLUs in the hidden layer,
+one of which positively affects the pre-activation output
+and the other two decrease it. Hence, the set P = {1}
+and the set N = {2, 3}.
+Using the general representation of a two layer network
+with rectiﬁer hidden units (Eq. (3)), we can now state our
+main theorem that analyzes the decision boundary of recti-
+ﬁer networks.
+
+Theorem 1 (Main Theorem). Consider a two-layer recti-
+ﬁer network with n hidden units represented in its general
+form (Eq. (3)). Then, for any input x, the following condi-
+tions are equivalent:
+
+1. The network classiﬁes the example x as positive.
+2. There exists a subset S1 of P such that,
+k∈S1
+
+ery subset S2 of N , we have w0 +(cid:80)
+(cid:80)
+ak(x) −(cid:80)
+P such that w0 +(cid:80)
+
+3. For every subset S2 of N , there exists a subset S1 of
+ak(x) ≥ 0.
+
+for ev-
+ak(x) −
+
+ak(x) ≥ 0.
+
+k∈S2
+
+k∈S2
+
+k∈S1
+
+Before discussing the implications of the theorem, let us
+see how it applies to our running example in Eq. (4). In
+this example, P has two subsets: ∅ and {1}, and N has
+four subsets: ∅, {2}, {3} and {2, 3}. The ﬁrst and second
+conditions of Theorem 1 indicate that the prediction is pos-
+itive if, and only if, at least one of the sets of conditions in
+Figure 2 hold in entirety.
+Each big left brace indicates a system of inequalities all of
+which should hold; thus essentially the conjunction of the
+individual inequalities contained within it. We can interpret
+of the subsets of P as certiﬁcates. In order for the output
+of Eq. (4) to be positive, we need at least one certiﬁcate
+S1 (one subset of P) such that for every subset S2 of N ,
+ak(x) ≥ 0. The two sets of
+inequalities show the choices of subsets of N for each of
+the two possible choices of S1 (i.e. either ∅ or {1}). The
+above conditions represent a disjunction of conjunctions.
+Similarly, employing the ﬁrst and third conditions of the
+theorem to our running example gives us:
+
+ak(x) −(cid:80)
+
+w0 +(cid:80)
+
+k∈S1
+
+k∈S2
+
+w0 ≥ 0,
+w0 − a2(x) ≥ 0,
+w0 − a3(x) ≥ 0,
+w0 − a2(x) − a3(x) ≥ 0, or w0 + a1(x) − a2(x)
+
+or w0 + a1(x) ≥ 0
+or w0 + a1(x) − a2(x) ≥ 0
+or w0 + a1(x) − a3(x) ≥ 0
+
+−a3(x) ≥ 0
+
+(5)
+Note that unlike the previous case, this gives us a condition
+that is a conjunction of disjunctions.
+The complete proof of Theorem 1 is given in the supple-
+mentary material; here we give a sketch. To prove that con-
+dition 1 implies condition 2 we construct a speciﬁc subset
+1 = {k : k ∈ P and ak(x) ≥ 0} and
+1 of P, where S∗
+S∗
+this S∗
+1 has the desired property. To prove condition 2 im-
+plies condition 1 we make use of a speciﬁc subset S∗
+2 of
+N , where S∗
+2 = {k : k ∈ N and ak(x) ≥ 0}, to show the
+example x has a positive label. That condition 1 implies
+condition 3 is a direct result of condition 1 implying condi-
+tion 2. Finally, to prove condition 3 implies condition 1 we
+use the same S∗
+
+2 again to show x has a positive label.
+
+
+
+
+
+Expressiveness of Rectiﬁer Networks
+
+w0 ≥ 0,
+w0 − a2(x) ≥ 0,
+w0 − a3(x) ≥ 0,
+w0 − a2(x) − a3(x) ≥ 0.
+
+(with S1 = ∅,S2 = ∅)
+(with S1 = ∅,S2 = {2})
+(with S1 = ∅,S2 = {3})
+(with S1 = ∅,S2 = {2, 3})
+
+(or)
+
+w0 + a1(x) ≥ 0,
+w0 + a1(x) − a2(x) ≥ 0,
+w0 + a1(x) − a3(x) ≥ 0,
+w0 + a1(x) − a2(x) − a3(x) ≥ 0.
+
+(with S1 = {1},S2 = ∅)
+(with S1 = {1},S2 = {2})
+(with S1 = {1},S2 = {3})
+(with S1 = {1},S2 = {2, 3})
+
+
+
+Figure 2. The sets of inequalities that should hold for the running example to predict an input as positive.
+
+BS1,S2(x) =
+
+(6)
+
+3.1. Converting from ReLU to Threshold
+
+Discussion. The only difference between the second and
+the third conditions of the theorem is the order of the uni-
+versal and existential quantiﬁers over the positive and nega-
+tive hidden units, P and N respectively. More importantly,
+in both cases, the inequality condition over the subsets S1
+and S2 is identical. Normally, swapping the order of the
+quantiﬁers does not give us an equivalent statement; but
+here, we see that doing so retains meaning because, in both
+cases, the output is positive for the corresponding input.
+For any subsets S1 ⊆ P and S2 ⊆ N , we can write the
+inequality condition as a Boolean function BS1,S2:
+
+
+
+true, w0 +(cid:80)
+−(cid:80)
+false, w0 +(cid:80)
+−(cid:80)
+
+k∈S2
+
+k∈S2
+
+ak(x)
+k∈S1
+ak(x) ≥ 0
+ak(x)
+k∈S1
+ak(x) < 0
+
+If the sizes of the positive and negative subsets are n1 and
+n2 respectively (i.e, n1 = |P| and n2 = |N|), then we
+know that P has 2n1 subsets and N has 2n2 subsets. Thus,
+there are 2n1+n2 such Boolean functions. Then, by virtue
+of conditions 1 and 2 of theorem 1, we have1
+
+y = ∨S1⊆P [∧S2⊆N BS1,S2 (x)] ,
+
+where ∧S2 indicates a conjunction over all different subsets
+S2 of N , and ∨S1 indicates a disjunction over all different
+subsets S1 of P. This expression is in the disjunctive nor-
+mal form (DNF), where each conjunct contains 2n2 B’s
+and there are 2n1 such terms. Since each B simpliﬁes into
+a hyperplane in the input space, this characterizes the deci-
+sion boundary of the ReLU network as a DNF expression
+over these hyperplane decisions.
+Similarly, by conditions 1 and 3, we have y =
+∧S2
+form (CNF), where each disjunctive clause contains 2n1
+Boolean values and there are 2n2 such clauses.
+An corollary is that if the hidden units of the ReLU network
+are all positive (or negative), then the equivalent threshold
+network is a pure disjunction (or conjunction).
+
+(cid:2)∨S1BS1,S2 (x)(cid:3). This is in the conjunctive normal
+
+1We write y as a Boolean with y = 1 and y = −1 representing
+
+true and false respectively.
+
+3. Comparing ReLU and threshold networks
+In the previous section, we saw that ReLU networks can
+express Boolean functions that correspond to much larger
+threshold networks. Of course, threshold activations are
+not generally used in applications; nonetheless, they are
+well understood theoretically and they emerge naturally as
+a result of the analysis above. Using threshold functions as
+a vehicle to represent the decision boundaries of ReLU net-
+works, naturally leads to two related questions that we will
+address in this section. First, given an arbitrary ReLU net-
+work, can we construct an equivalent threshold network?
+Second, given an arbitrary threshold network, how can we
+represent it using ReLU network?
+
+Theorem 1 essentially gives us a constructive way to repre-
+sent an arbitrary two layer ReLU network given in Eq. (3)
+as a three-layer threshold network. For every choice of the
+subsets S1 and S2 of the positive and negative units, we can
+deﬁne a Boolean function BS1,S2 as per Eq. (6). By deﬁ-
+nition, each of these is a threshold unit, giving us 2n1+n2
+threshold units in all. (Recall that n1 and n2 are the sizes
+of P and N respectively.) Since the decision function is a
+CNF or a DNF over these functions, it can be represented
+using a two-layer network over the B’s, giving us three lay-
+ers in all. We put all 2n1+n2 threshold units in the ﬁrst
+hidden layer, separated into 2n1 groups, with each group
+comprising of 2n2 units.
+Figure 3 shows the threshold network corresponding to our
+running example from Eq. (4). For brevity, we use the no-
+tation Bi,j to represent the ﬁrst hidden layer, with i and j
+indexing over the subsets of P and N respectively. The B’s
+can be grouped into two groups, with units in each group
+sharing the same subset S1 but with different S2. Note that,
+these nodes are linear threshold units corresponding to the
+inequalities in in Fig. 2. In the second hidden layer, we
+have one threshold unit connected to each group of units
+in the layer below. The weight for each connection unit is
+1 and the bias is 2n2 − 1, effectively giving us a conjunc-
+tion of the previous layer nodes. The second hidden layer
+has 2n1 such units. Finally, we have one unit in the output
+layer, with all weights being 1 and bias being 1− 2n1, sim-
+ulating a disjunction of the decisions of the layer below. As
+discussed in the previous section, we can also construct a
+
+Expressiveness of Rectiﬁer Networks
+
+Disjunction unit
+
+y
+
+C0
+
+Conjunction units
+
+1
+
+C1
+
+1
+
+1
+
+B0,1
+
+B0,0
+S1 = ∅ (See Fig. 2, left)
+
+B0,2
+
+B0,3
+
+B1,0
+
+Fully connected
+
+B1,2
+
+B1,1
+B1,3
+S1 = {1} (See Fig. 2, right)
+
+Input vector x
+
+Figure 3. A threshold network corresponding to the running example. The dotted boxes label the various components of the network.
+See the text above for details.
+
+threshold networks using CNFs, with 2n1+n2 units in the
+ﬁrst hidden layer, and 2n2 units in the second hidden layer.
+
+3.2. Boolean Expressiveness of ReLU Networks
+
+Our main theorem shows that for an arbitrary two-layer
+ReLU network, we can always represent it using a three-
+layer threshold network in which the number of thresh-
+old units is exponentially more than the number of ReLUs.
+However, this does not imply that actually need that many
+thresholds units. A natural question to ask is: can we repre-
+sent the same ReLU network without the expense of expo-
+nential number of threshold units? In general, the answer is
+no, because there are families of ReLU network that need at
+least an exponential number of threshold units to represent.
+We can formalize this for the case of ReLU networks where
+the hidden nodes are either all positive or negative – that is,
+either P or N is the empty set. We restrict ourselves to this
+set because we can represent such networks using a two-
+layer threshold network rather than the three-layer one in
+the previous section. We will consider the set of all Boolean
+functions in d dimensions expressed by such a ReLU net-
+work with n hidden units. Let ΓR(n, d) represent this set.
+Similarly, let ΓT (n, d) denote the set of such functions ex-
+pressed by threshold networks with n hidden units. We can
+summarize the Boolean expressiveness of ReLU networks
+via the following two-part theorem:
+Theorem 2. For rectiﬁer networks with n > 1 hidden
+units, all of which are either positive or negative, and for
+all input dimensionalities d ≥ n, we have
+1. ΓR(n, d) ⊆ ΓT (2n − 1, d), and,
+2. ΓR(n, d) (cid:54)⊂ ΓT (2n − 2, d).
+
+Before seeing the proof sketch, let us look at an intuitive
+explanation of this result. This theorem tells us that the up-
+per bound on the number of threshold units corresponding
+to the ReLU network is a tight one. In other words, not only
+can ReLU networks express Boolean functions that corre-
+spond to much larger threshold networks, there are some
+ReLU networks that can only be expressed by such large
+networks! This theorem may give us some intuition into
+the successes of ReLU networks.
+Note, however, that this theorem does not resolve the ques-
+tion of what fraction of all ReLU networks can be ex-
+pressed using fewer than exponential number of hidden
+threshold units. Indeed, if the inputs were only Boolean
+and the output was allowed to be real-valued, then Martens
+et al. (2013, theorem 6) show that a two layer ReLU net-
+work can be simulated using only a quadratic number of
+threshold units. (In contrast, Theorem 2 above considers
+the case of real-valued inputs, but Boolean outputs.)
+The proof is based on Theorem 1. From Theorem 1, we
+know the decision boundary of the rectiﬁer network with n
+positive ReLUs (with N being the empty set) can be deter-
+mined from 2n − 1 hyperplanes. In other words, the region
+of the input space that is classiﬁed as negative is the poly-
+tope that is deﬁned by the intersection of these 2n − 1 half-
+planes. We can show by construction that there are rectiﬁer
+networks for which the negative region is a polytope de-
+ﬁned by 2n − 1 bounding surfaces, thus necessitating each
+of the 2n − 1 half-planes as predicted by the main theorem,
+irrespective of how the corresponding threshold network is
+constructed. In other words, the number of threshold units
+cannot be reduced. The proof for the case of all negative
+ReLUs is similar. The complete proof of the theorem is
+given in the supplementary material.
+
+Expressiveness of Rectiﬁer Networks
+
+3.3. Converting Thresholds to ReLUs
+
+So far, we have looked at threshold networks corresponding
+to ReLU networks. The next question we want to answer
+is under what condition we can use ReLUs to represent the
+same decision boundary as a threshold network. In this sec-
+tion, we show a series of results that address various facets
+of this question. The longer proofs are in the appendices.
+First, with no restrictions in the number of ReLUs in the
+hidden layer, then we can always construct a rectiﬁer net-
+work that is equivalent to a threshold network. In fact, we
+have the following lemma:
+Lemma 1. Any threshold network with n units can be ap-
+proximated to arbitrary accuracy by a rectiﬁer network
+with 2n units.
+
+Proof. Consider a threshold unit with weight vector v and
+bias d, we have
+sgn(v· x + d) (cid:39) 1
+
+
+(cid:2)R(v· x + d + )− R(v· x + d− )(cid:3)− 1.
+
+where  is an arbitrary small number which determines the
+approximation accuracy.
+
+This result is akin to the simulation results from (Maass
+et al., 1994) that compares threshold and sigmoid networks.
+Given the exponential increase in the size of the threshold
+network to represent a ReLU network (Theorem 2), a natu-
+ral question is whether we can use only logarithmic number
+of ReLUs to represent any arbitrary threshold network. In
+the general case, the following lemma points out that this
+is not possible.
+Lemma 2. There exists a two-layer network with n hidden
+threshold units for which it is not possible to construct an
+equivalent two-layer ReLU network with fewer number of
+hidden units.
+
+We provide such an example with n hidden threshold units
+in the supplementary material. This lemma, in conjunction
+with Theorem 2 effectively points out that by employing a
+rectiﬁer network, we are exploring a subset of much larger
+threshold networks.
+Furthermore, despite the negative result of the lemma, in
+the general case, we can identify certain speciﬁc thresh-
+old networks that can be compressed into logarithmically
+smaller ones using ReLUs. Suppose we wish to compress
+a two layer threshold network with three sign hidden units
+into a ReLU network with (cid:100)log2 3(cid:101) = 2 hidden units. The
+sign network can be represented by
+y = sgn(2 + sgn (v1 · x + d1) + sgn (v2 · x + d2)
++ sgn (v3 · x + d3))
+
+Suppose one of the weight vectors can be written as the
+linear combination of the other two but its bias can not.
+That is, for some p and q, if v3 = pv1 + qv2 and d3 (cid:54)=
+pd1 + qd2. Then, we can construct the following equivalent
+ReLU network that is equivalent:
+
+y = sgn (−1 + R (u1 · x + b1) + R (u2 · x + b2)) ,
+
+where
+
+r =
+
+1
+
+d3 − pd1 − qd2
+
+,
+
+u1 = prv1,
+u2 = qrv2,
+b1 = prd1 + 1,
+b2 = qrd2 + 1.
+
+This equivalence can be proved by applying Theorem 1 to
+the constructed ReLU network. It shows that in two dimen-
+sions, we can use two ReLUs to represent three linearly
+independent sign units.
+We can generalize this result to the case of a two-layer
+threshold network with 2n hidden threshold units that rep-
+resents a disjunction over the hidden units. The goal is to
+ﬁnd that under what condition we can use only n rectiﬁer
+units to represent the same decision. To do so, we will use
+binary encoding matrix Tn of size n × 2n whose ith col-
+umn is the binary representation of i − 1. For example, the
+binary encoding matrix for n = 3 is given by T3,
+
+T3 =
+
+0
+0
+1
+
+0
+1
+0
+
+0
+1
+1
+
+1
+0
+0
+
+1
+0
+1
+
+1
+1
+0
+
+1
+1
+1
+
+0
+
+0
+0
+
+(cid:32)
+
+
+
+(cid:33)
+
+Lemma 3. Consider a two-layer threshold network with 2n
+threshold units in the hidden layer whose output represents
+a disjunction over the hidden units, i.e., the ﬁnal output is
+positive if and only if at least one of the hidden-unit outputs
+is positive. That is,
+
+y = sgn
+
+2n − 1 +
+
+sgn (vk · x + dk)
+
+.
+
+(7)
+
+2n(cid:88)
+
+k=1
+
+This decision can be represented using a two-layer rectiﬁer
+network with n hidden units, if the weight parameters of
+the threshold units can be factored in the following form:
+
+(cid:20)v1
+
+d1
+
+(cid:21)
+
+(cid:20)u1
+
+b1
+
+··· v2n
+···
+d2n
+
+=
+
+(cid:21)(cid:20) Tn
+
+(cid:21)
+
+e2n
+
+(8)
+
+··· un
+···
+
+0
+bn w0
+
+where e2n is a 2n dimensional row vector of all ones and 0
+is a vector of all zeros.
+
+Proof. If the weight parameters vk and dk can be written in
+the form as in Eq. (8), then we can construct the two-layer
+rectiﬁer network,
+
+y = sgn(cid:2)w0 +
+
+R(uk · x + bk)(cid:3).
+
+(9)
+
+n(cid:88)
+
+k=1
+
+Expressiveness of Rectiﬁer Networks
+
+Then by virtue of theorem 1, the decision boundary of the
+rectiﬁer network in Eq. (9) is the same as the decision
+boundary of the threshold network in Eq. (7).
+
+Note that this lemma only identiﬁes sufﬁcient conditions
+for the logarithmic reduction in network size. Identifying
+both necessary and sufﬁcient conditions for such a reduc-
+tion is an open question.
+
+4. Hidden Layer Equivalence
+Lemma 3 studies a speciﬁc threshold network, where the
+output layer is a disjunction over the hidden layer units. For
+this network, we can deﬁne an different notion of equiva-
+lence between networks by studying the hidden layer acti-
+vations. We do so by interpreting the hidden layer state of
+the network as a speciﬁc kind of a multiclass classiﬁer that
+either rejects inputs or labels them. If the output is nega-
+tive, then clearly none of the hidden layer units are active
+and the input is rejected. If the output layer is positive, then
+at least one of the hidden layer units is active and the mul-
+ticlass label is given by the maximum scoring hidden unit,
+namely arg maxk vk · x + dk.
+For threshold networks, the number of hidden units is equal
+to the number of classes. The goal is to learn the same
+concept with rectiﬁer units, hopefully with fewer rectiﬁer
+units than the number of classes. Suppose a ReLU network
+has n hidden units, then its hidden layer prediction is the
+highest scoring hidden unit of the corresponding threshold
+network that has 2n hidden units. We now deﬁne hidden
+layer equivalence of two networks as follows: A threshold
+network and a ReLU network are equivalent if both their
+hidden layer predictions are identical.
+We already know from lemma 3 that if the weight parame-
+ters of the true concept satisfy Eq. (8), then instead of learn-
+ing 2n threshold units we can just learn n rectiﬁer units. For
+simplicity, we write Eq. (8) as V = U T where
+··· un
+···
+
+··· v2n
+···
+d2n
+
+0
+bn w0
+
+(cid:21)
+
+(cid:20)v1
+
+d1
+
+(cid:21)
+
+V =
+
+and
+
+T =
+
+U =
+
+(cid:20)u1
+(cid:20) Tn
+(cid:21)
+
+b1
+
+e2n
+
+For simplicity of notation, we will assume that the input
+features x includes a constant bias feature in the last po-
+sition. Thus, the vector V T x represents the pre-activation
+score for each class.
+Now, we consider threshold networks with parameters such
+that there is no ReLU (deﬁned by the matrix U) that satis-
+ﬁes this condition. Instead, we ﬁnd a rectiﬁer network with
+parameters U that satisﬁes the following condition:
+
+U = argminU(cid:107)(V − U T )T(cid:107)∞,
+
+(10)
+
+(cid:107)Ax(cid:107)∞(cid:107)x(cid:107)∞ .
+
+Here (cid:107) · (cid:107)∞ is the induced inﬁnity norm, deﬁned for any
+matrix A as (cid:107)A(cid:107)∞ = supx(cid:54)=0
+If we have a matrix U such that V and U T are close in the
+sense of induced inﬁnity norm, then we have the following
+about their equivalence.
+Theorem 3. If the true concept of a 2n-class classiﬁer is
+given by a two-level threshold network in Eq. (7), then we
+can learn a two-layer rectiﬁer network with only n hidden
+units of the form in Eq. (9) that is hidden layer equivalent
+to it, if for any example x, we have
+
+(cid:107)(V − U T )T(cid:107)∞ ≤ γ(x)
+2(cid:107)x(cid:107)∞
+
+,
+
+(11)
+
+where γ(x) is the multiclass margin for x, deﬁned as the
+difference between its highest score and second-highest
+scoring classes.
+
+in the supplementary material,
+
+The proof,
+is based on
+the intuition that for hidden layer equivalence, as deﬁned
+above, only requires that the highest scoring label needs to
+be the same in the two networks rather than the actual val-
+ues of the scores. If V and U T are closed in the sense of
+induced inﬁnity norm, then the highest scoring hidden unit
+will be invariant regardless of which network is used.
+
+5. Experiments
+We have seen that every two-layer rectiﬁer network ex-
+presses the decision boundary of a three-layer threshold
+network. If the output weights of the former are all positive,
+then a two-layer threshold network is sufﬁcient. (See the
+discussion in §3.2.) However, the fact that rectiﬁer network
+can express the same decision boundary more compactly
+does not guarantee learnability because of optimization is-
+sues. Speciﬁcally, in this section, we study the following
+question using synthetic data: Given a rectiﬁer network
+and a threshold network with same decision boundary, can
+we learn one using the data generated from another using
+backpropagation?
+
+5.1. Data generation
+
+We use randomly constructed two-layer rectiﬁer networks
+to generate labeled examples. To do so, we specify various
+values of the input dimensionality and the number of hid-
+den ReLU units in the network. Once we have the network,
+we randomly generate the input points and label them us-
+ing the network. Using generated data we try to recover
+both the rectiﬁer network and the threshold network, with
+varying number of hidden units. We considered input di-
+mensionalities 3, 10 and 50 and in each case, used 3 or 10
+hidden units. This gave us six networks in all. For each
+network, we generated 10000 examples and 1500 of which
+are used as test examples.
+
+Expressiveness of Rectiﬁer Networks
+
+5.2. Results and Analysis
+
+For each dataset, we compare three different network archi-
+tectures. The key parameter that varies across datasets is n,
+the number of hidden ReLU units in the network that gener-
+ated the data. The ﬁrst setting learns using a ReLU network
+with n hidden units. The second setting uses the activation
+function tanh(cx), which we call the compressed tanh ac-
+tivation. For large values of c, this effectively simulates
+the threshold function. In the second setting, the number
+of hidden units is still n. The ﬁnal setting learns using the
+compressed tanh, but with 2n hidden units following §2.2.
+
+Figure 4. Test error for different learning settings. The x-axis
+speciﬁes the number of ReLUs used for data generalization
+and the dimensionality. Each dataset is learned using ReLU
+and compressed tanh activations with different number of hid-
+den units. Learning rate is selected with cross-validation from
+{100, 10−1, 10−2, 10−3, 10−4}. L2-regularization coefﬁcient is
+10−4. We use early-stopping optimization with a maximum of
+1000 epochs. The minibatch size is 20. For the compressed tanh,
+we set c = 10000.
+
+Figure 4 shows the results on the six datasets. These results
+verify several aspects of our theory. First, learning using
+ReLUs always succeeds with low error (purple bars, left).
+This is expected – we know that our hypothesis class can
+express the true concept and training using backpropaga-
+tion can successfully ﬁnd it. Second, learning using com-
+pressed tanh with same number of units cannot recover the
+true concept (red bars, middle). This performance drop is
+as expected, since compressed tanh is just like sign activa-
+tion, and we know in this case we need exponentially more
+hidden units.
+Finally, the performances of learning using exponential
+number of compressed tanh (green bars, right) are not al-
+
+ways good.2 In this case, from the analysis in §2, we know
+the hypothesis can certainly express the true concept; yet
+learning does not always succeed! In fact, for the ﬁrst three
+groups, where we have three ReLUs for data generation,
+the error for the learned classiﬁer is rather large, suggest-
+ing that even though the true concept can be expressed, it
+is not found by backpropagation. For the last three groups,
+where we have 10 hidden ReLUs for data generation, us-
+ing exponential number of compressed tanh does achieve
+better performance. We posit that this incongruence is due
+to the interplay between the non-convexity of the objective
+function and the fact that the set of functions expressed by
+threshold functions is larger (a consequence of lemma 2).
+
+6. Conclusions
+In this paper, we have presented a novel analysis of the
+expressiveness of rectiﬁer neural networks. Speciﬁcally,
+for binary classiﬁcation we showed that even though the
+decision boundary of two-layer rectiﬁer network can be
+represented using threshold unit network, the number of
+threshold units required is exponential. Further, while a
+corresponding general logarithmic reduction of threshold
+units is not possible, for speciﬁc networks, we character-
+ized sufﬁcient conditions for reducing a threshold network
+to a much smaller rectiﬁer network. We also presented a
+relaxed condition where we can approximately recover a
+rectiﬁer network that is hidden layer equivalent to an expo-
+nentially larger threshold network.
+Our work presents a natural next step: can we use the
+equivalence of the expressiveness results given in this pa-
+per to help us study the sample complexity of rectiﬁer net-
+works? Another open question is the generalization of
+these results to deep networks. Finally, from our experi-
+ments we see that expressiveness is not enough to guarantee
+learnability. Studying the interplay of expressiveness, sam-
+ple complexity and the convexity properties of the training
+objective function for rectiﬁer networks represents an ex-
+citing direction of future research.
+
+Acknowledgements
+We are grateful to the reviewers for their invaluable com-
+ments and pointers to related work. Xingyuan was partly
+supported by the School of Computing PhD fellowship.
+
+2We also evaluated the performance on the training set. The
+training errors for all six datasets for all three learning scenarios
+are very close to test error, suggesting that over-ﬁtting is not an
+issue.
+
+Expressiveness of Rectiﬁer Networks
+
+Maass, W., Schnitger, G., and Sontag, E. D. On the com-
+putational power of sigmoid versus boolean threshold
+circuits. In 32nd Annual Symposium on Foundations of
+Computer Science, 1991.
+
+Maass, Wolfgang, Schnitger, Georg, and Sontag, Ed-
+uardo D. A comparison of the computational power
+of sigmoid and boolean threshold circuits. In Theoret-
+ical Advances in Neural Computation and Learning, pp.
+127–151. 1994.
+
+Martens, James, Chattopadhya, Arkadev, Pitassi, Toni, and
+Zemel, Richard. On the representational efﬁciency of re-
+stricted boltzmann machines. In Advances in Neural In-
+formation Processing Systems 26, pp. 2877–2885. 2013.
+
+Montufar, Guido F, Pascanu, Razvan, Cho, Kyunghyun,
+and Bengio, Yoshua. On the number of linear regions
+of deep neural networks. In Advances in Neural Infor-
+mation Processing Systems 27, pp. 2924–2932. 2014.
+
+Nair, Vinod and Hinton, Geoffrey E. Rectiﬁed linear units
+improve restricted Boltzmann machines. In Proceedings
+of the 27th International Conference on Machine Learn-
+ing, 2010.
+
+Pascanu, Razvan, Montufar, Guido, and Bengio, Yoshua.
+On the number of response regions of deep feedforward
+networks with piecewise linear activations. In Interna-
+tional Conference on Learning Representations, 2014.
+
+Telgarsky, Matus. Representation Beneﬁts of Deep Feed-
+
+forward Networks. arXiv:1509.01801, 2015.
+
+Zaslavsky, Thomas. Facing up to arrangements:
+
+face-
+count formulas for partitions of space by hyperplanes.
+American Mathematical Society, 1975.
+
+Zeiler, M. D., Ranzato, M., Monga, R., Mao, M., Yang, K.,
+Le, Q. V., Nguyen, P., Senior, A., Vanhoucke, V., Dean,
+J., and Hinton, G. E. On rectiﬁed linear units for speech
+processing. In 2013 IEEE International Conference on
+Acoustics, Speech and Signal Processing, 2013.
+
+References
+Bengio, Y., Simard, P., and Frasconi, P. Learning long-term
+IEEE
+dependencies with gradient descent is difﬁcult.
+Transactions on Neural Networks, 5(2):157–166, 1994.
+
+Blum, Avrim L. and Rivest, Ronald L. Training a 3-node
+neural network is np-complete. Neural Networks, 5(1):
+117 – 127, 1992.
+
+Cybenko, G. Approximation by superpositions of a sig-
+moidal function. Mathematics of Control, Signals and
+Systems, 2(4):303–314, 1989.
+
+Daniely, Amit, Linial, Nati, and Shalev-Shwartz, Shai.
+From average case complexity to improper learning
+In Proceedings of the 46th Annual ACM
+complexity.
+Symposium on Theory of Computing, 2014.
+
+DasGupta, Bhaskar and Schnitger, Georg. The power of
+approximating: a comparison of activation functions. In
+Advances in Neural Information Processing Systems 5,
+pp. 615–622. 1993.
+
+Glorot, Xavier, Bordes, Antoine, and Bengio, Yoshua.
+Deep Sparse Rectiﬁer Neural Networks. In Proceedings
+of the 14th International Conference on Artiﬁcial Intel-
+ligence and Statistics, 2011.
+
+Hajnal, Andr´as, Maass, Wolfgang, Pudl´ak, Pavel, Szegedy,
+Mario, and Tur´an, Gy¨orgy.
+Threshold circuits of
+bounded depth. Journal of Computer and System Sci-
+ences, 46(2):129–154, 1993.
+
+Hochreiter, Sepp. The vanishing gradient problem dur-
+ing learning recurrent neural nets and problem solu-
+International Journal of Uncertainty, Fuzziness
+tions.
+and Knowledge-Based Systems, 06(02):107–116, 1998.
+
+Klivans, A. R. and Sherstov, A. A. Cryptographic hardness
+for learning intersections of halfspaces. In 47th Annual
+IEEE Symposium on Foundations of Computer Science,
+2006.
+
+Krizhevsky, Alex, Sutskever, Ilya, and Hinton, Geoffrey E.
+Imagenet classiﬁcation with deep convolutional neural
+networks. In Advances in Neural Information Processing
+Systems 25, pp. 1097–1105. 2012.
+
+Livni, Roi, Shalev-Shwartz, Shai, and Shamir, Ohad. On
+the computational efﬁciency of training neural networks.
+In Advances in Neural Information Processing Systems
+27, pp. 855–863. 2014.
+
+Maas, Andrew L., Hannun, Awni Y., and Ng, Andrew Y.
+Rectiﬁer nonlinearities improve neural network acoustic
+models. In ICML Workshop on Deep Learning for Audio,
+Speech and Language Processing, 2013.
+
+

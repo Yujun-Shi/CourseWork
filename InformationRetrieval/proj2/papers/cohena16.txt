@@ -1,0 +1,1541 @@
+Online Learning with Feedback Graphs Without the Graphs
+
+Alon Cohen
+Tamir Hazan
+Tomer Koren
+Technion—Israel Institute of Technology, Haifa, Israel
+
+ALON.COHEN@TECHNION.AC.IL
+TAMIR.HAZAN@TECHNION.AC.IL
+TOMERK@TECHNION.AC.IL
+
+Abstract
+
+We study an online learning framework intro-
+duced by Mannor and Shamir (2011) in which
+the feedback is speciﬁed by a graph, in a set-
+ting where the graph may vary from round to
+round and is never fully revealed to the learner.
+We show a large gap between the adversarial
+and the stochastic cases. In the adversarial case,
+we prove that even for dense feedback graphs,
+the learner cannot improve upon a trivial re-
+gret bound obtained by ignoring any additional
+feedback besides her own loss.
+In contrast, in
+the stochastic case we give an algorithm that
+αT ) regret over T rounds, pro-
+vided that the independence numbers of the hid-
+den feedback graphs are at most α. We also
+extend our results to a more general feedback
+model, in which the learner does not necessarily
+observe her own loss, and show that, even in sim-
+ple cases, concealing the feedback graphs might
+render a learnable problem unlearnable.
+
+achieves (cid:101)Θ(
+
+√
+
+1. Introduction
+Online learning is a general framework for sequential
+decision-making under uncertainty. In its most basic form,
+it can be described as follows. A learner has to iteratively
+choose an action from a set of K available actions, and
+suffer a loss associated with that action. The losses of the
+actions on each round are assigned in advance by an arbi-
+trary, possibly adversarial, environment. The learner’s goal
+is to minimize her regret over T rounds of the game, which
+is the difference between her cumulative loss and that of
+the best ﬁxed action in hindsight.
+After making each decision, the learner receives some form
+of feedback about the losses. Traditionally, the literature
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+full feedback (Little-
+considers two types of feedback:
+stone and Warmuth, 1994; Vovk, 1990; Cesa-Bianchi et al.,
+1997), where the learner observes the losses associated
+with all of her possible actions, and bandit feedback (Auer
+et al., 2002b), where the learner only observes the loss of
+the action she has actually taken.
+Full feedback and bandit feedback are special cases of
+a general framework introduced by Mannor and Shamir
+(2011), in which the feedback model is speciﬁed by a se-
+quence G1, . . . , GT of feedback graphs, one for each round
+t of the game. Each feedback graph Gt is a directed graph
+whose nodes correspond to the learner’s K possible ac-
+tions; a directed edge u → v in this graph indicates that
+whenever the learner chooses action u on round t, in ad-
+dition to observing the loss of action u, she also gets to
+observe the loss associated with the action v on that round.
+Online learning with feedback graphs was further stud-
+ied by several authors. Alon et al. (2013), and subse-
+quently Koc´ak et al. (2014); Alon et al. (2015), gave
+αT ) re-
+gret, where α is a bound on the independence numbers of
+the graphs G1, . . . , GT . Up to logarithmic factors, their
+√
+results recover and interpolate between the classic bounds
+√
+of O(
+T log K) with full feedback (Freund and Schapire,
+KT ) with bandit feedback (Auer et al.,
+1997) and O(
+αT ) bound
+turns out to be tight for any feedback graph (when it is ﬁxed
+throughout the game and known in advance), in light of a
+matching lower bound due to Mannor and Shamir (2011).
+However, all of the optimal algorithms mentioned above
+require the full structure of the feedback graph in order to
+operate. While some require the entire graph Gt for per-
+forming their updates only at the end of round t (e.g., Alon
+et al., 2013; Koc´ak et al., 2014; Alon et al., 2015),1 oth-
+ers actually need the description of Gt at the beginning of
+the round before making their decision (e.g., Alon et al.,
+
+regret-minimization algorithms that achieve (cid:101)O(
+
+2002b; Audibert and Bubeck, 2009). The (cid:101)O(
+
+√
+
+√
+
+1More precisely, these algorithms do not need the entire graph
+but rather the incoming neighborhood of each of the actions for
+which the associated loss has been observed.
+
+Online Learning with Feedback Graphs Without the Graphs
+
+2014). In fact, none of the algorithms previously proposed
+in the literature is able to provide non-trivial regret guaran-
+tees without the feedback graphs being disclosed.
+The assumption that the entire observation system is re-
+vealed to the learner on each round, even if only after mak-
+ing her prediction, is rather unnatural.
+In principle, the
+learner need not be even aware of the fact that there is a
+graph underlying the feedback model; the feedback graph
+is merely a technical notion for us to specify a set of obser-
+vations for each of the possible actions. Ideally, the only
+signal we would like the learner to receive following each
+round is the set of observations that corresponds to the ac-
+tion she has taken on that round (in addition to her own
+loss).
+As a motivating example for situations where receiving the
+entire observation system is unrealistic, consider the fol-
+lowing online pricing problem that faces any vendor sell-
+ing goods over the internet. On each round, the seller has
+to announce a price for his product. Then, a buyer ar-
+rives and decides whether or not to purchase the product
+at this price based on his private value; the only feedback
+the seller receives is whether or not the buyer purchased the
+product at the announced price. However, when a purchase
+takes place, the seller also knows that the buyer would have
+bought the product at any price lower than the price that she
+announced. While this feedback structure can be thought
+of as a directed graph over the seller’s actions (i.e., prices),
+the graph itself is never fully revealed to the seller as its
+structure discloses the buyer’s private value.
+
+1.1. Our contributions
+
+In this paper, we study online learning with feedback
+graphs in a setting where the feedback graphs are never
+revealed to the learner in their entirety. That is, in this set-
+ting the only feedback available to the learner at the end
+of round t is the out-neighborhood of her chosen action
+in the graph Gt, along with the loss associated with each
+of the actions in this neighborhood and the loss of the ac-
+tion that she chose. We address the following questions:
+how this lack of full disclosure affects the learner’s regret?
+√
+Is it possible to achieve any non-trivial regret guarantee in
+this setting, i.e., one that improves on the trivial O(
+KT )
+bound? In particular, can we obtain bounds that scale with
+the independence numbers of the feedback graphs?
+Our main results show that not knowing the entire feed-
+back graphs can have a signiﬁcant impact on the learner’s
+achievable regret. First, we show that in a standard ad-
+versarial online learning setting, where we assume noth-
+ing about the process generating the losses and the feed-
+√
+back graphs (i.e., both are possibly chosen by an adver-
+KT ) re-
+sary), any strategy of the learner must suffer Ω(
+gret in the worst case, even if the independence numbers of
+
+mal regret bound of the form (cid:101)O(
+
+G1, . . . , GT are all bounded by some small absolute con-
+stant. Namely, by hiding the feedback graphs from the
+learner, the problem surprisingly becomes as hard as the K-
+armed bandit problem, even when the feedback available to
+the learner is “almost full”: each of the feedback graphs is
+“almost a clique.” In other words, the side observations
+received by the learner are effectively useless; she may as
+well ignore them and use a standard bandit algorithm such
+as EXP3 (Auer et al., 2002b) to perform optimally.
+Second, and in contrast to the adversarial setting, we show
+that in a stochastic setting where the losses of each action
+are known to be drawn i.i.d. from some unknown proba-
+bility distribution, side observations can still be very use-
+ful. We show that the learner is able to achieve an opti-
+αT ), even if the graphs
+G1, . . . , GT are chosen adversarially and are never fully
+revealed to the learner, as long as their independence num-
+bers are all bounded by α. We give an efﬁcient elimination-
+based algorithm achieving this bound, that does not require
+knowing the value of α in advance. This result is optimal
+up to logarithmic factors, even when the feedback graph is
+ﬁxed throughout the game and known in advance, due to a
+lower bound of Mannor and Shamir (2011).
+For our algorithm in the stochastic case, we also prove
+a distribution-dependent regret bound that scales logarith-
+mically with T . The bound we prove is of the form
+v∈V (cid:48)(1/∆v) log T ), where ∆v is the gap of action
+
+√
+
+O((cid:80)
+v, and V (cid:48) is the subset of (cid:101)O(α) actions with smallest
+(cid:80)
+bound is taken only over the subset of (cid:101)O(α) actions with
+
+gaps. This bound is a substantial improvement over stan-
+dard regret bounds of stochastic multi-armed bandit algo-
+rithms such as UCB (Auer et al., 2002a): whereas the re-
+gret of the latter algorithms is typically bounded by a sum
+v∈V (1/∆v) taken over all K actions, the sum in our
+
+the smallest gaps. This result cannot be improved even
+when the feedback graph is ﬁxed throughout the game, and
+has an optimal dependence on α as well as on the gaps ∆v,
+thus resolving an open question of Alon et al. (2014).
+Finally, we extend our results to a more general feedback
+model recently studied by Alon et al. (2015), in which
+the learner does not necessarily observe her own loss af-
+ter making predictions (namely, each action may or may
+not have a self-loop in each feedback graph). Alon et al.
+(2015) gave a necessary and sufﬁcient condition for attain-
+T ) regret in this more general model—a graph-
+ing Θ(
+theoretic condition they call strong observability. The ex-
+tension of our results to their model bears some surprising
+consequences: even in the strongly observable case with
+only two actions, not revealing the entire feedback graphs
+to the learner might make the problem unlearnable! Never-
+theless, in the case of stochastic losses, our positive results
+do extend to the more general feedback model.
+
+√
+
+Online Learning with Feedback Graphs Without the Graphs
+
+1.2. Additional related work
+
+Online learning with feedback graphs was previously con-
+sidered in the stochastic setting by Caron et al. (2012), who
+gave results depending on the graph clique structure. Their
+analysis, however, only applies when the feedback graph is
+ﬁxed throughout the game, and can only bound the regret
+in terms of a quantity akin to the clique-partition number
+of this graph, which is always larger than its independence
+number (the gap between the two can be very large; see
+Alon et al., 2014).
+More recently, Wu et al. (2015) and Koc´ak et al. (2016)
+have investigated a noisy version of the feedback graph
+model, where feedback is speciﬁed by a weighted di-
+rected graph with edge weights indicating the quality (e.g.,
+the noise level or variance) of the feedback received on
+adjacent vertices. Wu et al. (2015) provided ﬁnite-time
+problem-dependent lower bounds for this setting; Koc´ak
+et al. (2016) generalized the notion of independence num-
+ber to the noisy case and gave new efﬁcient algorithms in
+this setting.
+
+2. Setup and Main Results
+We consider a general online learning model with graph-
+structured feedback, which can be described as a game be-
+tween a learner and an environment that proceeds for T
+rounds. Before the game begins, the environment privately
+determines a sequence of loss functions (cid:96)1, ..., (cid:96)T : V (cid:55)→
+[0, 1] deﬁned over a set V = {1, ..., K} of K actions,
+which we view as a sequence of loss vectors (cid:96)1, ..., (cid:96)T ∈
+[0, 1]K. In addition, the environment ﬁxes a sequence of
+directed graphs G1, . . . , GT over V as vertices.
+We will consider two different cases, that we refer to as the
+adversarial setting and the stochastic setting:
+• In the adversarial setting, the loss vectors (cid:96)1, ..., (cid:96)T and
+the feedback graphs G1, . . . , GT are chosen by the en-
+vironment in an arbitrary way.
+
+• In the stochastic setting, the environment privately se-
+lects a loss distribution D over [0, 1]K and an arbi-
+trary sequence G1, . . . , GT ; thereafter, the loss vectors
+(cid:96)1, . . . , (cid:96)T are sampled i.i.d. from D.
+
+Iteratively on rounds t = 1, 2, ..., T , the learner randomly
+chooses an action vt ∈ V and incurs the loss (cid:96)t(vt). At
+the end of each round t, the learner receives a feedback
+comprised of {(v, (cid:96)t(v)) : (vt → v) ∈ Gt)}, that includes
+the loss (cid:96)t(vt) incurred by the learner (i.e., we assume that
+(v → v) ∈ Gt for all t and v ∈ V ). In words, the learner
+observes the losses associated with vt and the actions in
+the out-neighborhood of vt in the feedback graph Gt. The
+feedback graph Gt itself is never revealed in its entirety to
+the learner.
+
+The goal of the learner throughout the T rounds of the game
+is to minimize her expected regret, which is deﬁned as
+
+(cid:34) T(cid:88)
+where v(cid:63) = minv∈V E[(cid:80)T
+
+RT = E
+
+t=1
+
+(cid:96)t(vt) − T(cid:88)
+
+t=1
+
+(cid:35)
+
+(cid:96)t(v(cid:63))
+
+,
+
+(1)
+
+t=1 (cid:96)t(v)] is the best action in
+hindsight. Here, the expectations are taken over the random
+choices of the learner and, in the stochastic setting, also
+over the randomness of the losses.
+For the stochastic setting we require additional notation.
+For each v ∈ V , we denote by µ(v) the mean of the loss of
+action v under D. We denote µ(cid:63) = µ(v(cid:63)), and let ∆v =
+µ(v) − µ(cid:63) for all v ∈ V . We refer to ∆v as the gap of
+action v, and assume for simplicity that v(cid:63) is unique so that
+∆v > 0 for all v (cid:54)= v(cid:63).
+For stating our results, we need a standard graph-theoretic
+deﬁnition. An independent set in a graph G = (V, E) (ei-
+ther directed or undirected) is a set of vertices that are not
+connected by any edges. Namely, S ⊆ V is independent if
+for any u, v ∈ S, u (cid:54)= v, it holds that (u → v) /∈ E. The
+independence number α(G) of G is the size of the largest
+independent set in G.
+
+2.1. Main results
+
+We now state the main results of this paper. Our ﬁrst result
+deals with the adversarial case and shows that when the
+feedback graphs are not revealed to the learner at the end
+of each round, her regret might be very large even when
+the independence numbers of the graphs are small—they
+are all bounded by a constant.
+Theorem 1. In the adversarial setting, any online learning
+KT ) regret in the worst
+algorithm must suffer at least Ω(
+case, even when all feedback graphs G1, . . . , GT have in-
+dependence numbers ≤ O(1).
+
+√
+
+The lower bound in the theorem is tight: it can be matched
+by simply running a standard bandit algorithm (e.g., EXP3
+of Auer et al., 2002b), ignoring all observed feedback be-
+sides the loss of the action played.
+Our next result shows that in the stochastic case, the learner
+is still able to attain non-trivial regret despite the fact that
+the feedback graphs are never fully revealed to her.
+Theorem 2. In the stochastic setting, Algorithm 1 de-
+scribed in Section 4 attains an expected regret of at most
+αT ), provided that the independence numbers of the
+
+√
+
+(cid:101)O(
+
+feedback graphs G1, . . . , GT are all bounded by α.
+
+This regret bound is optimal up to logarithmic factors, since
+the lower bound of Ω(
+αT ) found in Mannor and Shamir
+(2011) applies in our stochastic setting.
+
+√
+
+In the stochastic setting we also give a distribution-
+dependent analysis of Algorithm 1 which depends on the
+gaps of the actions under the distribution D.
+Theorem 3. In the stochastic setting, Algorithm 1 de-
+scribed in Section 4 attains an expected regret of
+
+(cid:32)(cid:88)
+
+O
+
+(cid:33)
+
+1
+∆v
+
+log T
+
+,
+
+v∈V (cid:48)
+
+where V (cid:48) is the set of (cid:101)O(α) actions with the smallest gaps
+
+(excluding v(cid:63)), provided that the the independence num-
+bers of the graphs G1, . . . , GT are all bounded by α.
+
+Online Learning with Feedback Graphs Without the Graphs
+u (cid:54)→ v(cid:63)
+
+(cid:96)t(v(cid:63)) = 0
+(cid:96)t(v(cid:63)) = 1
+
+(cid:96)t(v) = 0
+
+(cid:96)t(v) = 1
+
+2
+0
+
+2
+u (cid:54)→ v
+
+
+
+
+
+2
+
+1
+
+1
+
+u → v(cid:63)
+2 − 
+2 − 
+1 − 2
+u → v
+2 − 
+2 − 
+1 − 2
+
+1
+
+1
+
+1
+2 + 
+2 − 
+1
+
+1
+2
+1
+2
+
+We also extend our results to a more general class of feed-
+back graphs, in which each vertex may or may not have a
+self-loop. For the statements of these additional results, see
+the full version of the paper (Cohen et al., 2016).
+
+2.2. Discussion of the results
+
+Our results show that there is a large gap between the
+achievable regret rates in the adversarial and stochastic set-
+tings, in terms of the dependence on the properties of the
+feedback graphs.
+In the adversarial case, the environment is free to simulta-
+neously choose the sequences of loss values and feedback
+graphs in conjunction with each other; for example, they
+can be drawn from a joint distribution over sequences of
+loss values and sequences of directed graphs. The envi-
+ronment may use this freedom to manipulate the feedback
+observed by the learner and bias her observations in a ma-
+licious way. In the stochastic setting, on the other hand, the
+loss values are drawn from the underlying distribution only
+after the environment commits to some arbitrary sequence
+of graphs, so that the feedback graphs are probabilistically
+independent of the realizations of the losses.
+In fact, as our arguments in Section 3 reveal, there exists
+√
+a randomized construction of loss vectors and feedback
+graphs that inﬂicts Ω(
+KT ) on any learner, in which the
+loss vectors are i.i.d. However, the stochastic process that
+generates the feedback graphs in that construction is corre-
+lated with the actual realizations of the i.i.d. losses. This
+is a crucial aspect of our construction, as implied by our
+upper bound in the stochastic case.
+
+3. Lower Bound for Adversarial Losses
+In this section we deal with the adversarial setting and
+KT ) lower bound on
+prove Theorem 1: we show an Ω(
+the performance of any online learning algorithm, where
+both the losses of the actions and the feedback graphs can
+be chosen arbitrarily. In fact, our result relies heavily on
+the fact that the two can be behave in a correlated manner.
+
+√
+
+Figure 1. Summary of the joint distribution of the loss of action v(cid:63)
+and an edge between u and v(cid:63) (top), and of the joint distribution
+of the loss of action v (cid:54)= v(cid:63) and an edge between u and v (bot-
+tom). The grayed-out entries indicate probabilities that cannot be
+estimated by the learner; the remaining entries do not permit the
+learner to distinguish between v(cid:63) and v.
+
+Let us sketch the idea behind the lower bound. By Yao’s
+minimax principle, in order to prove a lower bound on the
+learner’s regret it is enough to demonstrate a randomized
+√
+strategy for the environment that forces any deterministic
+learner to incur Ω(
+KT ) regret. We construct our envi-
+ronment’s strategy as follows.
+First, before the game begins, the environment chooses an
+action v(cid:63) uniformly at random from V . At each round,
+the loss of all actions v (cid:54)= v(cid:63) is distributed Bernoulli(1/2),
+while the loss of action v(cid:63) is distributed Bernoulli(1/2 −
+
+) with  = (1/8)(cid:112)K/T . All of the loss values in the
+
+construction are drawn independently of each other.
+The feedback graphs G1, . . . , GT are chosen i.i.d. from the
+following distribution. Any edge u → v for v (cid:54)= v(cid:63) appears
+with probability 1 − 2 independently from all other edges
+and the losses of the actions. Edges of the form u → v(cid:63)
+appear mutually independently given the loss of action v(cid:63):
+if the loss of v(cid:63) is 1, each edge appears with probability
+1; if the loss of v(cid:63) is 0, each edge appears with probability
+(1 − 2)/(1 + 2). See Figure 1 for a summary of the edge
+probabilities in this construction.
+The idea behind the
+construction is as following. Suppose that the learner plays
+some action u (cid:54)= v(cid:63), the distributions of the observed losses
+of every other actions are identical, including that of v(cid:63). In
+other words, her only option of ﬁnding v(cid:63) is by sampling
+it directly and observing its loss. Hence, the construction
+is capable of simulating a K-armed bandit problem whose
+minimax regret is Ω(
+For the construction above we prove the following theorem.
+Theorem 4. Assume that K ≥ 2 and T ≥ K 2. Any deter-
+√
+ministic learner must suffer an expected regret of at least
+(1/32)
+
+KT against the environment constructed above.
+
+KT ).
+
+√
+
+Online Learning with Feedback Graphs Without the Graphs
+
+To prove the theorem, we shall need a few deﬁnitions. Let
+P, Q be a couple of distributions over the same space and
+sigma-algebra F. We deﬁne the total variation distance be-
+tween P and Q as DTV(P , Q) = supE∈F |P[E] − Q[E]|.
+(cid:80)
+If P and Q are discrete distributions, we deﬁne the
+KL divergence between P and Q as DKL(P(cid:107) Q) =
+x log (P[x]/Q[x]) P[x] assuming the support of P is con-
+tained in that of Q, and where the sum is taken over the
+support of P. We can now turn to the proof of the theorem.
+
+Proof of Theorem 4. Let us introduce the random variables
+Tv whose value is the number of times the learner plays ac-
+tion v. We also introduce the notations Pv and Ev indicat-
+ing probability and expectation with respect to the marginal
+distributions under which v(cid:63) = v. Then, we have
+
+RT = E
+
+(cid:34) T(cid:88)
+(cid:88)
+(cid:88)
+
+v∈V
+
+t=1
+
+(cid:96)t(vt) − T(cid:88)
+(cid:34) T(cid:88)
+
+t=1
+
+Ev
+
+(cid:96)t(v(cid:63))
+
+(cid:35)
+(cid:96)t(vt) − T(cid:88)
+(cid:33)
+
+t=1
+
+ · Ev[T − Tv]
+
+t=1
+
+(cid:88)
+
+v∈V
+
+v∈V
+T − 1
+K
+
+=
+
+=
+
+1
+K
+
+1
+K
+
+(cid:32)
+
+= 
+
+(cid:35)
+
+(cid:96)t(v)
+
+of the graph observed by the learner are distributed ex-
+actly the same under Pv and P0, and the KL divergence
+is 0.
+If vt = v then the losses of all other actions are
+distributed Bernoulli(1/2), and independently of the loss
+of action v and the observed edges. The latter is so un-
+der both Pv and P0. Moreover, the observed edges are
+distributed Bernoulli(1 − 2) independently of the loss of
+action v under both Pv and P0. Namely, the only el-
+ement that is distributed differently under Pv and P0 is
+the loss of action v, and the latter is distributed inde-
+pendently from all other observed variables. Recall that
+the loss of action v is distributed as Bernoulli(1/2) un-
+der P0 and as Bernoulli(1/2 − ) under Pv. Therefore,
+DKL
+
+(cid:0)P0[λt|λ(t−1)](cid:13)(cid:13) Pv[λt|λ(t−1)](cid:1)is upper-bounded by
+
+DKL
+
+− 
+
+= − 1
+2
+
+log(1 − 42) ≤ 42 ,
+
+where the last inequality holds since  < 1/4 by assump-
+tion. Plugging the above back into Eq. (4),
+
+(cid:19)
+
+2
+
+2
+
+(cid:18) 1
+
+(cid:13)(cid:13)(cid:13)(cid:13) 1
+(cid:16)P0[λ(T )]
+
+(cid:13)(cid:13)(cid:13) Pv[λ(T )]
+
+(cid:17)≤ T(cid:88)
+
+P0[vt = v]42
+
+t=1
+
+= 42E0[Tv] ,
+
+DKL
+
+T (cid:112)2E0[Tv].
+(cid:88)
+
+1
+K
+
+v∈V
+
+Ev[Tv]
+
+,
+
+(2)
+
+and the latter into Eq. (3), we get that Ev[Tv] ≤ E0[Tv] +
+
+and in order to proceed we shall upper bound Ev[Tv].
+Introduce a new distribution, in which the losses of the
+actions are independent Bernoulli(1/2) variables, and the
+feedback graphs are such that each directed edge appears
+with probability 1 − 2 independently of the other edges
+and the losses of the actions. We will refer to this new law
+using P0 and E0. Let λt be the losses and edges observed at
+time t, and similarly λ(t) = (λ1, ..., λt) are the losses and
+edges observed up until time t (inclusive). Then, since the
+sequence λ(T ) determines the actions of the learner over
+the entire game, and by Pinsker’s inequality,
+Ev[Tv] − E0[Tv] ≤ T · DTV
+
+(cid:113) 1
+
+≤ T
+
+(cid:16)Pv[λ(T )] , P0[λ(T )]
+(cid:17)
+(cid:0)P0[λ(T )](cid:13)(cid:13) Pv[λ(T )](cid:1). (3)
+(cid:13)(cid:13)(cid:13) Pv[λt|λ(t−1)]
+(cid:17)
+
+of KL-divergence,
+
+rule
+
+.
+
+Moreover,
+DKL
+
+2 DKL
+
+by
+
+the
+
+chain
+
+(cid:0)P0[λ(T )](cid:13)(cid:13) Pv[λ(T )](cid:1)equals
+(cid:88)
+
+P0[λ(t−1)]DKL
+
+(cid:16)P0[λt|λ(t−1)]
+
+T(cid:88)
+
+t=1
+
+λ(t−1)
+
+(4)
+Consider a single term in the sum. Recall that λ(t−1) de-
+termines the action vt chosen by the learner on round t.
+If vt (cid:54)= v then, by our construction, the losses and edges
+
+(cid:88)
+(cid:115) 1
+
+v∈V
+
+T (cid:112)2E0[Tv]
+(cid:88)
+
+2E0[Tv]
+
+K
+
+v∈V
+
+Now, K ≥ 2 by assumption, and therefore
+
+Ev[Tv] ≤ 1
+K
+
+E0[Tv] +
+
+1
+K
+
+(cid:88)
+(cid:88)
+
+v∈V
+
+v∈V
+
++ T 
+
+≤ 1
+K
+
+=
+
+T
+K
+≤ T
+2
+
+E0[Tv] + T 
+
+(cid:114)
+(cid:114)
+
+2T
+K
+2T
+K
+
++ T 
+
+.
+
+(cid:33)
+
+(cid:32)
+
+(cid:114)
+
+Let us now return to Eq. (2). We can lower bound the regret
+as
+
+(cid:33)
+By our choice of , we have that (cid:112)2T /K is at most 1/4,
+
+T − T
+2
+
+RT ≥ 
+
+(cid:114)
+
+− T 
+
+(cid:32)
+
+2T
+K
+
+2T
+K
+
+− 
+
+= T
+
+1
+2
+
+.
+
+(cid:114)
+
+(cid:18) 1
+
+2
+
+K
+T
+
+(cid:19)
+
+− 1
+4
+
+√
+
+=
+
+1
+32
+
+KT ,
+
+and so
+
+RT ≥ T
+8
+
+as claimed.
+
+Online Learning with Feedback Graphs Without the Graphs
+
+To show that Theorem 1 holds, we need to show that the
+learner suffers a large regret against an environment that
+selects feedback graphs with constant independence num-
+bers. While the independence numbers of the graphs that
+we have constructed might, in principle, be large, we can
+show that with very high probability they are uniformly
+bounded by a constant.
+Lemma 5. Suppose that |V | = K ≥ 2 and T ≥ K 2. Let
+G1, ..., GT be a sequence of graphs as constructed above.
+With probability at least 1−/8, the independence numbers
+of all graphs are at most 9.
+
+Theorem 1 now follows by combining Theorem 4 and
+Lemma 5; for technical details, see Cohen et al. (2016).
+
+4. Algorithms for Stochastic Losses
+In this section we present and analyze our algorithm for
+the stochastic setting. The algorithm, given in Algo-
+rithm 1, is reminiscent of elimination-based algorithms
+for the stochastic multi-armed bandit problem (e.g., Even-
+Dar et al., 2002; Karnin et al., 2013). For this algorithm,
+we prove the following guarantee on the expected regret,
+which implies Theorem 2.
+Theorem 6. Assume that K ≥ 2. Suppose that Algo-
+rithm 1 is run on a sequence of feedback graphs with in-
+dependence numbers ≤ α. Then the expected regret of the
+
+algorithm is at most (cid:101)O(
+
+αT ).
+
+√
+
+It maintains
+Algorithm 1 works in phases r = 1, 2, . . ..
+a subset of actions Vr, where initially V1 = V . At each
+phase r, the algorithm estimates the mean losses of all ac-
+tions in Vr to within r accuracy, by invoking a procedure
+called ALPHASAMPLE nr times. It then ﬁlters out from Vr
+the actions that are known to be 2r-suboptimal with suf-
+ﬁcient conﬁdence, and repeats this process, decreasing the
+accuracy parameter r after each phase.
+The key for achieving optimal regret lies in the the proce-
+dure ALPHASAMPLE, that appears as Algorithm 2. Each
+call to this procedure allows us to observe the losses of
+
+all actions in Vr once, while spending only (cid:101)O(α) rounds
+
+in expectation. The exact details of ALPHASAMPLE are
+discussed in Section 4.2 below, and here we just state its
+guarantee.
+Lemma 7. ALPHASAMPLE returns one sample of the loss
+of each action in Vr and terminates after at most 10α log K
+rounds of the game in expectation, provided that the inde-
+pendence numbers of all feedback graphs G1, . . . , GT are
+at most α.
+
+To prove Theorem 6 we need one additional lemma.
+It
+shows that, at each phase, the elimination procedure of the
+algorithm succeeds with high probability. Namely, after
+
+Algorithm 1
+
+input Set V of K actions, number of rounds T
+initialize r ← 1, V1 = V , 1 = 1/4
+while |Vr| > 1 and T rounds have not elapsed do
+
+Set nr = (cid:100)2 log(2KT )/2
+r(cid:101)
+Invoke ALPHASAMPLE(Vr) for nr times, and
+
+compute empirical mean mr(v) of each action
+v ∈ Vr using collected samples
+r = minv∈Vr mr(v)
+Vr+1 = {v ∈ Vr : mr(v) ≤ m(cid:63)
+
+Compute m(cid:63)
+Eliminate actions:
+Set r+1 = r/2, r ← r + 1
+
+r + 2r}
+
+end while
+Play the action left in Vr until T rounds have passed
+
+phase r, the algorithm is left with actions that are at most
+4r-suboptimal.
+Lemma 8. For all r, with probability at least 1 − 1/T we
+have µ(v) ≤ µ(cid:63) + 4r for all v ∈ Vr+1.
+
+We can now proceed with the proof of the theorem.
+
+Proof of Theorem 6. Let us start by bounding the number
+of phases R the algorithm makes. Let the random variable
+Tr denote the number of game rounds elapsed during phase
+r. Since the algorithm runs for T rounds we must have that
+
+Tr ≤ T .
+
+(5)
+
+R(cid:88)
+
+r=1
+
+(cid:18)
+
+In particular, since ALPHASAMPLE takes at least one round
+to complete, we have that Tr ≥ nr ≥ 2 log(2KT )4r+1 and
+we get the crude bound of
+
+R ≤ ¯r =
+
+1
+2
+
+log2
+
+3T
+
+32 log(2KT )
+
++ 1
+
+.
+
+(6)
+
+(cid:19)
+
+We turn to bound the expected regret of the algorithm. By
+Lemma 8 and the union bound, the total probability of fail-
+ure of the mean estimations is at most ¯r/T . Then the ex-
+pected regret of the algorithm is at most the expected regret
+conditioned on the success of the estimation of the means
+plus (¯r/T ) · T = ¯r = O(log T ) by Eq. (6), and since the
+regret is bounded by T with probability 1. Thus it remains
+to bound the regret conditioned on the success of the mean
+estimations.
+For convenience, deﬁne 0 = 1/2. On phase r, by
+Lemma 8 we have an instantaneous regret of at most
+4r−1 = 8r per round. If only one action is left in Vr then
+it must be v(cid:63) and therefore after the ﬁnal phase the algo-
+rithm suffers zero instantaneous expected regret. Overall,
+
+Online Learning with Feedback Graphs Without the Graphs
+
+E
+
+r=1
+
+(cid:35)
+
+(cid:35)
+
+(cid:35)
+
+·
+
+Tr
+
+≤ 8
+
+Tr · 8r
+
+(cid:34) R(cid:88)
+
+(cid:118)(cid:117)(cid:117)(cid:116)E
+
+the expected regret is at most
+
+(cid:118)(cid:117)(cid:117)(cid:116)E
+(cid:34) R(cid:88)
+(cid:34) R(cid:88)
+by the Cauchy-Schwartz inequality. Note that(cid:80)R
+(cid:34) R(cid:88)
+
+r=1 Tr ≤
+T by Eq. (5). Additionally, by Lemma 7 each call to AL-
+PHASAMPLE spends at most m = 10α log K rounds in
+expectation and thus E[Tr] ≤ mnr. Hence,
+
+r ≤ m¯r(2 log(2KT ) + 1) .
+
+≤ ¯r(cid:88)
+
+mnr2
+
+Tr2
+r
+
+Tr2
+r
+
+r=1
+
+r=1
+
+(cid:35)
+
+E
+
+r=1
+
+r=1
+
+The ﬁrst inequality holds since the number of phases is at
+most ¯r. The right-hand side is O(α log(K) log2(KT )) by
+Eq. (6) and the deﬁnition of m.
+
+4.1. Gap-based analysis
+
+We can also provide a distribution-dependent analysis of
+Algorithm 1 that yields a logarithmic regret bound, albeit
+with an explicit dependence on the gaps ∆v.
+Denote by V (n) the set of n actions with smallest gaps, ex-
+cluding v(cid:63) and breaking ties arbitrarily. Our main result
+in this section is the following theorem, which gives The-
+orem 3. Recall that we assume v(cid:63) is the unique optimal
+action, and so the gaps of all other actions are positive.
+Theorem 9. Suppose that K ≥ 2 and T ≥ K, and let
+τ = (cid:100)10α log K(cid:101). Suppose that Algorithm 1 is run on a
+sequence of feedback graphs with independence numbers
+≤ α. Then the expected regret of Algorithm 1 is at most
+
+ (cid:88)
+
+v∈V (τ )
+
+O
+
+ .
+
+1
+∆v
+
+log T
+
+We can explain the intuition behind the bound as follows.
+
+Each call to ALPHASAMPLE spends at most (cid:101)O(α) rounds
+with the “hardest” τ = (cid:101)O(α) actions and has to tell them
+
+while producing samples of all K actions. Thus, in the
+worst case, after a quick pruning phase the algorithm is left
+
+apart; in this last phase, the additional observations pro-
+vided by the feedback graphs might not help the algorithm
+at all (e.g., the remaining τ actions might form an indepen-
+dent set in all graphs). We now turn to the proof of the
+theorem.
+
+Proof of Theorem 9. As in the proof of Theorem 6, we
+have that the expected regret of the algorithm is at most
+the expected regret conditioned on the success of the mean
+estimations plus O(log T ), and thus it remains to bound the
+regret conditioned on the success of the mean estimations.
+
+Conditioned on the success of the algorithm, the regret of
+the algorithm is at most the regret of an algorithm that has
+ﬁnished running with Vr = {v(cid:63)}. Thus we can assume that
+T is large enough for that to happen.
+If τ ≤ K − 1, we begin by bounding the regret until the
+algorithm eliminates all actions besides the ones in V (τ ).
+Let ¯∆ be the largest gap of an action from V (τ ). Let ¯r =
+(cid:98)log2(2/ ¯∆)(cid:99). Thus, it takes ¯r + 1 phases in order for r
+to be less than ¯∆/4. The regret up to round ¯r is bounded
+using the following lemma.
+Lemma 10. Let m = 10α log K. The expected regret of
+Algorithm 1 up to round ¯r is at most (128m/ ¯∆) log(2KT ).
+
+We proceed with the analysis of the expected regret after
+phase ¯r. This is given by this next lemma.
+Lemma 11. The expected regret of Algorithm 1 from
+round ¯r + 1 until
+the game is at most
+
+the end of
+
+(cid:80)
+
+v∈V (τ )(128/∆v) log(2KT ).
+
+If τ > K − 1 then the regret of the algorithm is given by
+Lemma 11. Otherwise, the proof of the theorem is com-
+pleted by noticing that the regret of the algorithm up to
+round ¯r is at most the regret from round ¯r + 1 thereafter.
+Since ¯∆ ≥ ∆v for all v ∈ V (τ ) we get that
+
+(cid:88)
+
+v∈V (τ )
+
+≤ (cid:88)
+
+v∈V (τ )
+
+1
+∆v
+
+1
+∆v
+
+,
+
+m
+¯∆
+
+≤ m
+|V (τ )|
+
+bound of O((cid:80)
+
+by deﬁnition of m and V (τ ). This in total gives a regret
+log(KT )). Finally, we use our
+assumption that T ≥ K to simplify the bound.
+
+v∈V (τ ) ∆−1
+
+v
+
+Proof of Lemma 10. By Lemma 7, each call
+to AL-
+PHASAMPLE spends at most m rounds in expectation.
+By Lemma 8, the instantaneous regret for each round on
+phase r is at most 4r−1 = 8r. Then the expected
+r=1 m · nr · 8r ≤
+
+regret up to round ¯r is at most (cid:80)¯r
+32m log(2KT )(cid:80)¯r
+¯r(cid:88)
+
+r=1 −1
+¯r(cid:88)
+
+r , and we have
+
+1
+r
+
+=
+
+2r+1 ≤ 2¯r+2 ≤ 4
+¯∆
+
+.
+
+r=1
+
+r=1
+
+Proof of Lemma 11. Let us denote ¯rv = (cid:98)log2(2/∆v)(cid:99),
+the number of phases until v is removed from Vr. Let w
+be the action with the minimum nonzero gap. We shall as-
+sume that the game is ﬁnished after ¯rw phases.
+Note that after we have eliminated all actions not in V (τ ),
+each call to ALPHASAMPLE is ﬁnished after at most |Vr|
+steps. Thus, the expected regret for the remaining phases is
+at most
+
+32 log(2KT )
+
+|Vr| = 32 log(2KT )
+
+r=¯r+1
+
+r
+
+¯rw(cid:88)
+
+(cid:88)
+
+¯rv(cid:88)
+
+v∈V (τ )
+
+r=¯r+1
+
+1
+r
+
+,
+
+Online Learning with Feedback Graphs Without the Graphs
+
+and for all v ∈ V (τ ),(cid:80)¯rv
+
+turn equals 2¯rv+2 ≤ 4/∆v.
+
+r ≤(cid:80)¯rv
+
+r=¯r+1 −1
+
+r=0 2r+1, which in
+
+4.2. Efﬁcient sampling scheme
+
+In this section, we discuss the ALPHASAMPLE randomized
+sampling procedure. This procedure allows us to collect
+one sample of the loss for each action while spending only
+
+(cid:101)O(α) rounds in expectation. ALPHASAMPLE is described
+
+in Algorithm 2.
+Let us now explain the intuition behind the procedure. At
+each round, the procedure samples the loss of an action uni-
+formly at random from a subset of actions U. As each sam-
+ple is uniform over U, the procedure observes the losses
+of Ω(|U|/α) actions in expectation. The actions that have
+been observed are then removed from U and the process
+continues recursively until U is empty. This phase is com-
+
+plete after an expected (cid:101)O(α) rounds.
+
+The main result regarding ALPHASAMPLE is the following
+theorem, from which Lemma 7 would follow immediately
+(see Cohen et al., 2016).
+Theorem 12. Algorithm 2 returns one sample of the loss of
+each action in U and terminates after at most 4α log(K/δ)
+rounds with probability at least 1 − δ, provided that all
+graphs G1, . . . , GT have independence numbers ≤ α.
+
+To analyze the number of rounds that the algorithm spends,
+we shall deﬁne the following random process. Consider an
+inﬁnite sequence U1, U2, ... such that U1 = U. For every
+r > 0, if Ur is not empty we sample an action uniformly
+at random from Ur, and we let Ur+1 be Ur after removing
+the actions whose losses were observed. Otherwise, we let
+Ur+1 be the empty set.
+The following lemma lower bounds the expected number
+of actions whose losses are observed at each iteration of
+the process.
+Lemma 13. Let r > 0. Let N be the number of actions
+seen when sampling uniformly at random from Ur. Then,
+E[N|Ur] ≥ |Ur|/(2α).
+
+The main tool used in the proof of the lemma is the fol-
+lowing version of Tur´an’s theorem (see, e.g., Alon and
+Spencer, 2008).
+Theorem 14 (Tur´an). Let G = (V, E) be an undirected
+graph and α be the independence number of G. Then,
+
+α ≥
+
+|V |
+
+1 + 2|E|/|V | .
+
+Algorithm 2 ALPHASAMPLE
+input Set of actions U ⊆ V
+initialize S ← ∅
+while |U| > 0 do
+
+and let W (u) be the set of actions observed
+
+Play an action u ∈ U uniformly at random,
+Collect samples of losses of each w ∈ W (u) into S
+Update U ← U \ W (u)
+
+end while
+return S
+
+the subgraph over U can only decrease, namely it is also at
+most α. As such, we shall think of dout(v) as the out-degree
+of v in the subgraph.
+We would like to apply Tur´an’s theorem to the subgraph,
+which is a directed graph. We do so by constructing an
+undirected version of the subgraph, namely one in which
+we ignore the orientation of the edges. Note that the num-
+ber of edges in the undirected version can only decrease.
+Therefore,
+E[N|Ur] = 1 +
+
+dout(v) = 1 +
+
+(cid:88)
+
+,
+
+|Ur| ≥ |Ur|
+|E|
+
+2α
+
+1
+|Ur|
+
+v∈Ur
+
+where the inequality follows from Tur´an’s theorem (Theo-
+rem 14).
+
+Proof of Theorem 12. By the construction of the random
+process, the probability that Algorithm 2 spends more than
+t rounds of the game is exactly the probability that Ut+1 is
+not empty. To bound this probability we claim that for any
+r > 0,
+
+E[|Ur+1|] ≤ K exp
+
+Indeed, ﬁx some i > 0. By Lemma 13 we have that
+1 − 1
+2α
+
+E[|Ui+1||Ui] = |Ui| − E[N|Ui] ≤ |Ui|
+
+Taking expectation with respect to Ui and then applying
+this argument recursively, we get that
+
+.
+
+2α
+
+(cid:16)− r
+
+(cid:17)
+(cid:18)
+(cid:19)r ≤ K exp
+
+(7)
+
+(cid:19)
+
+.
+
+(cid:18)
+
+E[|Ur+1|] ≤ |U1|
+
+1 − 1
+2α
+
+(cid:17)
+
+(cid:16)− r
+
+2α
+
+.
+
+Now, let t1 = (cid:98)2α log(K/δ)(cid:99) + 1. We will show that
+the probability that Ut1+1 is not empty is at most δ. By
+Markov’s inequality and Eq. (7),
+
+P[|Ut1+1| > 0] ≤ E[|Ut1+1|]
+
+≤ K exp(−t1/(2α))
+< δ .
+
+Proof of Lemma 13. Fix some feedback graph G = (V, E)
+with independence number ≤ α, and let dout(v) be the out-
+degree of vertex v. Note that the independence number of
+
+To conclude, with probability at least 1 − δ, the num-
+ber of rounds that the algorithm spends is at most t1 ≤
+4α log(K/δ), since K ≥ 2 by assumption.
+
+Online Learning with Feedback Graphs Without the Graphs
+
+In Computational Learning Theory, pages 255–270.
+Springer, 2002.
+
+Y. Freund and R. E. Schapire. A decision-theoretic gener-
+alization of on-line learning and an application to boost-
+ing. Journal of computer and system sciences, 55(1):
+119–139, 1997.
+
+Z. Karnin, T. Koren, and O. Somekh. Almost optimal
+In Proceedings of
+exploration in multi-armed bandits.
+the 30th International Conference on Machine Learning
+(ICML-13), pages 1238–1246, 2013.
+
+T. Koc´ak, G. Neu, M. Valko, and R. Munos. Efﬁcient learn-
+ing by implicit exploration in bandit problems with side
+In Advances in Neural Information Pro-
+observations.
+cessing Systems, pages 613–621, 2014.
+
+T. Koc´ak, G. Neu, and M. Valko. Online learning with
+In Proceedings of the Nine-
+noisy side observations.
+teenth International Conference on Artiﬁcial Intelli-
+gence and Statistics (AISTATS), to appear, 2016.
+
+N. Littlestone and M. K. Warmuth. The weighted majority
+Information and computation, 108(2):212–
+
+algorithm.
+261, 1994.
+
+S. Mannor and O. Shamir. From bandits to experts: On the
+value of side-observations. In Advances in Neural Infor-
+mation Processing Systems 24, pages 684–692, 2011.
+
+V. G. Vovk. Aggregating strategies. In Proc. Third Work-
+shop on Computational Learning Theory, pages 371–
+383. Morgan Kaufmann, 1990.
+
+Y. Wu, A. Gy¨orgy, and C. Szepesv´ari. Online learning with
+In Advances
+gaussian payoffs and side observations.
+in Neural Information Processing Systems, pages 1360–
+1368, 2015.
+
+Acknowledgements
+TK would like to thank Nicol`o Cesa-Bianchi and Ofer
+Dekel for stimulating discussions in the early stages of this
+research.
+
+References
+N. Alon and J. H. Spencer. The Probabilistic Method. John
+
+Wiley & Sons, 2008.
+
+N. Alon, N. Cesa-Bianchi, C. Gentile, and Y. Mansour.
+From bandits to experts: A tale of domination and inde-
+pendence. In Advances in Neural Information Process-
+ing Systems 26, pages 1610–1618. Curran Associates,
+Inc., 2013.
+
+N. Alon, N. Cesa-Bianchi, C. Gentile, S. Mannor, Y. Man-
+sour, and O. Shamir. Nonstochastic multi-armed bandits
+with graph-structured feedback. CoRR, abs/1409.8428,
+2014.
+
+N. Alon, N. Cesa-Bianchi, O. Dekel, and T. Koren. Online
+learning with feedback graphs: Beyond bandits. In Pro-
+ceedings of The 28th Conference on Learning Theory,
+COLT 2015, Paris, France, July 3-6, 2015, volume 40,
+pages 23–35, 2015.
+
+J. Audibert and S. Bubeck. Minimax policies for adversar-
+In Proceedings of the 22nd
+ial and stochastic bandits.
+Conference on Learning Theory (COLT), pages 217–
+226, 2009.
+
+P. Auer, N. Cesa-Bianchi, and P. Fischer. Finite-time analy-
+sis of the multiarmed bandit problem. Machine learning,
+47(2-3):235–256, 2002a.
+
+P. Auer, N. Cesa-Bianchi, Y. Freund, and R. E. Schapire.
+The nonstochastic multiarmed bandit problem. SIAM
+Journal on Computing, 32(1):48–77, 2002b.
+
+S. Caron, B. Kveton, M. Lelarge, and S. Bhagat. Leverag-
+ing side observations in stochastic bandits. In Proceed-
+ings of the Twenty-Eighth Conference on Uncertainty in
+Artiﬁcial Intelligence, Catalina Island, CA, USA, pages
+142–151, 2012.
+
+N. Cesa-Bianchi, Y. Freund, D. Haussler, D. P. Helmbold,
+R. E. Schapire, and M. K. Warmuth. How to use ex-
+pert advice. Journal of the ACM (JACM), 44(3):427–
+485, 1997.
+
+A. Cohen, T. Hazan, and T. Koren. Online learning with
+arXiv preprint
+
+feedback graphs without the graphs.
+arXiv:1605.07018, 2016.
+
+E. Even-Dar, S. Mannor, and Y. Mansour. PAC bounds
+for multi-armed bandit and markov decision processes.
+
+

@@ -1,0 +1,2262 @@
+Barron and Cover’s Theory in Supervised Learning
+
+and its Application to Lasso
+
+Masanori Kawakita
+Jun’ichi Takeuchi
+Kyushu University, 744 Motooka, Nishi-Ku, Fukuoka city, Fukuoka 819-0395, JAPAN
+
+KAWAKITA@INF.KYUSHU-U.AC.JP
+TAK@INF.KYUSHU-U.AC.JP
+
+Abstract
+
+We study Barron and Cover’s theory (BC the-
+ory) in supervised learning. The original BC
+theory can be applied to supervised learning
+only approximately and limitedly.
+Though
+Barron & Luo (2008) and Chatterjee & Barron
+(2014a) succeeded in removing the approxima-
+tion, their idea cannot be essentially applied to
+supervised learning in general. By solving this
+issue, we propose an extension of BC theory to
+supervised learning. The extended theory has
+several advantages inherited from the original
+BC theory. First, it holds for ﬁnite sample num-
+ber n. Second, it requires remarkably few as-
+sumptions. Third, it gives a justiﬁcation of the
+MDL principle in supervised learning. We also
+derive new risk and regret bounds of lasso with
+random design as its application. The derived
+risk bound hold for any ﬁnite n without bound-
+edness of features in contrast to past work. Be-
+havior of the regret bound is investigated by nu-
+merical simulations. We believe that this is the
+ﬁrst extension of BC theory to general supervised
+learning without approximation.
+
+1. Introduction
+There have been various techniques to evaluate perfor-
+mance of machine learning methods theoretically. For
+an example, lasso (Tibshirani, 1996) has been analyzed
+by nonparametric statistics, empirical process, statistical
+physics and so on. Most of them require various assump-
+tions like asymptotic assumption (sample number n and/or
+feature number p go to inﬁnity), boundedness of features
+or moment conditions. Some of them are much restric-
+tive for practical use. In this paper, we try to develop an-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+other way for performance evaluation with as few assump-
+tions as possible. As an important candidate for this pur-
+pose, we focus on Barron and Cover’s theory (BC theory)
+(Barron & Cover, 1991), which is one of the most famous
+results for the minimum description length (MDL) prin-
+ciple. The MDL principle (Rissanen, 1978; Barron et al.,
+1998; Gr¨unwald, 2007; Takeuchi, 2014) claims that the
+shortest description of a given set of data leads to the best
+hypotheses about the data. A famous model selection crite-
+rion based on the MDL principle was proposed by Rissanen
+(1978). This criterion corresponds to a codelength of a two-
+stage code in which one encodes a statistical model to en-
+code data and then the data are encoded with the model. In
+this case, an MDL estimator is deﬁned as the minimizer of
+the total codelength of this two-stage code. BC theory guar-
+antees that a risk based on the R´enyi divergence (R´enyi,
+1961) is tightly bounded above by redundancy of the two-
+stage code. This result gives a mathematical justiﬁcation of
+the MDL principle. Furthermore, BC theory holds for ﬁnite
+n without any complicated technical conditions. However,
+BC theory has been applied to supervised learning only ap-
+proximately or limitedly. The original BC theory seems
+to be widely recognized that it is applicable to both un-
+supervised and supervised learning. Though it is not false,
+BC theory actually cannot be applied to supervised learning
+without a certain condition (2) deﬁned in Section 3. This
+condition is critical in a sense that a lack of (2) breaks a
+key technique of BC theory. (Yamanishi, 1992) is the only
+example of application of BC theory to supervised learn-
+ing to our knowledge. His work assumed a speciﬁc setting,
+where (2) can be satisﬁed. However, the risk bound may
+not be sufﬁciently tight due to imposing (2) forcedly, which
+will be explained in Section 3. Another well-recognized
+disadvantage is the necessity of quantization of parame-
+ter space. Barron & Luo (2008) and Chatterjee & Barron
+(2014b) proposed a way to avoid the quantization and de-
+rived a risk bound of lasso. However, their idea cannot be
+applied to supervised learning in general. This difﬁculty
+stems from the above condition (2). It is thus essentially
+difﬁcult to solve. Actually, their risk bound of lasso was de-
+rived with ﬁxed design only (i.e., essentially unsupervised
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+setting). The ﬁxed design, however, is not satisfactory to
+evaluate generalization error of supervised learning. In this
+paper, we propose an extension of BC theory to supervised
+learning without quantization in random design case. The
+derived risk bound inherits most of advantages of the orig-
+inal BC theory. Furthermore, we can use data-dependent
+penalties. The main term of the risk bound has again a form
+of redundancy of two-stage code. Thus, our extension also
+gives a mathematical justiﬁcation of the MDL principle in
+supervised learning. We also derive new risk and regret
+bounds of lasso with random design as its application un-
+der normality of features. This requires much more effort
+than that for the ﬁxed design case. The derived bounds hold
+even in case n ≪ p without boundedness of features. To
+our knowledge, no theory has such advantages in the past.
+This paper is organized as follows. Section 2 introduces
+an MDL estimator in supervised learning. We review BC
+theory in Section 3. We extend BC theory to supervised
+learning and derive new risk and regret bounds of lasso in
+Section 4. The performance of the regret bound will be
+investigated by numerical simulations in Section 5.
+
+training data (xn; yn)
+
+2. MDL Estimator in Supervised Learning
+:= f(xi; yi) 2
+Suppose that
+X (cid:2) Y ji = 1; 2;(cid:1)(cid:1)(cid:1) ; ng are subject to (cid:22)p(cid:3)(xn; yn) =
+q(cid:3)(xn)p(cid:3)(ynjxn), where X is a domain of feature vec-
+tor x and Y could be ℜ (regression) or a ﬁnite set (clas-
+siﬁcation). Here, the training data are not necessarily in-
+dependent and identically distributed (i.i.d.) but can be a
+stochastic process in general. A goal of supervised learn-
+ing is to estimate p(cid:3)(ynjxn). We use a parametric model
+p(cid:18)(ynjxn) with a parameter (cid:18) 2 (cid:2). The parameter space
+(cid:2) is a certain continuous space. To deﬁne an MDL esti-
+mator, we need to encode the model p(cid:18)(ynjxn) (or equiva-
+(cid:2) as e(cid:2)(xn). Then, let ~L(~(cid:18)jxn) be a model description
+lently the parameter). Since the continuous parameter can-
+not be encoded, we need to quantize the parameter space
+∑
+~(cid:18)2e(cid:2)(xn) exp((cid:0) ~L(~(cid:18)jxn)) (cid:20) 1. An MDL estimator is de-
+{(cid:0) log p~(cid:18)(ynjxn) + (cid:12) ~L(~(cid:18)jxn)
+}
+
+ﬁned by the minimizer of sum of a data description length
+(minus log-likelihood) and the model description length:
+
+length on it. Note that ~L must satisfy Kraft’s inequality
+
+(cid:127)(cid:18)(xn; yn) := arg min
+
+;
+
+~(cid:18)2e(cid:2)(xn)
+
+where (cid:12) > 1. Deﬁne the minimum description length
+attained by the two-stage code as ~L(cid:12)2(cid:0)p(ynjxn)
+:=
+(cid:0) log p(cid:127)(cid:18)(ynjxn)+(cid:12) ~L((cid:127)(cid:18)jxn). Because ~L(cid:12)2(cid:0)p also satisﬁes
+Kraft’s inequality in terms of yn, it is interpreted as a code-
+length of the two-stage code. Therefore, ~p(cid:12)2(cid:0)p(ynjxn) :=
+exp((cid:0) ~L(cid:12)2(cid:0)p(ynjxn)) is a conditional sub-probability dis-
+tribution corresponding to the two-stage code.
+
+3. Barron and Cover’s Theory
+We brieﬂy review BC theory and its recent progress in
+view of supervised learning though they discussed basi-
+cally unsupervised learning (or supervised learning with
+ﬁxed design). In BC theory, the R´enyi divergence between
+(
+p(ynjxn) and r(ynjxn) with order (cid:21) 2 (0; 1)
+
+)1(cid:0)(cid:21)
+bothe(cid:2)(xn) and ~L(~(cid:18)jxn) are independent of xn, i.e.,
+
+(1)
+is used as a loss function. Let us introduce a condition that
+
+r(ynjxn)
+p(ynjxn)
+
+log Eq(cid:3)(xn)p(ynjxn)
+
+(cid:0)1
+1 (cid:0) (cid:21)
+
+dn
+(cid:21)(p; r) :=
+
+e(cid:2)(xn) = e(cid:2); ~L(~(cid:18)jxn) = ~L(~(cid:18)):
+
+(2)
+
+We emphasize that the original BC theory cannot be ap-
+plied to supervised learning unless the condition (2) is sat-
+isﬁed. Under the condition (2), BC theory gives the follow-
+ing two theorems for supervised learning.
+Theorem 1. Let (cid:12) > 1. Assume that ~L satisﬁes Kraft’s
+inequality and that the condition (2) holds. For any (cid:21) 2
+(0; 1 (cid:0) (cid:12)
+
+(cid:0)1],
+
+E (cid:22)p(cid:3)(xn;yn)dn
+
+(cid:21)(p(cid:3); p(cid:127)(cid:18)) (cid:20) E (cid:22)p(cid:3)(xn;yn) log
+
+p(cid:3)(ynjxn)
+~p(cid:12)2-p(ynjxn)
+
+:
+
+Theorem 2. Let (cid:12) > 1. Assume that ~L satisﬁes Kraft’s
+inequality and that the condition (2) holds. For any (cid:21) 2
+(
+(0; 1 (cid:0) (cid:12)
+
+)
+
+(cid:0)1],
+(cid:21)(p(cid:3); p(cid:127)(cid:18))
+dn
+
+(cid:21) (cid:28)
+
+(cid:20) e
+
+(cid:0)(cid:28) n=(cid:12):
+
+Pr
+
+n
+
+(cid:0) 1
+n
+
+log
+
+p(cid:3)(ynjxn)
+~p(cid:12)2-p(ynjxn)
+
+Recall that the quantized space and the model description
+length can depend on xn in their deﬁnitions. If we make
+them independent of xn for the condition (2), we must
+make them uniform against xn (i.e., its worst value), which
+makes the total codelength longer. This is just a reason why
+we think the PAC bound by Yamanishi (1992) may not be
+sufﬁciently tight. Hence, data-dependent model description
+lengths is more desirable in view of the MDL principle. In
+addition, the restriction by (2) excludes a practically im-
+portant case ‘lasso with column normalization’ (explained
+later) from the scope of application. However, it is essen-
+tially difﬁcult to remove this restriction as described in Sec-
+tion 1. Another issue is quantization. The quantization for
+the encoding is natural in view of the MDL principle. Our
+target, however, is an application to machine learning. A
+trivial example of such an application is a penalized maxi-
+mum likelihood estimator (PMLE)
+
+{ (cid:0) log p(cid:18)(ynjxn) + L((cid:18)jxn)
+
+^(cid:18)(xn; yn) := arg min
+(cid:18)2(cid:2)
+
+}
+
+p(cid:12)2-p(ynjxn) := p^(cid:18)(ynjxn) (cid:1) exp((cid:0)L(^(cid:18)jxn));
+
+;
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+where L : (cid:2)(cid:2) X n ! [0;1] is a certain penalty. PMLE is
+a wide class of estimators including lasso. If we can accept
+(cid:127)(cid:18) as an approximation of ^(cid:18), we have a risk bound obtained
+by BC theory. However, the quantization is unnatural in
+view of machine learning. Barron et al. (2008) proposed an
+important notion ‘risk validity’ to remove this drawback.
+tized space e(cid:2)(xn) (cid:26) (cid:2) and a model description length
+Deﬁnition 3. Let (cid:12) > 1. For ﬁxed xn, we say that a
+penalty function L((cid:18)jxn) is risk valid if there exist a quan-
+}
+{
+~L(~(cid:18)jxn) satisfying Kraft’s inequality such that
+p(cid:3)(ynjxn)
+}
+{
+(cid:0)L((cid:18)jxn)
+8yn2 Y n; max
+p(cid:18)(ynjxn)
+(cid:18)2(cid:2)
+~(cid:18)2e(cid:2)(xn)
+)1(cid:0)(cid:21)
+(
+(cid:0)(cid:12) ~L(~(cid:18)jxn)
+(cid:20) max
+q(ynjxn)
+p(ynjxn)
+
+(cid:21)(p(cid:3); p(cid:18)jxn)(cid:0)log
+dn
+jxn)(cid:0)log
+
+p(cid:3)(ynjxn)
+p~(cid:18)(ynjxn)
+log Ep(ynjxn)
+
+(cid:21)(p(cid:3); p~(cid:18)
+dn
+(cid:21)(p; rjxn) :=
+
+(cid:0)1
+1 (cid:0) (cid:21)
+
+where dn
+
+; (3)
+
+:
+
+(cid:21)(p(cid:3); p^(cid:18)
+
+validity to random design straightforwardly, e(cid:2)(xn) and
+
+Here, d(p; rjxn) is the R´enyi divergence with ﬁxed xn
+(ﬁxed design). They proved that ^(cid:18) has similar bounds to
+Theorems 1 and 2 for any risk valid penalty in case of ﬁxed
+design. Their way is excellent because it requires no addi-
+tional condition except the risk validity. However, the risk
+jxn)] is
+evaluation with ﬁxed design Ep(cid:3)(ynjxn)[dn
+unsatisfactory for supervised learning to assess the gener-
+alization error. We need to evaluate the risk with random
+(cid:21)(p(cid:3); p^(cid:18))]. However, it is essentially difﬁcult
+design E (cid:22)p(cid:3)[dn
+to apply their idea to random design case. We explain this
+by using lasso as an example. If we extend the above risk
+~L(~(cid:18)jxn) must be independent of xn due to the condition
+{
+(2). In addition, (3) is replaced with
+p(cid:3)(ynjxn)
+}
+~(cid:18)2e(cid:2)
+8xn; yn2 X n(cid:2)Y n; max
+p~(cid:18)(ynjxn)
+(cid:0)(cid:12) ~L(~(cid:18))
+(cid:21)(p(cid:3); p(cid:18))(cid:0)log
+(cid:0)L((cid:18)jxn)
+dn
+:
+Note that the above inequality must hold for all xn 2 X n
+in addition to all yn 2 Y n. Furthermore, dn
+(cid:21)(p(cid:3); p(cid:18)jxn)
+{
+(cid:21)(p(cid:3); p(cid:18)). We can rewrite the above in-
+is replaced with dn
+equality equivalently as
+
+(cid:21)(p(cid:3); p~(cid:18)) (cid:0) log
+dn
+p(cid:3)(ynjxn)
+p(cid:18)(ynjxn)
+
+{
+(cid:21) max
+(cid:18)2(cid:2)
+
+}
+~(cid:18)2e(cid:2)
+8xn 2 X n; 8yn 2 Y n; 8(cid:18) 2 (cid:2); min
+(cid:20) L((cid:18)jxn):
+(cid:0)dn
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
++(cid:12) ~L(~(cid:18))
+
+(cid:21)(p(cid:3); p~(cid:18))+log
+
+}
+
+(4)
+
+p(cid:18)(ynjxn)
+p~(cid:18)(ynjxn)
+
+Let us write the inside part of min of the left side of (4) as
+H((cid:18); ~(cid:18); xn; yn). To derive a risk valid L((cid:18)jxn), we need
+ﬁnd an upper bound on min~(cid:18) H((cid:18); ~(cid:18); xn; yn). However,
+it is difﬁcult to obtain the explicit form of the ~(cid:18) minimiz-
+ing H. Chatterjee & Barron (2014b) proposed a remedy
+
+for ﬁxed design. We can use it in random design case too
+as follows. Instead of minimization, their idea is to take
+~(cid:18) close to (cid:18). This seems to be meaningful in the follow-
+ing sense. If we quantize (cid:2) ﬁnely, (cid:127)(cid:18) is expected to behave
+If ~(cid:18) (cid:25) (cid:18), then H((cid:18); ~(cid:18); xn; yn) (cid:25) ~L((cid:18)),
+similarly to ^(cid:18).
+which implies that ~L((cid:18)) is risk valid and gives a risk bound
+similar to (cid:127)(cid:18). Note that, however, we cannot make ~(cid:18) = (cid:18)
+
+exactly because ~(cid:18) 2 e(cid:2). Chatterjee and Barron randomized
+~(cid:18) on e(cid:2)(xn) around (cid:18) and took the expectation in terms of
+~(cid:18). This is justiﬁed because min~(cid:18) H (cid:20) E~(cid:18)[H]. By tun-
+ing the randomization carefully, they succeeded in remov-
+ing the dependency of E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)] on yn. Since
+this technique can be applied to random design case sim-
+ilarly, we can write E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)] as H
+((cid:18); xn). By
+this fact, any risk valid penalties derived in this way should
+depend on xn. If not, L((cid:18)) must bound maxxn H
+((cid:18); xn),
+which makes L much larger. This is unfavorable in view of
+MDL. In particular, H
+((cid:18); xn) includes an unbounded term
+in terms of xn in case of lasso, which stems from the like-
+lihood ratio term in (4). Hence, risk valid penalties derived
+in this way must depend on xn. Though the ℓ1 norm used
+in lasso does not depend on xn, the following weighted ℓ1
+norm
+
+′
+
+′
+
+′
+
+vuut 1
+
+n∑
+
+p∑
+
+j=1
+
+∥(cid:18)∥w;1 :=
+
+wjj(cid:18)jj; where wj :=
+
+x2
+ij
+
+n
+
+i=1
+
+plays an important role. The lasso with this penalty is
+equivalent to the usual lasso with column normalization
+such that each column of design matrix has the same norm.
+The column normalization is theoretically and practically
+important. Hence, we try to ﬁnd a risk valid penalty of
+the form L1((cid:18)jxn) = (cid:22)1∥(cid:18)∥w;1 + (cid:22)2. Indeed, there seems
+to be no other useful penalty dependent on xn for lasso.
+However, there are severe difﬁculties. The main difﬁculty
+is caused by (2). Suppose now that ~(cid:18) is eqeual to (cid:18) al-
+most ideally. This implies that H((cid:18); ~(cid:18); xn; yn) (cid:25) ~L((cid:18)).
+On the other hand, for each ﬁxed (cid:18), ∥(cid:18)∥w;1 can be ar-
+bitrarily small by making xn small accordingly. Hence,
+(cid:22)1∥(cid:18)∥w;1 + (cid:22)2 is almost equal to (cid:22)2. This implies that (cid:22)2
+must bound max(cid:18) ~L((cid:18)), which is inﬁnity in general. If ~L
+can depend on xn, we could resolve this problem. How-
+ever, ~L must be independent of xn. This issue seems not
+to be limited to lasso. Another major issue is evaluation
+((cid:18); xn) is quite difﬁcult in random design
+of the above H
+(cid:21)(p(cid:3); p(cid:18)) is generally more complicated than
+case since dn
+(cid:21)(p(cid:3); p(cid:18)jxn). Hence, their technique seems to be useless
+dn
+in the random design case. We propose a remedy to solve
+these issues in a lump.
+
+′
+
+4. Main Results
+We propose an extension of BC theory to supervised learn-
+ing and derive new bounds for lasso.
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+4.1. Extension of BC Theory to Supervised Learning
+
+There are several possible approaches to extend BC theory.
+Despite of our efforts, we can hardly derive a meaningful
+tight bound for lasso by most of them except the following
+way. Our key idea is to modify the risk validity by introduc-
+ing a ‘typical set’. Let Sx be a certain set of stochastic pro-
+cesses x1; x2;(cid:1)(cid:1)(cid:1) and P n
+x be the set of their marginal dis-
+tributions of x1; x2;(cid:1)(cid:1)(cid:1) ; xn. We assume that we can deﬁne
+ϵ ) ! 1
+ϵ for each q(cid:3) 2 P n
+a typical set An
+as n ! 1. This is possible if q(cid:3) is stationary and ergodic
+for example. For short, Pr(xn 2 An
+ϵ here-
+after. We modify the risk validity as follows.
+Deﬁnition 4. Let (cid:12) > 1 and (cid:21) 2 (0; 1 (cid:0) (cid:12)
+(cid:0)1]. We say
+that L((cid:18)jxn) is ϵ-risk valid for ((cid:21); (cid:12); P n
+ϵ ) if, for any
+x ; An
+q(cid:3) 2 P n
+a model description length ~L((cid:18)jq(cid:3)) satisfying Kraft’s in-
+
+x , there exist a quantized subset e(cid:2)(q(cid:3)) (cid:26) (cid:2) and
+
+x , i.e., Pr(xn 2 An
+ϵ ) is written as P n
+
+equality such thate(cid:2)(q(cid:3)) and ~L((cid:18)jq(cid:3)) satisfy (2) and
+p(cid:3)(ynjxn)
+}
+p~(cid:18)(ynjxn)
+(cid:0)L((cid:18)jxn)
+
+~(cid:18)2e(cid:2)(q(cid:3))
+{
+}
+(cid:2)Y n; max
+8xn; yn2 An
+(cid:21)(p(cid:3); p(cid:18))(cid:0)log
+(cid:21) max
+(cid:0)(cid:12)~L(~(cid:18)jq(cid:3))
+dn
+(cid:18)2(cid:2)
+
+(cid:21)(p(cid:3); p~(cid:18)) (cid:0) log
+dn
+p(cid:3)(ynjxn)
+p(cid:18)(ynjxn)
+
+{
+
+ϵ
+
+:
+
+ϵ ),
+
+A difference from (4) is the restriction of the range of xn
+onto the typical set. Therefore, we can possibly avoid the
+problem described in the previous section. Using the ϵ-risk
+validity, we can prove the following two main theorems.
+Theorem 5 (risk bound). Deﬁne En
+pectation in terms of (cid:22)p(cid:3)(xn; yn) given that xn 2 An
+(cid:12) > 1, ϵ 2 (0; 1) and (cid:21) 2 (0; 1(cid:0) (cid:12)
+valid for ((cid:21); (cid:12); P n
+
+ϵ as a conditional ex-
+ϵ . Let
+(cid:0)1]. If L((cid:18)jxn) is ϵ-risk
+
+(5)
+En
+Theorem 6 (regret bound). Let (cid:12) > 1, ϵ 2 (0; 1) and (cid:21) 2
+(0; 1 (cid:0) (cid:12)
+ϵ ),
+x ; An
+
+x ; An
+(cid:21)(p(cid:3); p^(cid:18)) (cid:20) En
+(
+)
+(cid:0)1]. If L((cid:18)jxn) is ϵ-risk valid for ((cid:21); (cid:12); P n
+Pr
+(cid:20) 1 (cid:0) P n
+
+(cid:21)(p(cid:3); p^(cid:18))
+dn
+ϵ + exp((cid:0)(cid:28) n=(cid:12)):
+
+p(cid:3)(ynjxn)
+p(cid:12)2-p(ynjxn)
+
+p(cid:3)(ynjxn)
+p(cid:12)2-p(ynjxn)
+
+(cid:0) 1
+n
+
+1
+P n
+ϵ
+
++ (cid:12) log
+
+ϵ log
+
+ϵ dn
+
+> (cid:28)
+
+(6)
+
+log
+
+n
+
+:
+
+We describe the proof of Theorem 5 in Appendix A and the
+proof of Theorem 6 in a supplementary material due to the
+page restriction. In contrast to the usual BC theory, there is
+an additional term (cid:12) log(1=P n
+ϵ ) in the risk bound. Due to
+the property of the typical set, this term decreases to zero
+as n ! 1. Hence, the ﬁrst term is the main term, which
+has a form of redundancy of a two-stage code like the quan-
+tized case. Hence, this theorem gives a justiﬁcation of the
+MDL principle in supervised learning. Note that, however,
+an additional condition on L is required to interpret the ﬁrst
+
+term of (5) as a redundancy exactly. A sufﬁcient condition
+for it is called ‘codelength validity’ (Chatterjee & Barron,
+2014b). The risk validity does not imply the codelength
+validity and vice versa in general. Due to the space limita-
+tions, we omit more details of the codelength validity.
+We note that the conditional expectation in the risk bound
+(5) is seemingly hard to be replaced with the usual un-
+conditional expectation. The main difﬁculty arises from
+the unboundedness of the loss function: the loss function
+(cid:21)(p(cid:3); p^(cid:18)) can be arbitrarily large according to the choice
+dn
+of xn in general. Our remedy is a typical set. Because xn
+lies out of An
+ϵ with small probability, the conditional ex-
+pectation is likely to capture the expectation of almost all
+cases. In spite of this fact, if one wants to remove the un-
+natural conditional expectation, Theorem 6 offers a more
+satisfactory bound. We should remark that the effective-
+ness of this approach in real situations depends on whether
+we can show the risk validity of the target penalty and de-
+rive a sufﬁciently small bound for 1 (cid:0) P n
+ϵ . Actually, much
+effort is required to realize them for lasso.
+
+4.2. Risk Bound of Lasso in Random Design
+
+(cid:3)
+
+In this section, we derive new risk and regret bounds by
+Theorems 5 and 6. Assume that training data f(xi; yi) 2
+(ℜp (cid:2) ℜ)ji = 1; 2;(cid:1)(cid:1)(cid:1) ; ng obey a usual regression model
++ E , where Y := (y1; y2;(cid:1)(cid:1)(cid:1) ; yn)T , E is a
+Y = X(cid:18)
+(cid:3) is a true parameter
+noise vector subject to N (ϵ; 0; (cid:27)2In), (cid:18)
+and X = [xij]. Here, xij is the jth element of xi and
+N ((cid:1); m; (cid:6)) is a Gaussian distribution with a mean vector
+m and a covariance matrix (cid:6). The dimension p of (cid:18) can be
+greater than n. Under the normality of xn, we can derive a
+risk valid weighted ℓ1 penalty by choosing an appropriate
+typical set.
+Lemma 1. For any ϵ 2 (0; 1), deﬁne
+∑
+
+}
+i=1N (xi; 0; (cid:6))j Non-Singular (cid:6)g;
+(cid:20) 1 + ϵ
+
+(cid:12)(cid:12)(cid:12)8j; 1 (cid:0) ϵ (cid:20) (1=n)
+
+x := fq(xn) = (cid:5)n
+
+A(n)
+
+ϵ
+
+:=
+
+xn
+
+n
+i=1 x2
+ij
+
+{
+
+P n
+
+;
+
+(cid:6)jj
+
+(cid:3)
+
+a
+
+diagonal
+regression
+
+jth
+denotes
+the
+element
+linear
+Assume
+setting:
+i=1N (yijxT
+; (cid:27)2) and p(cid:18)(ynjxn) =
+i (cid:18)
+i (cid:18); (cid:27)2) with (cid:2) = ℜp. Let (cid:12) > 1 and
+(cid:0)1]. The penalty L1((cid:18)jxn) = (cid:22)1∥(cid:18)∥w;1 +(cid:22)2
+
+where (cid:6)jj
+of (cid:6).
+p(cid:3)(ynjxn) = (cid:5)n
+i=1N (yijxT
+(cid:5)n
+(cid:21) 2 (0; 1 (cid:0) (cid:12)
+is ϵ-risk valid for ((cid:21); (cid:12); P n
+ϵ ) if
+x ; An
+p
+1 (cid:0) ϵ2
+(1 (cid:0) ϵ)
+
+; (cid:22)2 (cid:21) (cid:12) log 2:
+
+(7)
+
+(cid:1) (cid:21) + 4
+
+(cid:22)1 (cid:21)
+
+n(cid:12) log 4p
+
+√
+
+2(cid:27)2
+
+We describe its proof in Appendix B. The derivation is
+much more complicated and requires more techniques
+compared to ﬁxed design case in (Chatterjee & Barron,
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+2014b). This is because the R´enyi divergence is a usual
+mean square error in the ﬁxed design case, while it is not
+in the random design case in general. Remarkably, the risk
+valid penalty in the above theorem also satisﬁes the code-
+length validity. This indicates that the main term of the risk
+bound can always be interpreted as redundancy of a preﬁx
+code. Next, we evaluate the convergence rate of P n
+ϵ .
+Lemma 2 (Exponential Bound of Typical Set). Suppose
+that xi (cid:24) N (0; (cid:6)) independently. For any ϵ 2 (0; 1),
+(
+P n
+ϵ
+(cid:21) 1(cid:0)2p exp
+
+(cid:0) n
+2
+(ϵ(cid:0)log(1 + ϵ))
+
+)
+(ϵ (cid:0) log(1 + ϵ))
+
+(cid:21) 1(cid:0)2p exp
+
+(
+1(cid:0)2 exp
+(cid:0) n
+2
+
+))p
+
+(cid:0) nϵ2
+7
+
+)
+
+(
+
+(
+
+(cid:21)
+
+(8)
+
+:
+
+ϵ
+
+ϵ
+
+Its proof is described in a supplementary material. For
+lasso, n ≪ p is often assumed. By Lemma 2, 1 (cid:0) P n
+is bounded above by O(p exp((cid:0)nϵ2=7)). Hence, (cid:0) log P n
+in (5) and 1 (cid:0) P n
+ϵ
+in (10) can be negligibly small even if
+n ≪ p. In this sense, the exponential bound is critical for
+lasso. From Lemmas 1 and 2, we obtain the following the-
+orem.
+Theorem 7. Assume the same setting as Lemma 1.
+If
+L1((cid:18)jxn) = (cid:22)1∥(cid:18)∥w;1 + (cid:22)2 satisﬁes (7), the lasso estimator
+(9)
+)
+
+2 + (cid:22)1∥(cid:18)∥w;1
+
+∥Y (cid:0) X(cid:18)∥2
+
+^(cid:18) := argmin
+
+2n(cid:27)2
+
+[
+
+(cid:18)2(cid:2)
+
+1
+
+{(∥y (cid:0) X(cid:18)∥2
+((cid:0) n
+
+(
+1(cid:0)2exp
+
+n(cid:12)
+
+inf
+(cid:18)2(cid:2)
+
+(cid:0) p log
+
+(cid:3)∥2
+
+(cid:0) ∥y (cid:0) X(cid:18)
+2
+2n(cid:27)2
+
+))
+2 (ϵ(cid:0)log(1+ϵ))
+
+2
+
+:
+
+ϵ
+
+has a risk bound
+}]
+ϵ [d(cid:21)(p(cid:3); p^(cid:18))](cid:20) En
+En
++(cid:22)1∥(cid:18)∥w;1+(cid:22)2
+{
+and a regret bound
+d(cid:21)(p(cid:3); p^(cid:18)) (cid:20)
+∥y (cid:0) X(cid:18)∥2
+(
+(
+
+inf
+(cid:18)2(cid:2)
+
+(cid:0)∥y (cid:0) X(cid:18)
+2
+2n(cid:27)2
+
+(cid:3)∥2
+
+2
+
+with probability at least
+1(cid:0)2 exp
+
+(ϵ(cid:0)log(1 + ϵ))
+
+(cid:0) n
+2
+
+}
++(cid:22)1∥(cid:18)∥w;1+(cid:22)2
+))p(cid:0)exp((cid:0)(cid:28) n=(cid:12)):
+
+Figure1.Plot of (11) against ϵ 2 (0; 1) when n = 200; p = 1000
+and (cid:28) = 0:03. The dotted vertical line indicates ϵ = 0:5.
+
+5. Numerical Simulations
+We investigate the behavior of the regret bound (10). Here,
+(cid:22)1 and (cid:22)2 are set to their smallest values in (7) and (cid:21) =
+1 (cid:0) (cid:12)
+(cid:0)1. As described before, the R´enyi divergence is no
+longer a mean square error (MSE) in random design case.
+The R´enyi divergence approaches to KL-divergence when
+(cid:21) ! 1 which is MSE in this case. If we take (cid:21) close to
+1, however, the risk valid penalty function L (and also the
+regret bound) tends to diverge unless n is accordingly large
+enough. That is, we can obtain only the approximate eval-
+uation on the MSE. The precision of that approximation
+varies according to the sample size n. We do not employ
+the MSE here but another important case (cid:21) = 0:5, that is,
+Bhattacharyya divergence. Bhattacharyya divergence is an
+upper bound of two times the squared Hellinger distance
+
+∫(√
+
+√
+p(cid:18)(yjx)
+p(cid:3)(yjx)(cid:0)
+
+)2
+
+q(cid:3)(x)p(cid:3)(yjx)dxdy;
+
++ (cid:28) (10)
+
+H (p(cid:3); p(cid:18)) =
+d2
+
+(cid:21)(p; r). Since (cid:22)p(cid:3)(xn; yn) is i.i.d. in
+Here, d(cid:21)(p; r) denotes d1
+this setting, we presented the risk bound as a single-sample
+version by dividing the both sides by n. Compared to the
+(2014b) showed that, if (cid:22)1 (cid:21) √
+risk bound in the ﬁxed design case, a coefﬁcient of the
+weighted ℓ1 norm is basically larger. Chatterjee & Barron
+√
+2n log 4p=(cid:27)2 and (cid:22)2 (cid:21)
+(cid:12) log 2, then the weighted ℓ1 norm is risk valid. Ignoring
+((cid:21) + 4)=(1 (cid:0) (cid:21)) times
+ϵ, the minimum (cid:22)1 in (7) is (1=2)
+that for the ﬁxed design case. Hence, the coefﬁcient is al-
+ways larger than or equal to compared to the ﬁxed design
+case but its extent is not so large unless (cid:21) is close to 1.
+
+which is often used to performance evaluation. This can be
+proved by the fact that d(cid:21)(p(cid:3); p(cid:18)) (cid:21) (cid:21)D 1(cid:0)2(cid:21)(p(cid:3); p(cid:18)) for
+any (cid:18) and (cid:21) 2 (0; 1), where D (cid:11)(p; q) is (cid:11)-divergence
+
+(11)
+
+(
+
+∫(
+1(cid:0)
+
+r(yjx)
+p(yjx)
+
+) 1+(cid:11)
+
+2
+
+)
+q(cid:3)(x)p(yjx)dxdy
+
+D(cid:11)(p; r) :=
+
+4
+
+1 (cid:0) (cid:11)2
+
+(Cichocki & Amari, 2010) and D 0 is just four times
+the squared Hellinger distance. Thus, we can bound
+H (p(cid:3); p^(cid:18)) through Bhattacharyya divergence (d0:5). We
+2d2
+set n = 200, p = 1000 and (cid:6) = Ip to mimic a typical sit-
+uation of sparse learning. The lasso estimator is calculated
+by a proximal gradient method. To make the regret bound
+tight, we take (cid:28) = 0:03 that is close to zero compared to
+the main term (regret). For this (cid:28), Fig. 1 shows the plot
+
+0.00.20.40.60.81.00.00.20.40.60.81.0elower bound of Pe(n)-exp(-n(1-l)t)Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+Figure2.Plot of d0:5 (R´enyi div.), 2d2
+bound with (cid:28) = 0:03 in case SN ratio=1.5.
+
+H ((cid:11)-div.) and the regret
+
+(cid:3)
+
+of (11) against ϵ. We should choose the smallest as long as
+the regret bound holds with large probability. Our choice is
+ϵ = 0:5 at which the value of (11) is 0:81. We show the re-
+sults of two cases in Figs. 2 and 3. These plots express the
+value of d0:5, 2d2
+H and the regret bound that were obtained
+in a hundred of repetitions with different SN ratios (SNR)
+)2]=(cid:27)2 (that is, different (cid:27)2). From these ﬁg-
+Ep(cid:3)[(xT (cid:18)
+ures and other experiments, we observed that 2d2
+H almost
+always equaled d0:5 (they are completely overlapped). As
+the SN ratio got larger, then the regret bound became looser
+(for example, about six times larger than 2d2
+H when SNR
+is 10). One of the reasons is that the risk validity condi-
+tion is too strict to bound the loss function when SNR is
+high. Hence, a possible way to improve the risk bound is
+to restrict the parameter space (cid:2) used in ϵ-risk validity to a
+range of ^(cid:18), which is expected to be considerably narrower
+than (cid:2) due to high SNR. In contrast, the regret bound is
+tight when SNR is 0.5 in Fig. 3. Though the regret bound
+is probabilistic, the regret bound dominated the R´enyi di-
+vergence over all trials.
+
+(cid:21)(p(cid:3); p(cid:18)) (cid:0) log p(cid:3)(ynjxn)
+p(cid:18)(ynjxn) .
+
+A. Proof of Theorem 5
+Proof. Deﬁne F (cid:18)
+By the risk validity, we obtain
+
+(cid:21) (xn; yn) := dn
+
+(
+[
+
+(
+
+1
+(cid:12)
+
+exp
+
+exp
+
+[
+[
+En
+ϵ
+∑
+(cid:20) En
+(cid:20)
+~(cid:18)2e(cid:2)(q(cid:3))
+
+ϵ
+
+En
+ϵ
+
+exp
+
+{
+{
+(cid:21) (xn; yn) (cid:0) L((cid:18)jxn)
+F (cid:18)
+(
+(
+~(cid:18)2e(cid:2)
+
+})]
+})]
+))]
+(cid:21) (xn; yn) (cid:0) (cid:12) ~L(~(cid:18)jq(cid:3))
+(cid:21) (xn; yn) (cid:0) (cid:12) ~L(~(cid:18)jq(cid:3))
+
+max
+
+F
+
+F
+
+~(cid:18)
+
+~(cid:18)
+
+max
+(cid:18)2(cid:2)
+1
+(cid:12)
+
+1
+(cid:12)
+
+: (12)
+
+Rearranging terms of this inequality, we have the statement.
+
+The following fact is a key technique:
+
+En
+ϵ
+
+exp
+
+~(cid:18)
+(cid:21) (xn; yn)
+F
+
+)]
+
+)
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
+En
+ϵ
+
+exp
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
+[
+
+(
+
+1
+(cid:12)
+
+(
+
+1
+(cid:12)
+
+= exp
+
+(cid:20) 1
+P n
+ϵ
+
+=
+
+1
+P n
+ϵ
+(cid:20) 1
+P n
+ϵ
+
+(
+(
+(
+
+1
+(cid:12)
+
+1
+(cid:12)
+1
+(cid:12)
+
+Figure3.Plot of d0:5 (R´enyi div.), 2d2
+bound with (cid:28) = 0:03 in case SN ratio=0.5.
+
+H ((cid:11)-div.) and the regret
+
+]
+) 1
+) 1
+
+(cid:12)
+
+(cid:12)
+
+[(
+p~(cid:18)(ynjxn)
+[(
+)
+p(cid:3)(ynjxn)
+)
+(
+(
+)
+
+p~(cid:18)(ynjxn)
+p(cid:3)(ynjxn)
+(cid:0) 1
+(cid:12)
+(cid:0) 1
+(cid:12)
+
+exp
+
+E
+
+]
+
+)
+
+)
+
+1
+P n
+ϵ
+
+:
+
+exp
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
+1(cid:0)(cid:12)(cid:0)1 (p(cid:3); p(cid:18))
+dn
+
+exp
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
+exp
+
+(cid:21)(p(cid:3); p(cid:18))
+dn
+
+=
+
+ϵ
+
+exp
+
+1
+P n
+ϵ
+
+{
+{
+
+inequality holds because E (cid:22)p(cid:3)(xn;yn) [A] (cid:21)
+The ﬁrst
+ϵ [A] for any nonnegative random variable A. The
+ϵ En
+P n
+(cid:21)(p(cid:3); p(cid:18)) is monotoni-
+second inequality holds because dn
+[
+cally increasing with respect to (cid:21). Thus, the right side of
+(12) is bounded by 1=P n
+(
+(cid:21) En
+(
+(cid:21) exp
+(cid:21) exp
+
+})]
+ϵ . By Jensen’s inequality,
+}])
+(cid:21) (xn; yn) (cid:0) L((cid:18)jxn)
+F (cid:18)
+)])
+(cid:21) (xn; yn) (cid:0) L((cid:18)jxn)
+F (cid:18)
+
+(cid:21) (xn; yn) (cid:0) L(^(cid:18)jxn)
+
+(
+[
+[
+[
+Thus, we have
+(cid:21) En
+(cid:0)(cid:12) log P n
+
+]
+(cid:0)L(^(cid:18)jxn)
+
+(cid:21)(p(cid:3); p^(cid:18))(cid:0)log
+dn
+
+1
+(cid:12)
+1
+(cid:12)
+1
+(cid:12)
+
+max
+(cid:18)2(cid:2)
+
+max
+(cid:18)2(cid:2)
+
+(
+
+(13)
+
+En
+ϵ
+
+En
+ϵ
+
+F
+
+^(cid:18)
+
+:
+
+:
+
+ϵ
+
+ϵ
+
+p(cid:3)(ynjxn)
+p^(cid:18)(ynjxn)
+
+0204060801000.00.20.40.60.81.0trialloss0204060801000.00.20.40.60.81.0d0.52dH2regret bound0204060801000.00.10.20.30.4trialloss0204060801000.00.10.20.30.4d0.52dH2regret boundBarron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+B. Proof of Lemma 1
+Proof. For convenience, we deﬁne H((cid:18); ~(cid:18); xn; yn) as
+{z
+}
++ (cid:12) ~L(~(cid:18)jq(cid:3))
+(cid:21)(p(cid:3); p(cid:18)) (cid:0) dn
+dn
+loss variation part
+
+p(cid:18)(ynjxn)
+{z
+p~(cid:18)(ynjxn)
+codelength validity part
+
+(cid:21)(p(cid:3); p~(cid:18))
+
++ log
+
+|
+
+}
+
+|
+
+:
+
+ϵ
+
+We need to ﬁnd a weighted ℓ1 penalty function L((cid:18)jxn)
+that bounds min~(cid:18)2e(cid:2)(q(cid:3)) H((cid:18); ~(cid:18); xn; yn) from above for
+any ((cid:18); xn; yn) 2 (ℜp (cid:2) An
+To bound
+min~(cid:18) H((cid:18); ~(cid:18); xn; yn), we borrow a nice randomization
+technique introduced in (Chatterjee & Barron, 2014b)
+with some modiﬁcations.
+:=
+2;(cid:1)(cid:1)(cid:1) ; w
+(cid:3)
+(cid:3)
+(cid:3)
+p)T , where w
+(w
+:=
+1; w
+1;(cid:1)(cid:1)(cid:1) ; w
+(cid:3)
+(cid:3)
+diag(w
+:=
+(cid:0)1zjz 2 Z pg, where (cid:14) > 0 is a quantization
+f(cid:14)(W
+(cid:3)
+
+width and Z is a set of all integers. Though e(cid:2) de-
+
+p). We quantize (cid:2) as e(cid:2)(q(cid:3))
+
+(cid:3)
+Let us deﬁne w
+(cid:6)jj and W
+
+(cid:2) ℜn).
+√
+
+(cid:3)
+j =
+
+(cid:3)
+
+)
+
+pends on the data in (Chatterjee & Barron, 2014b), we
+must remove that dependency to satisfy ϵ-risk validity.
+A problem is that the minimization of H((cid:18); ~(cid:18); xn; yn)
+seems to be difﬁcult to evaluate. A key idea here is to
+bound not min~(cid:18) H((cid:18); ~(cid:18); xn; yn) directly but its expectation
+E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)] with respect to a dexterously random-
+ized ~(cid:18) because the expectation is larger than the minimum.
+For each given (cid:18), ~(cid:18) is randomized as
+
+⌈mj⌉ with prob. mj (cid:0) ⌊mj⌋
+⌊mj⌋ with prob. ⌈mj⌉ (cid:0) mj
+mj
+
+with prob. 1 (cid:0) (⌈mj⌉ (cid:0) ⌊mj⌋)
+
+; (14)
+
+8><>: (cid:14)
+
+(cid:3)
+w
+j
+(cid:14)
+(cid:3)
+w
+j
+(cid:14)
+(cid:3)
+w
+j
+
+~(cid:18)j =
+
+(cid:3)
+j (cid:18)j=(cid:14) and each component of ~(cid:18) is statisti-
+where mj := w
+cally independent of each other. Its important properties are
+E~(cid:18)[~(cid:18)] = (cid:18) and E[(~(cid:18)j (cid:0) (cid:18)j)(~(cid:18)j′ (cid:0) (cid:18)j′)] (cid:20) I(j = j
+j(cid:18)jj.
+Using these, we bound E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)] as follows. The
+loss variation part in H((cid:18); ~(cid:18); xn; yn) is the main concern
+because it is more complicated than that of ﬁxed design
+case. Let us consider the following Taylor expansion
+
+) (cid:14)
+(cid:3)
+w
+j
+
+′
+
+(cid:21)(p(cid:3); p(cid:18)) (cid:0) dn
+dn
+(cid:0) 1
+2
+
+Tr
+
+(
+(cid:21)(p(cid:3); p~(cid:18)) = (cid:0)
+
+@dn
+
+(cid:21)(p(cid:3); p(cid:18))
+
+@(cid:18)
+
+)
+(~(cid:18) (cid:0) (cid:18))
+
+@2dn
+
+(cid:21)(p(cid:3); p(cid:18)◦ )
+@(cid:18)@(cid:18)T
+
+(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T
+
+; (15)
+
+)T
+
+(
+
+◦ is a vector between (cid:18) and ~(cid:18). The ﬁrst term in the
+where (cid:18)
+right side of (15) vanishes after taking expectation w.r.t. ~(cid:18)
+because E~(cid:18)[~(cid:18) (cid:0) (cid:18)] = 0. To bound the second term by the
+weighted ℓ1 norm of (cid:18), we have to bound this term above
+by a multiple of Tr((cid:6)(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T ). Nevertheless, it
+is not an easy task because the dependency of the Hessian
+(cid:21) on ~(cid:18) is complicated. Here, Lemma 3 in Appendix
+of dn
+C plays a key role. By this lemma and Cauchy-Schwartz
+
+)
+
+(
+
+inequality, we obtain
+(cid:21)(p(cid:3); p(cid:18)◦ )
+@(cid:18)@(cid:18)T
+
+(cid:0) @2dn
+
+Tr
+
+((
+
+)(
+
+(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T
+′
+′
+(cid:6)1=2 (cid:22)(cid:18)
+((cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+)T (cid:6)1=2(~(cid:18) (cid:0) (cid:18))
+
+)2
+
+)T (cid:6)1=2
+
+2
+
+~(cid:18) (cid:0) (cid:18)
+(
+
+∥(cid:22)(cid:18)
+
+(cid:20) n(cid:21)
+4(cid:27)2
+
+2 =
+
+n(cid:21)
+4(cid:27)2 Tr
+
+(cid:20) n(cid:21)
+
+(
+
+4(cid:27)2 Tr
+′
+((cid:22)(cid:18)
+
+=
+
+=
+
+n(cid:21)
+4(cid:27)2
+n(cid:21)
+4(cid:27)2
+
+2
+
+∥(cid:22)(cid:18)′∥2
+∥(cid:6)1=2(~(cid:18) (cid:0) (cid:18))∥2
+[
+
+)
+
+)T
+
+)(
+
+~(cid:18) (cid:0) (cid:18)
+
+′∥2
+
+2
+
+∥(cid:6)1=2(~(cid:18) (cid:0) (cid:18))∥2
+)
+
+∥(cid:22)(cid:18)′∥2
+
+2
+
+2
+
+(cid:6)(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T
+
+:
+
+See Lemma 3 for unknown symbols. Thus, the expectation
+of the loss variation part with respect to ~(cid:18) is bounded as
+
+(cid:21)(p(cid:3); p(cid:18)) (cid:0) dn
+dn
+
+(cid:21)(p(cid:3); p~(cid:18))
+
+E~(cid:18)
+
+∥(cid:18)∥w(cid:3);1:
+
+(16)
+
+] (cid:20) (cid:14)n(cid:21)
+
+8(cid:27)2
+
+term in H((cid:18); ~(cid:18); xn; yn) is calculated as
+
+The codelength validity part in H((cid:18); ~(cid:18); xn; yn) have the
+same form as that for the ﬁxed design case in its appear-
+ance. However, we need to evaluate it again in our setting
+
+because both e(cid:2) and ~L are changed. The likelihood ratio
+))
+(
+(
+X T X(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T
+2(y (cid:0) X(cid:18))T X((cid:18) (cid:0) ~(cid:18))+Tr
+[
+[
+)]
+(
+p∑
+
+1
+2(cid:27)2
+Taking expectation with respect to ~(cid:18), we have
+
+W 2(~(cid:18) (cid:0) (cid:18))(~(cid:18) (cid:0) (cid:18))T
+
+p(cid:18)(ynjxn)
+p~(cid:18)(ynjxn)
+
+n
+2(cid:27)2 E~(cid:18)
+
+]
+
+E~(cid:18)
+
+log
+
+Tr
+
+=
+
+:
+
+(cid:20) (cid:14)n
+2(cid:27)2
+
+j(cid:18)jj;
+
+w2
+j
+(cid:3)
+w
+j
+
+j=1
+
+where W := diag(w1; w2;(cid:1)(cid:1)(cid:1) ; wp). We deﬁne a code-
+length function C(z) := ∥z∥1 log 4p + log 2 for any z 2
+Z p. Note that C(z) satisﬁes Kraft’s inequality. Let us de-
+
+ﬁne a penalty function one(cid:2)(q(cid:3)) as
+
+(
+
+)
+
+(cid:3) ~(cid:18)
+
+W
+
+= (1=(cid:14))∥W
+
+(cid:3) ~(cid:18)∥1 log 4p + log 2:
+
+Note that ~L satisﬁes Kraft’s inequality and does not depend
+on xn. By taking expectation w.r.t. ~(cid:18), we have
+∥(cid:18)∥w(cid:3);1 + log 2:
+
+log 4p
+
+=
+
+]
+
+Thus, the codelength validity part is bounded above by
+∥(cid:18)∥w(cid:3);1 + (cid:12) log 2
+
+j(cid:18)jj +
+
+(cid:12) log 4p
+
+1
+(cid:14)
+
+~L(~(cid:18)jq(cid:3)) := C
+[
+~L(~(cid:18)jq(cid:3))
+p∑
+
+E~(cid:18)
+
+(cid:14)n
+2(cid:27)2
+
+w2
+j
+(cid:3)
+w
+j
+
+j=1
+
+(cid:14)
+
+(cid:14)
+
+Combining with (16), E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)]
+above by
+
+is bounded
+
+(cid:14)n(cid:21)
+8(cid:27)2
+
+∥(cid:18)∥w(cid:3);1+
+
+(cid:14)n
+2(cid:27)2
+
+j(cid:18)jj+
+
+w2
+j
+(cid:3)
+w
+j
+
+(cid:12) log 4p
+
+(cid:14)
+
+∥(cid:18)∥w(cid:3);1+(cid:12) log 2:
+
+p∑
+
+j=1
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+ϵ , we can bound this by the data-dependent
+
+Therefore, the above quantity is calculated as
+
+)
+
+]
+
+xxT (cid:22)(cid:18) (cid:22)(cid:18)T xxT
+
+j1j2
+
+[(
+p∑
+
+Eq(cid:21)
+
+(cid:18)
+
+=
+
+[
+
+Eq(cid:21)
+
+(cid:18)
+
+(cid:22)(cid:18)j3
+
+(cid:22)(cid:18)j4 (Sj1j2 Sj3j4 + Sj1j3 Sj2j4 + Sj2j3 Sj1j4 )
+
++ (cid:12) log 2
+
+j3;j4=1
+
+= (cid:22)(cid:18)T S (cid:22)(cid:18)Sj1j2 + 2(S (cid:22)(cid:18))j1(S (cid:22)(cid:18))j2:
+
++
+
+p
+(cid:12) log 4p
+1 (cid:0) ϵ
+(cid:14)
+
+∥(cid:18)∥w;1+(cid:12) log 2:
+
+Summarizing these as a matrix form, we have
+
+xxT (cid:22)(cid:18) (cid:22)(cid:18)T xxT
+
+= ((cid:22)(cid:18)T S (cid:22)(cid:18))S + 2S (cid:22)(cid:18)(S (cid:22)(cid:18))T :
+
+]
+
+Since xn 2 An
+weighted ℓ1 norm ∥(cid:18)∥w;1 as
+E~(cid:18)[H((cid:18); ~(cid:18); xn; yn)] (cid:20) (cid:14)n(cid:21)
+8(cid:27)2
+(
+j(cid:18)jj +
+p
+1 + ϵ
+
+p
+1 + ϵ
+
+p∑
+
+w2
+j
+wj
+
+(
+
+2(cid:27)2
+
+(cid:14)n
+
++
+
++
+
+=
+
+j=1
+(cid:21)
+1 (cid:0) ϵ
+
+p
+4
+
+(cid:14)n
+2(cid:27)2
+
+∥(cid:18)∥w;1p
+1 (cid:0) ϵ
+)
+(cid:12) log 4p
+
+(cid:14)
+
+∥(cid:18)∥w;1p
+)
+1 (cid:0) ϵ
+
+Because this holds for any (cid:14) > 0, we can minimize the
+upper bound with respect to (cid:14), which completes the proof.
+
+(cid:3) and (cid:22)(cid:18)
+′
+
+C. Upper Bound of Negative Hessian
+Lemma 3. Let (cid:22)(cid:18) := (cid:18)(cid:0)(cid:18)
+⪯ (cid:21)
+4(cid:27)2
+
+:= (cid:6)1=2 (cid:22)(cid:18). For any (cid:18); (cid:18)
+′
+′
+((cid:22)(cid:18)
+(cid:6)1=2 (cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+
+(17)
+where A ⪯ B implies that B (cid:0) A is positive semi-deﬁnite.
+
+(cid:0) @2d(cid:21)(p(cid:3); p(cid:18))
+
+)T (cid:6)1=2
+
+@(cid:18)@(cid:18)T
+
+(
+
+)
+
+(cid:3),
+
+2
+
+;
+
+Proof. The R´enyi divergence and its derivatives are well
+interpreted through a distribution
+
+(cid:18) (x; y) := q(cid:3)(x)p(cid:3)(yjx)(cid:21)p(cid:18)(yjx)1(cid:0)(cid:21)=Z (cid:21)
+(cid:22)p(cid:21)
+(cid:18) ;
+(cid:18) is a normalization constant. Here, we show only
+(cid:18) (x; y)dy and the Hessian
+(cid:22)p(cid:21)
+
+where Z (cid:21)
+an explicit form of q(cid:21)
+of d(cid:21)(p(cid:3); p(cid:18)) without proof due to the page limit:
+q(cid:21)
+(cid:18) (x) = N (x; 0; (cid:6)(cid:21)
+
+(cid:18) (x) =
+
+(cid:18) );
+
+(
+
+)
+
+∫
+(
+
+)(
+
+(cid:6)(cid:21)
+
+(cid:18) := (cid:6)1=2
+
+Ip (cid:0) (cid:13)(∥(cid:22)(cid:18)
+
+)T
+′
+(cid:22)(cid:18)
+(
+∥(cid:22)(cid:18)′∥2
+
+(cid:6)1=2;
+
+)
+
+Varq(cid:21)
+
+(cid:18) (x)
+
+xxT (cid:22)(cid:18)
+
+;
+
+′
+(cid:22)(cid:18)
+′∥2
+∥(cid:22)(cid:18)′∥2
+2)
+(cid:0) (cid:21)2(1 (cid:0) (cid:21))
+
+(cid:27)4
+
+; (cid:13)(t) :=
+
+t
+
+c + t
+
+:
+
+Here, Ip is an identity matrix of dimension p and
+Varq(A) := Eq[(A (cid:0) Eq[A])(A (cid:0) Eq[A])T ]. Therefore,
+we need to evaluate
+(xxT (cid:22)(cid:18)) = Eq(cid:21)
+
+(xxT (cid:22)(cid:18))(xxT (cid:22)(cid:18))T
+
+(cid:22)(cid:18))((cid:6)(cid:21)
+(cid:18)
+
+Varq(cid:21)
+
+(cid:22)(cid:18))T :
+
+] (cid:0) ((cid:6)(cid:21)
+]
+
+(cid:18)
+
+The (j1; j2) element of Eq(cid:21)
+
+xxT (cid:22)(cid:18) (cid:22)(cid:18)T xxT
+
+is calculated as
+
+[
+p∑
+
+]
+
+(cid:18)
+
+(cid:18)
+
+)
+
+(cid:18)
+
+[(
+
+Eq(cid:21)
+
+(cid:18)
+
+xxT (cid:22)(cid:18) (cid:22)(cid:18)T xxT
+
+(cid:22)(cid:18)j3
+
+(cid:22)(cid:18)j4Eq(cid:21)
+
+(cid:18)
+
+[xj1 xj2xj3 xj4 ] ;
+
+j1j2
+
+=
+j3;j4=1
+
+@2d(cid:21)(p(cid:3); p(cid:18))
+
+@(cid:18)@(cid:18)T
+
+where c :=
+
+(cid:18)
+
+=
+
+(cid:21)
+(cid:27)2 (cid:6)(cid:21)
+(cid:27)2
+(cid:21)(1 (cid:0) (cid:21))
+[
+
+where xj denotes the jth element of x only here. We
+rewrite (cid:6)(cid:21)
+(cid:18) as S to reduce notation complexity hereafter.
+By the formula of moments of Gaussian distribution,
+
+=
+
+Eq(cid:21)
+
+(cid:18)
+
+[xj1xj2 xj3 xj4] = Sj1j2Sj3j4 +Sj1j3 Sj2j4+Sj2j3 Sj1j4:
+
+As a result, Varq(cid:21)
+
+(cid:18)
+
+(xxT (cid:22)(cid:18)) is obtained as
+
+Varq(cid:21)
+
+(cid:18)
+
+(xxT (cid:22)(cid:18)) = S (cid:22)(cid:18) (cid:22)(cid:18)T S + ((cid:22)(cid:18)T S (cid:22)(cid:18))S:
+
+We need to survey how this matrix is bounded above in
+the sense of positive semi-deﬁnite. By noticing that S (cid:22)(cid:18) =
+(1 (cid:0) (cid:13)(∥(cid:22)(cid:18)
+
+′, the ﬁrst term is calculated as
+
+′∥2
+2))(cid:6)1=2 (cid:22)(cid:18)
+
+′
+′
+(cid:6)1=2 (cid:22)(cid:18)
+((cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+
+S (cid:22)(cid:18) (cid:22)(cid:18)T S = (1 (cid:0) (cid:13)(∥(cid:22)(cid:18)
+
+′∥2
+2))2∥(cid:22)(cid:18)
+
+′∥2
+
+:
+p
+Note that (1 (cid:0) (cid:13)(t))2t = c2t=(c + t)2 = c2=(2(c=
+p
+p
+p
+t +
+t)=2)2 (cid:20) c2=(2
+p
+t)=2 (cid:21) p
+c)2 = c=4 holds, since (c=
+t +
+
+2
+
+2
+
+)T (cid:6)1=2
+
+c. Thus, we have
+S (cid:22)(cid:18) (cid:22)(cid:18)T S ⪯ c
+4
+
+′
+′
+(cid:6)1=2 (cid:22)(cid:18)
+((cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+
+2
+
+)T (cid:6)1=2
+
+:
+
+′∥2
+′
+2))(cid:6)1=2 (cid:22)(cid:18)
+
+As for the second term, we ﬁrst calculate
+(cid:22)(cid:18)T S (cid:22)(cid:18) = (cid:22)(cid:18)T (1 (cid:0) (cid:13)(∥(cid:22)(cid:18)
+′∥2
+2:
+Note that (1(cid:0) (cid:13)(t))t = ct=(c + t) = c=(c=t + 1) (cid:20) c holds
+and that S is positive semi-deﬁnite for any (cid:18), the second
+term is bounded as
+
+= (1 (cid:0) (cid:13)(∥(cid:22)(cid:18)
+
+′∥2
+2))∥(cid:22)(cid:18)
+
+((cid:22)(cid:18)T S (cid:22)(cid:18))S = f2(∥(cid:22)(cid:18)
+
+′∥2
+2)S ⪯ cS:
+
+Summarizing these, we have
+
+Varq(cid:21)
+
+(cid:18)
+
+(xxT (cid:22)(cid:18)) ⪯ c
+4
+
+′
+′
+(cid:6)1=2 (cid:22)(cid:18)
+((cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+
+2
+
+)T (cid:6)1=2
+
++ cS:
+
+Hence, the negative Hessian of d(cid:21)(p(cid:3); p(cid:18)) is bounded as
+
+)
+
+(
+
+)
+
+S (cid:22)(cid:18) (cid:22)(cid:18)T S + ((cid:22)(cid:18)T S (cid:22)(cid:18))S
+
+)T (cid:6)1=2
+
++ cS
+
+(
+= (cid:0) (cid:21)
+
+(cid:0) @2d(cid:21)(p(cid:3); p(cid:18))
+
+⪯ (cid:0) (cid:21)
+
+@(cid:18)@(cid:18)T
+
+(
+
+(cid:27)2 S +
+(cid:21)
+4(cid:27)2
+
+(cid:21)
+c(cid:27)2
+′
+′
+(cid:6)1=2 (cid:22)(cid:18)
+((cid:22)(cid:18)
+∥(cid:22)(cid:18)′∥2
+
+2
+
+(cid:21)
+(cid:27)2 S +
+c(cid:27)2
+′
+′
+)
+((cid:22)(cid:18)
+(cid:6)1=2 (cid:22)(cid:18)
+c
+∥(cid:22)(cid:18)′∥2
+4
+)T (cid:6)1=2
+
+2
+
+:
+
+Barron and Cover’s Theory in Supervised Learning and its Application to Lasso
+
+Yamanishi, K. A learning criterion for stochastic rules. Ma-
+
+chine Learning, 9(2-3):165–203, 1992.
+
+Acknowledgements
+This work was partially supported by JSPS KAKENHI
+Grant Numbers (25870503) and the Okawa Foundation for
+Information and Telecommunications. We also thank Mr.
+Yushin Toyokihara for his support.
+
+References
+Barron, A. R. and Cover, T. M. Minimum complexity den-
+sity estimation. IEEE Transactions on Information The-
+ory, 37(4):1034–1054, 1991.
+
+Barron, A. R. and Luo, X. MDL procedures with ℓ1 penalty
+In Proceedings of the First
+and their statistical risk.
+Workshop on Information Theoretic Methods in Science
+and Engineering, Tampere, Finland, August 18-20 2008.
+
+Barron, A. R., Rissanen, J., and Yu, B. The minimum de-
+scription length principle in coding and modeling. IEEE
+Transactions on Information Theory, 44(6):2743–2760,
+1998.
+
+Barron, A. R., Huang, C., Li, J. Q., and Luo, X. MDL,
+penalized likelihood and statistical risk. In Proceedings
+of IEEE Information Theory Workshop, Porto, Portugal,
+May 4-9 2008.
+
+Chatterjee, S. and Barron, A. R.
+
+Information theoretic
+validity of penalized likelihood. 2014 IEEE Interna-
+tional Symposium on Information Theory, pp. 3027–
+3031, 2014a.
+
+Chatterjee, S. and Barron, A. R.
+
+Information theory
+of penalized likelihoods and its statistical implications.
+arXiv’1401.6714v2 [math.ST] 27 Apr., 2014b.
+
+Cichocki, A. and Amari, S. Families of alpha- beta- and
+gamma- divergences: ﬂexible and robust measures of
+similarities. Entropy, 12(6):1532–1568, 2010.
+
+Gr¨unwald, P. D. The Minimum Description Length Princi-
+
+ple. MIT Press, 2007.
+
+R´enyi, A. On measures of entropy and information.
+
+In
+Proceedings of the Fourth Berkeley Symposium on Math-
+ematical Statistics and Probability, 1:547–561, 1961.
+
+Rissanen, J. Modeling by shortest data description. Auto-
+
+matica, 14(5):465–471, 1978.
+
+Takeuchi, J. An introduction to the minimum description
+In A Mathematical Approach to Re-
+length principle.
+search Problems of Science and Technology, Springer
+(book chapter), pp. 279–296. Springer, 2014.
+
+Tibshirani, R. Regression shrinkage and selection via the
+lasso. Journal of the Royal Statistical Society Series B,
+58(1):267–288, 1996.
+
+

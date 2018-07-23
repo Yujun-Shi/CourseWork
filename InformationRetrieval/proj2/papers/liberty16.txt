@@ -1,0 +1,1295 @@
+Stratiﬁed Sampling Meets Machine Learning
+
+Kevin Lang
+Yahoo Research
+Edo Liberty
+Yahoo Research
+Konstantin Shmakov
+Yahoo Research
+
+Abstract
+
+This paper solves a specialized regression prob-
+lem to obtain sampling probabilities for records
+in databases. The goal is to sample a small set of
+records over which evaluating aggregate queries
+can be done both efﬁciently and accurately. We
+provide a principled and provable solution for
+this problem; it is parameterless and requires no
+data insights. Unlike standard regression prob-
+lems, the loss is inversely proportional to the
+regressed-to values. Moreover, a cost zero so-
+lution always exists and can only be excluded by
+hard budget constraints. A unique form of reg-
+ularization is also needed. We provide an efﬁ-
+cient and simple regularized Empirical Risk Min-
+imization (ERM) algorithm along with a theoret-
+ical generalization result. Our extensive exper-
+imental results signiﬁcantly improve over both
+uniform sampling and standard stratiﬁed sam-
+pling which are de-facto the industry standards.
+
+sult y of an aggregate query q to be y = (cid:80)
+
+1. Introduction
+Given a database of n records 1, 2, . . . , n we deﬁne the re-
+i qi. Here,
+qi is the scalar result of evaluating query q on record i.1
+For example, consider a database containing user actions
+on a popular site such as the Yahoo homepage. Here, each
+record corresponds to a single user and contains his/her past
+actions on the site. The value qi can be the number of times
+user i read a full news story if they are New York based and
+
+1For notational brevity, the index i ranges over 1, 2, . . . , n un-
+
+less otherwise speciﬁed.
+
+LANGK@YAHOO-INC.COM
+
+EDO@YAHOO-INC.COM
+
+KSHMAKOV@YAHOO-INC.COM
+
+qi = 0 otherwise. The result y = (cid:80)
+
+i qi is the number of
+articles read by Yahoo’s New York based users. In an inter-
+nal system at Yahoo (YAM+) such queries are performed in
+rapid succession by advertisers when designing advertising
+campaigns.
+Answering such queries efﬁciently poses a challenge. On
+the one hand, the number of users n is too large for an ef-
+ﬁcient linear scan, i.e., evaluating y explicitly. This is both
+in terms of running time and space (disk) usage. On the
+other hand, the values qi could be results of applying arbi-
+trarily complex functions to records. Consider for example
+the Flurry SDK (Yahoo) where users issue arbitrary queries
+on their dataset. This means no indexing, intermediate pre-
+aggregation, or sketching based solutions could be applied.
+Fortunately, executing queries on a random sample of
+records can provide good approximate answers. See the
+work of Olken, Rotem and Hellerstein (Olken & Rotem,
+1986; 1990; Olken, 1993; Hellerstein et al., 1997) for mo-
+tivations and efﬁcient algorithms for database sampling. It
+is well known (and easy to show) that a uniform sample of
+records provides a provably good solution to this problem.
+
+1.1. Uniform Sampling
+Let S ⊂ {1, 2, . . . , n} be the set of sampled records and
+Pr(i ∈ S) = pi independently for all i. The Horvitz-
+i∈S qi/pi. If
+pi ≥ ζ > 0 the following statements hold true.
+
+Thompson estimator for y is given by ˜y =(cid:80)
+• σ[˜y − y] ≤ y(cid:112)1/(ζ · card(q))
+(cid:80)|qi|/ max|qi| is the numeric cardinality of a query.2 The
+
+• E[˜y − y] = 0
+
+• Pr[|˜y − y| ≥ εy] ≤ e−O(ε2ζ·card(q))
+
+Here, σ[·] stands for the standard deviation and card(q) :=
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+2Note that for binary, or ‘select’, queries the numeric cardi-
+nality card(q) is equal to the cardinality of the set of selected
+records.
+
+Stratiﬁed Sampling Meets Machine Learning
+
+ﬁrst and second facts follow from direct expectation and
+variance computations. The third follows from applying
+Bernstein’s inequality to the sum of independent, mean
+zero, random variables that make up ˜y − y.
+Note that ζ can be inversely proportional to card(q) which
+means high cardinality queries can be well approximated
+by very few uniform samples. Acharya, Gibbons and Poos-
+ala (Acharya et al., 2000) showed that uniform sampling is
+also the optimal strategy against adversarial queries. Later
+it was shown by Liberty, Mitzenmacher, Thaler and Ull-
+man (Liberty et al., 2014) that uniform sampling is also
+space optimal in the information theoretic sense for any
+compression mechanism (not limited to selecting records).
+That means that no summary of a database can be more
+accurate than uniform sampling in the worst case.
+Nevertheless, in practice, queries and databases are not ad-
+versarial. This gives some hope that a non-uniform sam-
+ple could produce better results for practically encountered
+datasets and query distributions. This motivated several in-
+vestigations into this problem.
+
+1.2. Prior Art
+
+Sampling populations non-uniformly, such as Stratiﬁed
+Sampling, is a standard technique in statistics. An ex-
+ample is known as Neyman allocation3 (Neyman, 1934;
+Cochran, 1977) which selects records with probability in-
+versely proportional to the size of the stratum they belong
+to. Strata in this context is a mutually exclusive partitioning
+of the records which mirrors the structure of future queries.
+This structure is overly restrictive for our setting where the
+queries are completely unrestricted.
+Acharya et al. (Acharya et al., 2000) introduce congres-
+sional sampling. This is a hybrid of uniform sampling and
+Neyman allocation. The stratiﬁcation is performed with re-
+spect to the relations in the database. Later Chaudhuri, Das
+and Narasayya (Chaudhuri et al., 2007) considered the no-
+tion of a distribution over queries and assert that the query
+log is a random sample from that distribution, an assump-
+tion we later make as well. Both papers describe standard
+stratiﬁed sampling on ﬁnest partitioning (or fundamental
+regions) which often degenerate to single records in our
+setting. Nevertheless, if the formulation of
+(Chaudhuri
+et al., 2007) is taken to its logical conclusion, their result
+resembles our ERM based approach. Their solution of the
+optimization problem however does not carry over.
+The work of Joshi and Jermaine (Joshi & Jermaine, 2008)
+is closely related to ours. They generate a large number of
+distributions by taking convex combinations of Neyman al-
+locations of individual strata of single queries. The chosen
+solution is the one that minimizes the observed variance on
+
+3Also known as Neyman optimal allocation.
+
+y =(cid:80)
+˜y = (cid:80)
+
+the query log. They report favorable results but they sug-
+gest an inefﬁcient algorithm, offer no formal guaranties and
+fail to recognize the critical importance of regularization.
+Recent results (Agarwal et al., 2013; Laptev et al., 2012;
+Agarwal et al., 2014) investigate a more interactive or dy-
+namic database setting. These ideas combined with modern
+data infrastructures lead to impressive practical results.
+
+1.3. Our Contributions
+
+In this paper we approach this problem in its fullest gener-
+ality. We allow each record to be sampled with a different
+probability. Then, we optimize these probabilities to min-
+imize the expected error of estimating future queries. Our
+only assumption is that past and future queries are drawn
+independently from the same unknown distribution. This
+embeds the stratiﬁcation task into the PAC model.
+
+1. We formalize stratiﬁed sampling as a special regres-
+
+sion problem in the PAC model (Section 2).
+
+2. We propose a simple and efﬁcient one pass algorithm
+for solving the regularized ERM problem (Section 3).
+3. We report extensive experimental results on both syn-
+thetic and real data that showcase the effectiveness of
+our proposed solution (Section 4).
+
+This gives the ﬁrst solution to this problem which is simul-
+taneously provable, practical, efﬁcient and fully automated.
+
+2. Sampling in the PAC Model
+In the PAC model, one assumes that examples are drawn
+i.i.d. from an unknown distribution (e.g. (Valiant, 1984;
+Kearns & Vazirani, 1994)). Given a random collection
+of such samples – a training set – the goal is to train a
+model that is accurate in expectation for future examples
+(over the unknown distribution). Our setting is very sim-
+ilar. Let pi be the probability with which we pick record
+i. Let qi denote the query q evaluated for record i and let
+i qi be the correct exact answer for that query. Let
+i∈S qi/pi where i ∈ S with probability pi be the
+Horvitz-Thompson estimator for y. The value ˜y is anal-
+ogous to the prediction of our regressor at point q. The
+model in this analogy is the vector of probabilities p.
+A standard objective in regression problems is to mini-
+mize the squared loss, L(˜y, y) = (˜y − y)2.
+In our set-
+ting, however, the prediction ˜y is itself a random vari-
+able. By taking the expectation over the random bits of
+the sampling algorithm and by overloading the loss func-
+i (1/pi − 1), our goal is modiﬁed to
+i q2
+(cid:88)
+
+tion L(p, q) := (cid:80)
+
+minimize
+Eq[E˜y(˜y − y)2] = Eq
+
+i (1/pi − 1) = Eq L(p, q) .
+q2
+
+i
+
+Stratiﬁed Sampling Meets Machine Learning
+
+Optimizing for relative squared loss L(˜y, y) = (˜y/y − 1)2
+is possible simply by dividing the loss by y2. For nota-
+tional reasons the absolute squared loss is used for the al-
+gorithm presentation and mathematical derivation. The ex-
+perimental section uses the relative loss which turns out to
+be preferred by most practitioners. The reader should keep
+in mind that both absolute and relative squared losses fall
+under the exact same formulation.
+The absolute value loss L(˜y, y) = |˜y − y| was considered
+by (Chaudhuri et al., 2007). While it is a very reasonable
+measure of loss it is problematic in the context of optimiza-
+tion. First, there is no simple closed form expression for
+its expectation over ˜y. While this does not rule out gradi-
+ent descent based methods it makes them much less efﬁ-
+cient. A more critical issue with setting L(˜y, y) = |˜y − y|
+is the fact that L(p, q) is, in fact, not convex in p. To ver-
+ify, consider a dataset with only two records and a single
+query (q1, q2) = (1, 1). Setting (p1, p2) = (0.1, 0.5) or
+(p1, p2) = (0.5, 0.1) gives E˜y[|˜y − y|] = 1.8. Setting
+(p1, p2) = (0.3, 0.3) yields E˜y[|˜y − y|] = 1.96. This con-
+tradicts the convexity of L with respect to p.
+
+3. Empirical Risk Minimization
+Empirical Risk Minimization (ERM) is a standard ap-
+proach in machine learning in which the chosen model is
+the minimizer of the empirical risk. The empirical risk
+Remp(p) is deﬁned as an average loss of the model over
+the training set Q. Here Q is a query log containing a ran-
+dom collection of queries q drawn independently from the
+unknown query distribution.
+
+pemp = arg min
+
+p
+
+Remp(p) = arg min
+
+p
+
+1
+|Q|
+
+L(p, q)
+
+(cid:88)
+
+q∈Q
+
+Notice that, unlike most machine learning problems, one
+could trivially obtain zero loss by setting all sampling prob-
+abilities to 1. This clearly gives very accurate “estimates”
+but also, obviously, achieves no reduction in the database
+size.
+In this paper we assume that retaining record i in-
+curs cost ci and constrain the sampling to a ﬁxed budget B.
+One can think of ci, for example, being the size of record
+i on disk and B being the total available storage. The in-
+
+teresting scenario for sampling is when(cid:80) ci (cid:29) B. By
+enforcing that(cid:80) pici ≤ B the expected cost of the sample
+
+ﬁts the budget and the trivial solution is disallowed.
+ERM is usually coupled with regularization because ag-
+gressively minimizing the loss on the training set runs the
+risk of overﬁtting. We introduce a regularization mecha-
+nism by enforcing that pi ≥ ζ for some small threshold
+i ci. When ζ = 0 no regularization is ap-
+i ci the regularization is so severe
+that uniform sampling is the only feasible solution. This
+type of regularization both insures that the variance is never
+
+0 ≤ ζ ≤ B/(cid:80)
+plied. When ζ = B/(cid:80)
+
+inﬁnite and guarantees some accuracy for arbitrary queries
+(see Section 1.1). To sum up, pemp is the solution to the
+following constrained optimization problem:
+
+(cid:88)
+
+(cid:88)
+
+q∈Q
+
+i
+
+i (1/pi − 1)
+q2
+
+pemp = arg min
+
+1
+|Q|
+
+p
+
+(cid:88)
+
+s.t.
+
+pici ≤ B and ∀ i pi ∈ [ζ, 1]
+
+i
+
+This optimization is computationally feasible because it
+minimizes a convex function over a convex set. However, a
+(nearly) closed form solution to this constrained optimiza-
+tion problem is obtainable using the standard method of
+Lagrange multipliers. The ERM solution, pemp, minimizes
+αi(pi − ζ)
+
+(cid:88)
+i (1/pi − 1) −(cid:88)
+(cid:88)
+βi(1 − pi) − γ(B −(cid:88)
+−(cid:88)
+
+1
+|Q|
+
+max
+α,β,γ
+
+pici)]
+
+q∈Q
+
+q2
+
+[
+
+i
+
+i
+
+i
+
+i
+
+where αi, βi and γ are nonnegative. By complementary
+slackness conditions, if ζ < pi < 1 then αi = βi = 0.
+Taking the derivative with respect to pi we get that
+
+pi ∝(cid:113) 1
+(cid:80)
+(cid:113)
+(1/ci|Q|)(cid:80)
+
+1|Q|
+
+ci
+
+q∈Q q2
+i
+
+This yields pi = CLIP1
+ζ(λzi) for some constant λ
+where zi =
+ζ(z) =
+max(ζ, min(1, z)). The value for λ is the maximal value
+
+such that (cid:80) pici ≤ B and can be computed by binary
+
+i and CLIP1
+
+q∈Q q2
+
+search. This method for computing pemp is summarized
+by Algorithm 1, which only makes a single pass over the
+training data (in Line 5).
+
+Algorithm 1 Train: regularized ERM algorithm
+1: input: training queries Q,
+2:
+3:
+
+budget B, record costs c,
+regularization factor η ∈ [0, 1]
+
+4: ζ = η · (B/(cid:80)
+(cid:113) 1
+6: Binary search for λ satisfying(cid:80)
+
+5: ∀ i zi =
+
+i ci)
+1|Q|
+
+(cid:80)
+
+q∈Q q2
+i
+
+ci
+
+i ci CLIP1
+
+7: output: ∀ i pi = CLIP1
+
+ζ(λzi)
+
+ζ(λzi) = B
+
+3.1. Model Generalization
+
+The reader is reminded that we would have wanted to ﬁnd
+the minimizer p∗ of the real risk R(p). However, Algo-
+rithm 1 ﬁnd pemp which minimizes Remp(p), the empiri-
+cal risk . Generalization, in this context, refers to the risk
+associated with the empirical minimizer R(pemp). Stan-
+dard generalization results reason about R(pemp) − R(p∗)
+as a function of the number of training examples and the
+complexity of the learned concept.
+
+Stratiﬁed Sampling Meets Machine Learning
+
+i =(cid:112)(1/ci)Eqq2
+another, and that ε diminishes proportionally to(cid:112)1/|Q|.
+
+In terms of model complexity, a comprehensive study of the
+VC-dimension of SQL queries was presented by Riondato
+et al. (Riondato et al., 2011). For regression problems, such
+as ours, Rademacher complexity (see for example (Bartlett
+& Mendelson, 2003) and (Shalev-Shwartz & Ben-David,
+2014)) is a more appropriate measure. Moreover, it is di-
+rectly measurable on the training set which is of great prac-
+tical importance.
+Luckily, here, we can bound the generalization directly. Let
+z∗
+i in
+Algorithm 1 we obtain the optimal solution p∗.
+We will show that z∗
+This will yield that the values of λ and λ∗, pi and p∗
+i , and
+ﬁnally that R(p) and R(p∗) are also 1±O(ε) multiplicative
+approximations of one another which establishes our claim.
+For a single record, the variable z2
+i is a sum of i.i.d. ran-
+dom variables. Moreover, z∗2
+i . Using Hoeffding’s
+inequality we can reason about the difference between the
+two values.
+
+i and zi are 1±ε approximations of one
+
+i . Notice that, if we replace zi by z∗
+
+i = Eqz2
+
+(cid:12)(cid:12) ≥ εz∗2
+
+i
+
+(cid:3) ≤ 2e−2|Q|ε2/ skew2(i) .
+
+Pr(cid:2)(cid:12)(cid:12)z2
+
+i − z∗2
+
+i
+
+Deﬁnition: The skew of a record is deﬁned as
+
+skew(i) = (max
+
+q
+
+i )/(Eqq2
+q2
+
+i ) .
+
+It captures the variability in the values a single record con-
+tributes to different queries. Note that skew(i) is not di-
+rectly observable. Nevertheless, skew(i) is usually a small
+constant times the reciprocal probability of record i being
+selected by a query.
+Taking the union bound over all records, we get the mini-
+mal value for ε for which we succeed with probability 1−δ.
+
+skew(i)(cid:112)log(n/δ)/|Q|)
+
+ε = O(max
+
+i
+
+i /(1 + ε) ≤ zi ≤
+From this point on, it is safe to assume z∗
+(1 + ε)z∗
+i for all records i simultaneously. To prove that
+λ∗ ≤ (1 + ε)λ assume by negation that λ∗ > (1 + ε)λ.
+Because CLIP1
+ζ is a monotone non-decreasing function we
+have that
+
+(cid:88)
+
+ci CLIP1
+
+ζ(λ∗z∗
+
+i ) >
+
+ci CLIP1
+
+ζ(λ(1 + ε)z∗
+i )
+
+ci CLIP1
+
+ζ(λzi) = B
+
+(cid:88)
+(cid:88)
+
+B =
+
+>
+
+The contradiction proves that λ∗ ≤ (1+ε)λ. Using the fact
+that CLIP1
+
+ζ(ax)/a for all a ≥ 1 we observe
+
+ζ(x) ≥ CLIP1
+
+pi = CLIP1
+≥ CLIP1
+
+ζ(λzi) ≥ CLIP1
+ζ(λ∗z∗
+
+i )/(1 + ε)2 = p∗
+
+ζ(λzi(1 + ε)2)/(1 + ε)2
+
+i /(1 + ε)2
+
+(cid:88)
+
+Eqq2
+
+i
+
+Finally, a straightforward calculation shows that
+
+R(p) =
+
+(cid:88)
+≤ (cid:88)
+
+i
+
+i
+
+i
+
+(1/pi − 1)Eqq2
+
+(cid:0)(1 + ε)2/p∗
+(cid:88)
+
+i − 1(cid:1) Eqq2
+
+i
+
+i − 1) Eqq2
+
+i + 3ε
+
+≤ (1 + 3ε)
+(1/p∗
+≤ (1 + O(ε))R(p∗) .
+
+i
+
+i
+
+i (1/p∗
+
+The last inequality requires that(cid:80)
+than R(p∗) =(cid:80)
+able assumption. In fact, in most cases we expect(cid:80)
+to be much smaller than(cid:80)
+skew(i)(cid:112)log(n/δ)/|Q|)) .
+
+Eqq2
+i is not much larger
+i
+i . This is a very reason-
+Eqq2
+i − 1) Eqq2
+i
+i because the
+sampling probabilities tend to be rather small. This con-
+cludes the proof of our generalization result
+R(p) ≤ R(p∗)(1 + O(max
+
+i − 1) Eqq2
+i (1/p∗
+
+i
+
+i
+
+4. Experiments
+In the previous section we proved that if ERM is given a
+sufﬁciently large number of training queries it will generate
+sampling probabilities that are nearly optimal for answer-
+ing future queries.
+In this section we present an array of experimental results
+using our algorithm. We compare it to uniform sampling
+and stratiﬁed sampling. We also study the effects of varying
+the number of training example and strength of the regular-
+ization. This is done for both synthetic and real datasets.
+Our experiments focus exclusively on the relative error de-
+ﬁned by L(˜y, y) = (ˆy/y − 1)2. As a practical shortcut,
+this is achievable without modifying Algorithm 1 at all.
+The only modiﬁcation needed is normalizing all training
+queries such that y = 1 before executing Algorithm 1. The
+reader can easily verify that this is mathematically identical
+to minimizing the relative error. Algorithm 2 describes the
+testing phase reported below.
+
+yq ←(cid:80)
+
+Algorithm 2 Test: measure expected test error.
+1: input: Test queries Q, probability vector p
+2: for q ∈ Q do
+3:
+i qi
+4:
+5: end for
+
+q = E(˜yq/yq − 1)2 = (1/y2
+v2
+
+6: output: (1/|Q|)(cid:80)
+
+q )(cid:80)
+
+q∈Q v2
+q
+
+i (1/pi − 1)
+i q2
+
+4.1. Details of Datasets
+Cube Dataset The Cube Dataset uses synthetic records
+and synthetic queries which allows us to dynamically gen-
+erate queries and test the entire parameter space. A record
+
+Stratiﬁed Sampling Meets Machine Learning
+
+is a 5-tuple {xk; 1 ≤ k ≤ 5} of random real values, each
+drawn uniformly at random from the interval [0, 1]. The
+dataset contained 10000 records. A query {(tk, sk); 1 ≤
+k ≤ 5} is a 5-tuple of pairs, each containing a random
+threshold tk in [0, 1] (uniformly) and a randomly chosen
+sign sk ∈ {−1, 1} with equal probability. We set qx = 1
+iff ∀k, sk(xk−tk) ≥ 0 and zero else. We also set all record
+costs to ci = 1. The length of the tuples and the number
+of record is arbitrary. Changing those yields qualitatively
+similar results.
+
+DBLP Dataset
+In this dataset we use a real database
+from DBLP and synthetic queries. Records correspond to
+2,101,151 academic papers from the DBLP public database
+(database). From the publicly available DBLP database
+XML ﬁle we selected all papers from the 1000 most pop-
+ulous venues. A venue could be either a conference or a
+journal. From each paper we extracted the title, the num-
+ber of authors, and the publication date. From the titles we
+extracted the 5000 most commonly occurring words (delet-
+ing several typical stop-words such as “a”, “the” etc.).
+Next 50,000 random queries were generated as follows.
+Select one title word w uniformly at random from the set
+of 5000 commonly occurring words. Select a year y uni-
+formly at random from 1970, . . . , 2015. Select a number k
+of authors from 1, . . . , 5. The query matches papers whose
+titles contain w and one of the following four conditions
+(1) the paper was published on or before y (2) the paper
+was published after y (3) the number of authors is ≤ k (4)
+the number of authors is > k. Each condition is selected
+with equal probability. A candidate query is rejected if it
+was generated already or if it matches fewer than 100 pa-
+pers. The 50,000 random queries were split into 40,000 for
+training and 10,000 for testing.
+
+YAM+ Dataset The YAM+ dataset was obtained from
+an advertising system at Yahoo. Among its many func-
+tions, YAM+ must efﬁciently estimate the reach of adver-
+tising campaigns. It is a real dataset with real queries issued
+by campaign managers. In this task, each record contains
+a single user’s advertising related actions. The result of
+a query is the number of users, clicks or impressions that
+meet some conditions.
+In this task, record costs ci correspond to their volume on
+disk which varies signiﬁcantly between records. The bud-
+get is the pre-speciﬁed allotted disk space available for stor-
+ing the samples. Moreover, unlike the above two exam-
+ples, the values qi often represent the number of matching
+events for a given user. These are not binary but instead
+vary between 1 and 10,000. To set up our experiment, 1600
+contracts (campaigns) were evaluated on 60 million users,
+yielding 1.6 billion nonzero values of qi.
+
+Dataset
+
+Sampling Rate
+
+Uniform Sampling
+Neyman Allocation
+Regularized Neyman
+
+ERM-η, small training set
+ERM-ρ, small training set
+ERM-η, large training set
+ERM-ρ, large training set
+
+Cube DBLP YAM+
+0.1
+0.01
+0.104
+0.664
+0.286
+0.643
+0.582
+0.102
+0.096
+0.637
+0.092
+0.623
+0.233
+0.064
+0.233
+0.059
+
+0.01
+0.229
+0.640
+0.228
+0.222
+0.213
+0.182
+0.179
+
+Figure 1. Average expected relative squared errors on test set for
+two standard baselines (uniform sampling and Neyman alloca-
+tion); one novel baseline (Regularized Neyman); and ERM us-
+ing two regularization methods. Note that Neyman allocation is
+worse than uniform sampling for two of the three datasets, and
+that “Regularized Neyman” works better than either of them on
+all three datasets. The best result for each dataset is shown in bold
+text. In all cases it is achieved by regularized ERM. Also, more
+training data reduces the testing error, which is to be expected.
+Surprisingly, a heuristic variant of the regularization (Section 4.4)
+slightly outperforms the one analyzed in the paper.
+
+The queries were subdivided to training and testing sets
+each containing 800 queries. All training queries were
+chronologically issued before any of the testing queries.
+The training and testing sets each contained roughly 60
+queries that matched fewer than 1000 users. These were
+discarded since they are considered by YAM+ users as too
+small to be of any interest. As such, approximating them
+well is unnecessary.
+
+4.2. Baseline Methods
+
+We used three algorithms to establish baselines for judging
+the performance of regularized ERM. Both of the ﬁrst two
+algorithms, uniform sampling and Neyman allocation, are
+well known and widely used. The third algorithm (see Sec-
+tion 4.5) was a novel hybrid of uniform sampling and Ney-
+man allocation that was inspired by our best-performing
+version of regularized ERM.
+
+Standard Baseline Methods The most important base-
+line method is uniform random sampling. It is widely used
+by practitioners and has been proved optimal for adversar-
+ial queries. Moreover, as shown in Section 1, it is theoreti-
+cally well justiﬁed.
+The second most important (and well known) baseline is
+Stratiﬁed Sampling, speciﬁcally Neyman allocation (also
+known as Neyman optimal allocation). Stratiﬁed Sampling
+as a whole requires the input records to be partitioned into
+disjoint sets called strata. In the most basic setting, the op-
+timal sampling scheme divides the budget equally between
+the strata and then uniformly samples within each stratum.
+This causes the sampling probability of a given record to
+
+Stratiﬁed Sampling Meets Machine Learning
+
+Figure 2. The three plots correspond to the three datasets. The y-axis is the average expected normalized squared error on the testing
+queries (lower values are better). The different curves in each plot correspond to different sizes of training sets (see the legend). The
+black horizontal line corresponds to uniform sampling using a similar sampling rate. The value of η (strength of regularization) varies
+along the x-axis. The plots make clear that a) training on more examples reduces the future expected error b) more regularization is
+needed for smaller training sets and c) that overﬁtting is a real concern.
+
+be inversely proportional to the cardinality of its stratum.
+Informally, this works well when future queries correlate
+with the strata and therefore have plenty of matching sam-
+ples.
+
+Strata for Neyman Allocation The difﬁculty in applying
+Neyman allocation to a given data system lies in designing
+the strata. This task incurs a large overhead for developing
+insights about the database and queries. Our experiment
+used the most reasonable strata we could come up with.
+It turned out that the only dataset where Neyman alloca-
+tion beat uniform random sampling was the synthetic Cube
+Dataset, whose structure we understood completely (since
+we designed it). This, however, does not preclude the pos-
+sibility that better strata would have produced better results
+and possibly have improved on uniform random sampling
+for the other datasets as well.
+
+Strata for Cube Data Set For the Cube Dataset, we hap-
+pened to know that good coverage of the corners of the
+cube is important. We therefore carved out the 32 corners
+of the cube and assigned them to a separate “corners” stra-
+tum as follows. A point was assigned to this stratum if
+∀k ∈ {1 . . . 5}, min(xk, 1 − xk) < C where the threshold
+C = (1/160)(1/5) ≈ 0.362 was chosen so that the total
+volume of the corners stratum was 20 percent of the vol-
+ume of the cube. This corners stratum was then allocated
+50 percent of the sampling scheme’s space budget. This
+caused the sampling probabilities of points in the corners
+stratum to be 4 times larger than the probabilities of other
+points.
+
+Strata for DBLP Data Set For the DBLP dataset, we
+experimented with three different stratiﬁcations that could
+plausibly correlate with queries: 1) by paper venue, 2) by
+number of authors, and 3) by year. Stratiﬁcation by year
+turned out to work best, with number of authors a fairly
+close second.
+
+Strata for YAM+ Data Set For the YAM+ dataset users
+were put into separate partitions by the type of device they
+use most often (smartphone, laptop, tablet etc.) and avail-
+able ad-formats on these devices. This creates 71 strata.
+YAM+ supports Yahoo ads across many devices and ad-
+formats and advertisers often choose one or a few formats
+for their campaigns. Therefore, this partition respects the
+structure of most queries. Other reasonable partitions we
+experimented with did not perform as well. For example,
+partition by user age and/or gender would have been rea-
+sonable but it correlates poorly with the kind of queries is-
+sued to the system.
+
+Results for Baseline Methods Figure 1 tabulates the
+baseline results against which the accuracy of regularized
+
+ERM is judged. The sampling rate is B/(cid:80) ci. The rest of
+the rows contain the quantity (1/|Q|)(cid:80)
+
+q∈Q v2
+
+q, the output
+of Algorithm 2. A comparison of the two standard base-
+line methods shows that uniform random sampling worked
+better than Neyman allocation for both of the datasets that
+used real records and whose structure was therefore com-
+plex and somewhat obscure.
+
+4.3. Main Experimental Results
+
+Figure 2 shows the results of applying Algorithm 1 to the
+three above datasets. There is one plot per dataset. In all
+three plots the y-axis is the average expected normalized
+squared error as measured on the testing queries; lower
+values are better. The different curves in each plot in Fig-
+ure 2 report the results for a different size of training set.
+The worst results (highest curve) correspond to the small-
+est training set. The best results (lowest curve) are for the
+largest training set. There is also a black line across the
+middle of the plot showing the performance of uniform ran-
+dom sampling at the same average sampling rate (budget).
+More training data yields better generalization (and clearly
+does not affect uniform sampling). This conﬁrms our hy-
+pothesis that the right model is learned.
+
+ 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 1.1 1.2 0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1Expected Error[weaker...] Value of Regularization Parameter Eta [...stronger]Cube DatasetUniform Sampling p = 1/1050 Training Queries100 Training Queries200 Training Queries800 Training Queries6400 Training Queries 0.16 0.18 0.2 0.22 0.24 0.26 0.28 0.3 0.32 0.34 0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1Expected Error[weaker...] Value of Regularization Parameter Eta [...stronger]DBLP DatasetUniform Sampling p = 1/1005000 Training Queries10000 Training Queries20000 Training Queries40000 Training Queries 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.15 0.16 0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1Expected Error[weaker...] Value of Regularization Parameter Eta [...stronger]YAM+ DatasetUniform p = 1/10050 Training Queries100 Training Queries200 Training Queries400 Training QueriesAll Training QueriesStratiﬁed Sampling Meets Machine Learning
+
+Figure 3. These three plots show the expected error of each test query. Clearly, for all three datasets, error is generally a decreasing
+function of the numeric cardinality of the queries. The advantage of ERM over uniform random sampling lies primarily at the more
+difﬁcult low cardinality end of the spectrum.
+
+The x-axis in Figure 2 varies with the value of the parame-
+ter η which controls the strength of regularization. Moving
+from left to right means that stronger regularization is being
+applied. When the smallest training set is used (top curve),
+ERM only beats uniform sampling when very strong reg-
+ularization is applied (towards the right side of the plot).
+However, the larger the training set becomes, the less reg-
+ularization is needed. This effect is frequently observed in
+many machine learning tasks where smaller training sets
+require stronger regularization to prevent overﬁtting.
+
+4.4. Mixture Regularization
+
+(1 − ρ)p + ρu where u = B/((cid:80)
+
+In Algorithm 1, the amount of regularization is determined
+by a probability ﬂoor whose height is controlled by the user
+parameter η. We have also experimented with a different
+regularization that seems to work slightly better.
+In this
+method, unregularized sampling probabilities p are gen-
+erated by running Algorithm 1 with η = 0. Then, reg-
+ularized probabilities are computed via the formula p(cid:48) =
+i ci) is the uniform sam-
+pling rate that would hit the space budget. Note that p(cid:48) is a
+convex combinations of two feasible solutions to our opti-
+mization problem and is therefore also a feasible solution.
+Test error as a function of training set size and the value of
+ρ are almost identical to those achieved by η-regularization
+(Figure 2). The only difference is that the minimum test-
+ing errors achieved by mixture regularization are slightly
+lower. Some of these minima are tabulated in Figure 1.
+This behavior could be speciﬁc to the data used but could
+also apply more generally.
+
+4.5. Neyman with Mixture Regularization
+
+The Mixture Regularization method described in Sec-
+tion 4.4 can be applied to any probability vector, including
+a vector generated by Neyman allocation. The resulting
+probability vector is a convex combination of a uniform
+vector and a Neyman vector, with the fraction of uniform
+controlled by a parameter ρ ∈ [0, 1]. This idea is similar in
+spirit to Congressional Sampling (Acharya et al., 2000).
+
+The estimation accuracy of Neyman with Mixture Regu-
+larization is tabulated in the “Regularized Neyman” row of
+Figure 1. Each number was measured using the best value
+of ρ for the particular dataset (tested in 0.01 increments).
+We note that this hybrid method worked better than either
+uniform sampling or standard Neyman allocation.
+
+4.6. Accuracy as a Function of Query Size
+
+Our main experimental results show that (with appropriate
+regularization) ERM can work better overall than uniform
+random sampling. However, there is no free lunch. The
+method intuitively works by redistributing the overall sup-
+ply of sampling probability, increasing the probability of
+records involved in hard queries by taking it away from
+records that are only involved in easy queries. This de-
+creases the error of the system on the hard queries while
+increasing its error on the easy queries. This tradeoff is
+acceptable because easy queries initially exhibit minuscule
+error rates and remain well below an acceptable error rate
+even if increased.
+We illustrate this phenomenon using scatter plots that have
+a separate plotted point for each test query showing its ex-
+pected error as a function of its numeric cardinality. As
+discussed in Section 1.1, the numeric cardinality is a good
+measure of how hard it is to approximate a query result well
+using a downsampled database.
+These scatter plots appear in Figure 3. There is one plot
+for each of the three datasets. Also, within each plot, each
+query is plotted with two points; a blue one showing its er-
+ror with uniform sampling, and a red one showing its error
+with regularized ERM sampling.
+For high cardinality (easy) queries ERM typically exhibits
+more error than uniform sampling. For example, the ex-
+treme cardinality queries for the Cube dataset experience a
+0.001 error rate with uniform random sampling. With our
+solution the error increases to 0.005. This is a ﬁve fold
+increase but still well below an average 0.25 error in this
+setting. For low cardinality (hard) queries, ERM typically
+
+ 0.0001 0.001 0.01 0.1 1 10 100 1 10 100 1000 10000Expected ErrorNumeric Cardinality of Test QueryCube DatasetERMUniform Sampling 0.0001 0.001 0.01 0.1 1 10 100 1000 10000 100000 1e+06Expected ErrorNumeric Cardinality of Test QueryDBLP DatasetRegularized ERMUniform Sampling 1e-05 0.0001 0.001 0.01 0.1 1 10 1 10 100 1000 10000 100000 1e+06Expected ErrorNumeric Cardinality of Test QueryYAM+ DatasetRegularized ERMUniform SamplingStratiﬁed Sampling Meets Machine Learning
+
+achieves less error than uniform sampling. However, it
+doesn’t exhibit lower error on all of the hard queries. That
+is because error is measured on testing queries that were
+not seen during training. Predicting the future isn’t easy.
+
+Figure 4. Left: These smoothed histograms show the variability
+of results caused by random sampling decisions. Clearly, the dis-
+tribution of outcomes for regularized ERM is preferable to that
+of uniform random sampling. Right: ERM with mixture regular-
+ization versus uniform random sampling at various effective sam-
+
+pling rates (B/(cid:80) ci). The gains might appear unimpressive in
+
+the log-log scale plot but are, in fact, 40%-50% throughout which
+is signiﬁcant.
+
+(cid:80)
+
+q∈Q v2
+
+4.7. Variability Caused by Sampling Choices
+The quantity 1|Q|
+q output by Algorithm 2 is the av-
+erage expected normalized squared error on the queries of
+the testing set. While this expected test error is minimized
+by the algorithm, the actual test error is a random variable
+that depends on the random bits of the sampling algorithm.
+Therefore, for any speciﬁc sampling, the test error could be
+either higher or lower than its expected value. The same
+thing is true for uniform random sampling. Given this ad-
+ditional source of variability, it is possible that a concrete
+sample obtained using ERM could perform worse than a
+concrete sample obtained by uniform sampling, even if the
+expected error of ERM is better.
+To study the variability caused by sampling randomness,
+we ﬁrst computed two probability vectors, pe and pu for
+the YAM+ dataset. The former was the output of ERM with
+mixture regularization with ρ = 0.71 (its best value for this
+dataset). The latter was a uniform probability vector with
+the same effective sampling rate (0.01). These were kept
+ﬁxed throughout the experiment.
+Next the following experiment was repeated 3000 times.
+In each trial a random vector, r, of n random numbers was
+created. Each of the values ri was chosen uniformly at
+random from [0, 1].
+The two concrete samples speciﬁed by these values are
+i ∈ Se if pe,i < ri and i ∈ Su if pu,i < ri. Finally we mea-
+sured the average normalized squared error over the testing
+queries for the concrete samples Se and Su. The reason for
+this construction is so that the two algorithms use the exact
+same random bits.
+
+Smoothed histograms of these measurements for regular-
+ized ERM and for uniform sampling appear in Figure 4.
+For esthetic reasons, these histograms were smoothed by
+convolving the discrete data points with a narrow gaussian
+(σ = 0.006). They approximate the true distribution of
+concrete outcomes.
+The two distributions overlap. With probability 7.2%, a
+speciﬁc ERM outcome was actually worse than the out-
+come of uniform sampling with the same vector of random
+numbers. Even so, from Figure 4 we clearly see the distri-
+bution for regularized ERM shifted to the left. This corre-
+sponds to the reduced expected loss but also shows that the
+mode of the distribution is lower.
+Moreover, the ERM outcomes are more sharply concen-
+trated around their mean, exhibiting standard deviation of
+0.049 versus 0.062 using uniform sampling. This is de-
+spite the fact that the right tail of the ERM distribution
+was slightly worse, with 17/3000 outcomes in the interval
+[0.4, 0.6] versus 11/3000 for uniform. The increased con-
+centration is surprising because usually reducing expected
+loss comes at the expense of increasing its variance. This
+should serve as additional motivation for using the ERM
+solution.
+
+5. Concluding discussion
+Using three datasets, we demonstrate that our machine
+learning based sampling and estimation scheme provides
+a useful level of generalization from past queries to fu-
+ture queries. That is, the estimation accuracy on future
+queries is better than it would have been had we used uni-
+form or stratiﬁed sampling. Moreover, it is a disciplined
+approach that does not require any manual tuning or data
+insights such as needed for using Stratiﬁed Sampling (cre-
+ating strata). Since we believe most systems of this nature
+already store a historical query log, this method should be
+widely applicable.
+The ideas presented extend far beyond the squared loss and
+the speciﬁc ERM algorithm analyzed. Machine learning
+theory allows us to apply this framework to any convex loss
+function using gradient descent based algorithms (Hazan &
+Kale, 2014). One interesting function to minimize is the
+deviation indicator function L(˜y, y) = 1 if |˜y − y| ≥ εy
+and zero else. This choice does not yield a closed form so-
+lution for L(p, q) but using Bernstein’s inequality yields a
+tight bound that turns out to be convex in p. Online convex
+optimization (Zinkevich, 2003) could give provably low
+regret results for any arbitrary sequence of queries. This
+avoids the i.i.d. assumption and could be especially appeal-
+ing in situations where the query distribution is expected to
+change over time.
+
+ 0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4Probability (Rescaled)Average ErrorYAM+ DatasetUniform SamplingRegularized ERM 0.0001 0.001 0.01 0.1 1 10 0.0001 0.001 0.01 0.1 1Expected Error’Sampling Rate’ = Budget / (Total Cost)YAM+ DatasetUniform SamplingRegularized ERMStratiﬁed Sampling Meets Machine Learning
+
+References
+Acharya, Swarup, Gibbons, Phillip B., and Poosala,
+Viswanath. Congressional samples for approximate an-
+swering of group-by queries. SIGMOD Rec., 29(2):487–
+498, May 2000. ISSN 0163-5808. doi: 10.1145/335191.
+335450. URL http://doi.acm.org/10.1145/
+335191.335450.
+
+Agarwal, Sameer, Mozafari, Barzan, Panda, Aurojit, Mil-
+ner, Henry, Madden, Samuel, and Stoica, Ion. Blinkdb:
+Queries with bounded errors and bounded response
+In Proceedings of the 8th
+times on very large data.
+ACM European Conference on Computer Systems, Eu-
+roSys ’13, pp. 29–42, New York, NY, USA, 2013.
+ACM.
+10.1145/
+2465351.2465355. URL http://doi.acm.org/
+10.1145/2465351.2465355.
+
+ISBN 978-1-4503-1994-2.
+
+doi:
+
+Agarwal, Sameer, Milner, Henry, Kleiner, Ariel, Talwalkar,
+Ameet, Jordan, Michael, Madden, Samuel, Mozafari,
+Barzan, and Stoica, Ion. Knowing when you’re wrong:
+Building fast and reliable approximate query processing
+systems. In Proceedings of the 2014 ACM SIGMOD In-
+ternational Conference on Management of Data, SIG-
+MOD ’14, pp. 481–492, New York, NY, USA, 2014.
+ACM.
+10.1145/
+2588555.2593667. URL http://doi.acm.org/
+10.1145/2588555.2593667.
+
+ISBN 978-1-4503-2376-5.
+
+doi:
+
+Bartlett, Peter L. and Mendelson, Shahar. Rademacher
+and gaussian complexities: Risk bounds and struc-
+tural results. J. Mach. Learn. Res., 3:463–482, March
+2003.
+ISSN 1532-4435. URL http://dl.acm.
+org/citation.cfm?id=944919.944944.
+
+Chaudhuri, Surajit, Das, Gautam, and Narasayya, Vivek.
+Optimized stratiﬁed sampling for approximate query
+processing. ACM Trans. Database Syst., 32(2), June
+2007.
+10.1145/1242524.
+1242526. URL http://doi.acm.org/10.1145/
+1242524.1242526.
+
+ISSN 0362-5915.
+
+doi:
+
+Cochran, William G. Sampling Techniques, 3rd Edition.
+
+John Wiley, 1977. ISBN 0-471-16240-X.
+
+database, DBLP XML. http://dblp.uni-trier.de/xml/.
+
+Hazan, Elad and Kale, Satyen.
+
+Beyond the regret
+minimization barrier: Optimal algorithms for stochas-
+J. Mach. Learn.
+tic strongly-convex optimization.
+Res., 15(1):2489–2512, January 2014.
+ISSN 1532-
+4435.
+URL http://dl.acm.org/citation.
+cfm?id=2627435.2670328.
+
+Hellerstein, Joseph M., Haas, Peter J., and Wang, He-
+len J. Online aggregation. SIGMOD Rec., 26(2):171–
+182, June 1997. ISSN 0163-5808. doi: 10.1145/253262.
+
+253291. URL http://doi.acm.org/10.1145/
+253262.253291.
+
+Joshi, Shantanu and Jermaine, Christopher. Robust strati-
+ﬁed sampling plans for low selectivity queries. In Pro-
+ceedings of the 2008 IEEE 24th International Confer-
+ence on Data Engineering, ICDE ’08, pp. 199–208,
+Washington, DC, USA, 2008. IEEE Computer Society.
+ISBN 978-1-4244-1836-7.
+doi: 10.1109/ICDE.2008.
+4497428. URL http://dx.doi.org/10.1109/
+ICDE.2008.4497428.
+
+Kearns, Michael J and Vazirani, Umesh Virkumar. An in-
+troduction to computational learning theory. MIT press,
+1994.
+
+Laptev, Nikolay, Zeng, Kai, and Zaniolo, Carlo. Early
+accurate results for advanced analytics on mapre-
+Proc. VLDB Endow., 5(10):1028–1039, June
+duce.
+2012.
+ISSN 2150-8097.
+doi: 10.14778/2336664.
+2336675. URL http://dx.doi.org/10.14778/
+2336664.2336675.
+
+Liberty, Edo, Mitzenmacher, Michael, Thaler, Justin, and
+Ullman, Jonathan. Space lower bounds for itemset fre-
+quency sketches. CoRR, abs/1407.3740, 2014. URL
+http://arxiv.org/abs/1407.3740.
+
+Neyman, Jerzy. On the two different aspects of the repre-
+sentative method: the method of stratiﬁed sampling and
+the method of purposive selection. Journal of the Royal
+Statistical Society, pp. 558–625, 1934.
+
+Olken, Frank. Random Sampling from Databases. PhD
+
+thesis, University of California at Berkeley, 1993.
+
+Olken, Frank and Rotem, Doron.
+
+Simple random
+In Proceedings
+sampling from relational databases.
+of the 12th International Conference on Very Large
+Data Bases, VLDB ’86, pp. 160–169, San Francisco,
+CA, USA, 1986. Morgan Kaufmann Publishers Inc.
+ISBN 0-934613-18-4. URL http://dl.acm.org/
+citation.cfm?id=645913.671474.
+
+Olken, Frank and Rotem, Doron. Random sampling from
+In Statistical and Scientiﬁc
+database ﬁles: A survey.
+Database Management, 5th International Conference
+SSDBM, Charlotte, NC, USA, April 3-5, 1990, Procced-
+ings, pp. 92–111, 1990. doi: 10.1007/3-540-52342-1
+23.
+
+Riondato, Matteo, Akdere, Mert,
+
+and Upfal, Eli.
+
+˜Aetintemel, UC¸§ur,
+Zdonik, StanleyB.,
+The vc-
+dimension of sql queries and selectivity estimation
+through sampling.
+In Gunopulos, Dimitrios, Hof-
+mann, Thomas, Malerba, Donato, and Vazirgiannis,
+Michalis (eds.), Machine Learning and Knowledge Dis-
+covery in Databases, volume 6912 of Lecture Notes
+
+Stratiﬁed Sampling Meets Machine Learning
+
+in Computer Science, pp. 661–676. Springer Berlin
+Heidelberg, 2011.
+doi:
+10.1007/978-3-642-23783-6 42. URL http://dx.
+doi.org/10.1007/978-3-642-23783-6_42.
+
+ISBN 978-3-642-23782-9.
+
+Shalev-Shwartz, Shai and Ben-David, Shai. Understanding
+Machine Learning: From Theory to Algorithms. Cam-
+bridge University Press, New York, NY, USA, 2014.
+ISBN 1107057132, 9781107057135.
+
+Valiant, L. G. A theory of the learnable. Commun. ACM, 27
+(11):1134–1142, November 1984. ISSN 0001-0782. doi:
+10.1145/1968.1972. URL http://doi.acm.org/
+10.1145/1968.1972.
+
+Yahoo. https://developer.yahoo.com/ﬂurry/.
+
+Zinkevich, Martin. Online convex programming and gener-
+alized inﬁnitesimal gradient ascent. In Machine Learn-
+ing, Proceedings of the Twentieth International Confer-
+ence (ICML 2003), August 21-24, 2003, Washington,
+DC, USA, pp. 928–936, 2003.
+
+

@@ -1,0 +1,1305 @@
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Abram L. Friesen
+Pedro Domingos
+Department of Computer Science and Engineering, University of Washington, Seattle, WA 98195 USA
+
+AFRIESEN@CS.WASHINGTON.EDU
+PEDROD@CS.WASHINGTON.EDU
+
+Abstract
+
+Inference in expressive probabilistic models is
+generally intractable, which makes them difﬁ-
+cult to learn and limits their applicability. Sum-
+product networks are a class of deep models
+where, surprisingly, inference remains tractable
+even when an arbitrary number of hidden layers
+are present. In this paper, we generalize this re-
+sult to a much broader set of learning problems:
+all those where inference consists of summing a
+function over a semiring. This includes satisﬁ-
+ability, constraint satisfaction, optimization, in-
+tegration, and others. In any semiring, for sum-
+mation to be tractable it sufﬁces that the factors
+of every product have disjoint scopes. This uni-
+ﬁes and extends many previous results in the lit-
+erature. Enforcing this condition at learning time
+thus ensures that the learned models are tractable.
+We illustrate the power and generality of this ap-
+proach by applying it to a new type of structured
+prediction problem: learning a nonconvex func-
+tion that can be globally optimized in polynomial
+time. We show empirically that this greatly out-
+performs the standard approach of learning with-
+out regard to the cost of optimization.
+
+1. Introduction
+Graphical models are a compact representation often used
+as a target for learning probabilistic models. Unfortunately,
+inference in them is exponential in their treewidth (Chan-
+drasekaran et al., 2008), a common measure of complex-
+ity. Further, since inference is a subroutine of learning,
+graphical models are hard to learn unless restricted to those
+with low treewidth (Bach & Jordan, 2001; Chechetka &
+Guestrin, 2007), but few real-world problems exhibit this
+property. Recent research, however, has shown that prob-
+abilistic models can in fact be much more expressive than
+this while remaining tractable (Domingos et al., 2014). In
+particular, sum-product networks (SPNs) (Gens & Domin-
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+gos, 2013; Poon & Domingos, 2011) are a class of deep
+probabilistic models that consist of many layers of hid-
+den variables and can have unbounded treewidth. Despite
+this, inference in SPNs is guaranteed to be tractable, and
+their structure and parameters can be effectively and accu-
+rately learned from data (Gens & Domingos, 2012; 2013;
+Rooshenas & Lowd, 2014).
+In this paper, we generalize and extend the ideas behind
+SPNs to enable learning tractable high-treewidth repre-
+sentations for a much wider class of problems, including
+satisﬁability, MAX-SAT, model counting, constraint sat-
+isfaction, marginal and MPE inference, integration, non-
+convex optimization, database querying, and ﬁrst-order
+probabilistic inference. The class of problems we ad-
+dress can be viewed as generalizing structured prediction
+beyond combinatorial optimization (Taskar et al., 2005),
+to include optimization for continuous models and oth-
+ers.
+Instead of approaching each domain individually,
+we build on a long line of work showing how, despite
+apparent differences, these problems in fact have much
+common structure (e.g., Bistarelli et al. (1997); Dechter
+(1999); Aji & McEliece (2000); Wilson (2005); Green
+et al. (2007); Dechter & Mateescu (2007); Bacchus et al.
+(2009)); namely, that each consists of summing a function
+over a semiring. For example, in the Boolean semiring the
+sum and product operations are disjunction and conjunc-
+tion, and deciding satisﬁability is summing a Boolean for-
+mula over all truth assignments. MPE inference is summa-
+tion over all states in the max-product semiring, etc.
+We begin by identifying and proving the sum-product the-
+orem, a unifying principle for tractable inference that states
+a simple sufﬁcient condition for summation to be tractable
+in any semiring: that the factors of every product have dis-
+joint scopes. In “ﬂat” representations like graphical models
+and conjunctive normal form, consisting of a single prod-
+uct of sums, this would allow only trivial models; but in
+deep representations like SPNs and negation normal form it
+provides remarkable ﬂexibility. Based on the sum-product
+theorem, we develop an algorithm for learning representa-
+tions that satisfy this condition, thus guaranteeing that the
+learned functions are tractable yet expressive. We demon-
+strate the power and generality of our approach by applying
+it to a new type of structured prediction problem: learning
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+a nonconvex function that can be optimized in polynomial
+time. Empirically, we show that this greatly outperforms
+the standard approach of learning a continuous function
+without regard to the cost of optimizing it. We also show
+that a number of existing and novel results are corollaries
+of the sum-product theorem, propose a general algorithm
+for inference in any semiring, deﬁne novel tractable classes
+of constraint satisfaction problems, integrable and optimiz-
+able functions, and database queries, and present a much
+simpler proof of the tractability of tractable Markov logic.
+2. The sum-product theorem
+We begin by introducing our notation and deﬁning several
+important concepts. We denote a vector of variables by
+X = (X1, . . . , Xn) and its value by x = (x1, . . . , xn)
+for xi ∈ Xi for all i, where Xi is the domain of Xi. We
+denote subsets (for simplicity, we treat tuples as sets) of
+variables as XA, Xa ⊆ X, where the domains XA,Xa are
+the Cartesian product of the domains of the variables in
+XA, Xa, respectively. We denote (partial) assignments as
+a ∈ XA and restrictions of these to XB ⊂ XA as aB. To
+indicate compatibility between a ∈ XA and c ∈ XC (i.e.,
+that aj = cj for all Xj ∈ XA ∩ XC), we write a ∼ c. The
+scope of a function is the set of variables it takes as input.
+Deﬁnition 1. A commutative semiring (R,⊕,⊗, 0, 1) is a
+nonempty set R on which the operations of sum (⊕) and
+product (⊗) are deﬁned and satisfy the following condi-
+tions: (i) (R,⊕) and (R,⊗) are associative and commu-
+tative, with identity elements 0, 1 ∈ R such that 0 (cid:54)= 1,
+a ⊕ 0 = a, and a ⊗ 1 = a for all a ∈ R; (ii) ⊗ distributes
+over ⊕, such that a ⊗ (b ⊕ c) = (a ⊗ b) ⊕ (a ⊗ c) for
+all a, b, c ∈ R; and (iii) 0 is absorbing for ⊗, such that
+a ⊗ 0 = 0 for all a ∈ R.
+
+We are interested in computing summations(cid:76)
+
+x∈X F (x),
+for (R,⊕,⊗, 0, 1) a commutative semiring and F : X →
+R a function on that semiring, with X a ﬁnite set (but see
+Section 5.4 for extensions to continuous variables). We re-
+fer to such a function as a sum-product function.
+Deﬁnition 2. A sum-product function (SPF) over (R,X,Φ),
+where R is a semiring, X is a set of variables, and Φ is a set
+of constant (φl ∈ R) and univariate functions (φl : Xj →
+R for Xj ∈ X), is any of the following: (i) a function
+φl ∈ Φ, (ii) a product of SPFs, or (iii) a sum of SPFs.
+An SPF S(X) computes a mapping S : X → R and can
+be represented by a rooted directed acyclic graph (DAG),
+where each leaf node is labeled with a function φl ∈ Φ and
+each non-leaf node is labeled with either ⊕ or ⊗ and re-
+ferred to as a sum or product node, respectively. Two SPFs
+are compatible iff they compute the same mapping; i.e.,
+S1(x) = S2(x) for all x ∈ X , where S1(X) and S2(X)
+are SPFs. The size of an SPF is the number of edges in the
+graph. The DAG rooted at each node v ∈ S represents a
+
+x∈X (ψ(x) ⊗(cid:78)n
+
+the trivial SPF F (X) =(cid:76)
+
+sub-SPF Sv : Xv → R for Xv ⊆ X. Notice that restricting
+the leaf functions φl to be univariate incurs no loss of gener-
+ality because any mapping ψ : X → R is compatible with
+i=1[Xi = xi]),
+where the indicator function [.] has value 1 when its argu-
+ment is true, and 0 otherwise (recall that 0 and 1 are the
+semiring identity elements). SPFs are similar to arithmetic
+circuits (Shpilka & Yehudayoff, 2010), but the leaves of an
+SPF are functions instead of variables. Darwiche (2003)
+used arithmetic circuits as a data structure to support infer-
+ence in Bayesian networks over discrete variables. An im-
+portant subclass of SPFs are those that are decomposable.
+Deﬁnition 3. A product node is decomposable iff the scopes
+of its children are disjoint. An SPF is decomposable iff all
+of its product nodes are decomposable.
+Decomposability is a simple condition that deﬁnes a class
+of functions for which inference is tractable.
+Theorem 1 (Sum-product theorem). Every decomposable
+SPF can be summed in time linear in its size.
+Proof. The proof is recursive, starting from the leaves of
+the SPF. Let S(X) be a decomposable SPF on commutative
+semiring (R,⊕,⊗, 0, 1). Every leaf node can be summed
+in constant time, because each is labeled with either a con-
+stant or univariate function. Now, let v ∈ S be a node, with
+Sv(Xv)
+its summation. Let {ci} be the children of v for ci ∈ S,
+with sub-SPFs Si(Xi) for Xi ⊆ Xv and summations Zi.
+Let Xv\i be the domain of variables Xv\Xi. If v is a sum
+Si(Xi) =
+
+Sv(Xv) the sub-SPF rooted at v and Zv = (cid:76)Xv
+node, then Zv =(cid:76)Xv
+(cid:76)Xv
+i Si(Xi) =(cid:76)
+i Zi ⊗ (cid:0)(cid:76)Xv\i
+(cid:76)Xi
+(cid:76)Xv\i
+(cid:76)
+= (cid:76)
+Xi ∩ Xj = ∅, and Zv = (cid:76)Xv
+(cid:78)
+(cid:76)Xv\1
+(cid:76)X1
+(cid:78)
+(cid:76)X1
+(cid:76)Xv\1
+(cid:78)m
+Si(Xi) = (cid:78)
+i=2 Si(Xi) = (cid:78)
+
+then any two children
+i, j ∈ {1, . . . , m} have disjoint scopes,
+i Si(Xi) =
+S1(X1) ⊗
+i Zi. The
+above equations only require associativity and commutativ-
+ity of ⊕ and associativity and distributivity of ⊗, which are
+properties of a semiring. Thus, any node can be summed
+over its domain in time linear in the number of its children,
+and S can be summed in time linear in its size.
+
+If v is a product node,
+ci, cj
+
+for
+
+(cid:76)Xi
+
+=
+
+i
+
+i
+
+Si(Xi)
+
+1(cid:1).
+
+We assume here that(cid:76)Xv\i
+
+1 can be computed in constant
+time and that each leaf function can be evaluated in con-
+stant time, which is true for all semirings considered. We
+also assume that a ⊕ b and a ⊗ b take constant time for any
+elements a, b of semiring R, which is true for most com-
+mon semirings. See the supplement1 for details.
+The complexity of summation in an SPF can be related to
+other notions of complexity, such as treewidth, the most
+common and relevant complexity measure across the do-
+mains we consider. To deﬁne the treewidth of an SPF, we
+
+1http://homes.cs.washington.edu/∼pedrod/papers/mlc16sp.pdf
+
+(cid:76)
+
+i
+
+i Si(Xi)
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+ﬁrst deﬁne junction trees (Lauritzen & Spiegelhalter, 1988;
+Aji & McEliece, 2000) and a related class of SPFs.
+Deﬁnition 4. A junction tree over variables X is a tuple
+(T, Q), where T is a rooted tree, Q is a set of subsets of
+variables, each vertex i ∈ T contains a subset of variables
+Ci ∈ Q such that ∪iCi = X, and for every pair of vertices
+i, j ∈ T and for all k ∈ T on the (unique) path from i to
+j, Ci ∩ Cj ⊆ Ck. The separator for an edge (i, j) ∈ T is
+deﬁned as Sij = Ci ∩ Cj.
+A junction tree provides a schematic for constructing a spe-
+ciﬁc type of decomposable SPF called a tree-like SPF (a
+semiring-generalized version of a construction from Dar-
+wiche (2003)). Note that a tree-like SPF is not a tree, how-
+ever, as many of its nodes have multiple parents.
+Deﬁnition 5. A tree-like SPF over variables X is con-
+structed from a junction tree T = (T, Q) and functions
+{ψi(Ci)} where Ci ∈ Q and i ∈ T , and contains the
+following nodes: (i) a node φvt with indicator φt(Xv) =
+[Xv = t] for each value t ∈ Xv of each variable Xv ∈ X;
+(ii) a (leaf) node ai with value ψi(ci) and a product node
+ci for each value ci ∈ XCi of each cluster Ci; (iii) a sum
+node sij for each value sij ∈ XSij of each separator Sij,
+and (iv) a single root sum node s.
+A product node cj and a sum node sij are compatible iff
+their corresponding values are compatible; i.e., cj ∼ sij.
+The nodes are connected as follows. The children of the
+root s are all product nodes cr for r the root of T . The
+children of product node cj are all compatible sum nodes
+sij for each child i of j, the constant node aj with value
+ψj(cj), and all indicator nodes φvt such that Xv ∈ Cj,
+t ∼ cj, and Xv /∈ Ck for k any node closer to the root of
+T than j. The children of sum node sij are the compatible
+product nodes ci of child i of j connected by separator Sij.
+If S is a tree-like SPF with junction tree (T, Q), then it
+is not difﬁcult to see both that S is decomposable, since
+the indicators for each variable all appear at the same
+level, and that each sum node sjk computes Ssjk (Sjk) =
+
+ψj(c)⊗[Cj = c]⊗(cid:0)(cid:78)
+(cid:76)
+the child of k. Further, S(x) =(cid:78)
+
+i∈Ch(j) Ssij (cSij )(cid:1),
+
+(c∈XCj )∼sjk
+
+where the indicator children of cj have been combined into
+[Cj = c], Ch(j) are the children of j, and i, j, k ∈ T with j
+i∈T ψi(xCi) for any x ∈
+X . Thus, tree-like SPFs provide a method for decomposing
+an SPF. For a tree-like SPF to be compatible with an SPF
+F , it cannot assert independencies that do not hold in F .
+Deﬁnition 6. Let F (U) be an SPF over variables U
+with pairwise-disjoint subsets X, Y, W ⊆ U. Then X
+and Y are conditionally independent in F given W iff
+F (X, Y, w) = F (X, w)⊗F (Y, w) for all w ∈ W, where
+
+F (X) =(cid:76)Y F (X, Y) for {X, Y} a partition of U.
+
+Similarly, a junction tree T = (T, Q) is incompatible with
+F if it asserts independencies that are not in F , where vari-
+
+ables X and Y are conditionally independent in T given
+W if W separates X from Y . A set of variables W sepa-
+rates X and Y in T iff after removing all vertices {i ∈ T :
+Ci ⊆ W} from T there is no pair of vertices i, j ∈ T such
+that X ∈ Ci, Y ∈ Cj, and i, j are connected.
+Inference complexity is commonly parameterized by
+treewidth, deﬁned for a junction tree T = (T, Q) as
+the size of the largest cluster minus one; i.e., tw(T ) =
+maxi∈T |Ci| − 1. The treewidth of an SPF S is the min-
+imum treewidth over all junction trees compatible with S.
+Notice that these deﬁnitions of junction tree and treewidth
+reduce to the standard ones (Kask et al., 2005).
+If the
+treewidth of S is bounded then inference in S is efﬁcient
+because there must exist a compatible tree-like SPF that
+has bounded treewidth. Note that the trivial junction tree
+with only a single cluster is compatible with every SPF.
+Corollary 1. Every SPF with bounded treewidth can be
+summed in time linear in the cardinality of its scope.
+Due to space limitations, all other proofs are provided in the
+supplement. For any SPF, tree-like SPFs are just one type
+of compatible SPF, one with size exponential in treewidth;
+however, there are many other compatible SPFs. In fact,
+there can be compatible (decomposable) SPFs that are ex-
+ponentially smaller than any compatible tree-like SPF.
+Corollary 2. Not every SPF that can be summed in time
+linear in the cardinality of its scope has bounded treewidth.
+Given existing work on tractable high-treewidth inference,
+it is perhaps surprising that the above results do not exist
+in the literature at this level of generality. Most relevant
+is the preliminary work of Kimmig et al. (2012), which
+proposes a semiring generalization of arithmetic circuits
+for knowledge compilation and does not address learning.
+Their main results show that summation of circuits that are
+both decomposable and either deterministic or based on
+an idempotent sum takes time linear in their size, whereas
+we show that decomposability alone is sufﬁcient, a much
+weaker condition. In fact, over the same set of variables,
+deterministic circuits may be exponentially larger and are
+never smaller than non-deterministic circuits (Darwiche &
+Marquis, 2002; Kimmig et al., 2012). We note that while
+decomposable circuits can be made deterministic by in-
+troducing hidden variables, this does not imply that these
+properties are equivalent.
+Even when restricted to speciﬁc semirings, such as those
+for logical and probabilistic inference (e.g., Darwiche
+(2001; 2003); Poon & Domingos (2011)), some of our re-
+sults have not previously been shown formally, although
+some have been foreshadowed informally. Further, exist-
+ing semiring-speciﬁc results (discussed further below) do
+not make it clear that the semiring properties are all that
+is required for tractable high-treewidth inference. Our re-
+sults are thus simpler and more general. Further, the sum-
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+product theorem provides the basis for general algorithms
+for inference in arbitrary SPFs (Section 3) and for learn-
+ing tractable high-treewidth representations (i.e., decom-
+posable SPFs) in any semiring (Section 4).
+3. Inference in non-decomposable SPFs
+Inference in arbitrary SPFs can be performed in a variety
+of ways, some more efﬁcient than others. We present an
+algorithm for summing an SPF that adapts to the structure
+of the SPF and can thus take exponentially less time
+than constructing and summing a compatible tree-like
+SPF (Bacchus et al., 2009), which imposes a uniform de-
+composition structure. SPF S with root node r is summed
+by calling SUMSPF(r), for which pseudocode is shown in
+Algorithm 1. SUMSPF is a simple recursive algorithm for
+summing an SPF (note the similarity between its structure
+and the proof of the sum-product theorem). If S is decom-
+posable, then SUMSPF simply recurses to the bottom of
+S, sums the leaf functions, and evaluates S in an upward
+pass.
+If S is not decomposable, SUMSPF decomposes
+each product node it encounters while summing S.
+Algorithm 1 Sum an SPF.
+Input: node v, the root of the sub-SPF Sv(Xv)
+Sv(v)
+
+Output: sum, which is equal to(cid:76)
+
+v∈Xv
+
+// Xv\c = Xv\Xc
+
+1
+
+if v is decomposable then
+
+if (cid:104)v, sum(cid:105) in cache then return sum
+if v is a sum node then
+
+c∈Ch(v) SUMSPF(c) ⊗(cid:76)Xv\c
+
+else if v is a product node then
+
+sum ←(cid:76)
+sum ←(cid:78)
+else sum ←(cid:76)
+
+1: function SUMSPF(v)
+2:
+3:
+4:
+5:
+6:
+7:
+8:
+9:
+10:
+11:
+12:
+13:
+14:
+
+else
+sum ← SUMSPF( DECOMPOSE(v) )
+else
+if v is a constant then sum ← a
+cache (cid:104)v, sum(cid:105)
+return sum
+
+φv(xj)
+
+xj∈Xj
+
+c∈Ch(v) SUMSPF(c)
+
+// v is a leaf with constant a or function φv
+
+Decomposition can be achieved in many different ways,
+but we base our method on a common algorithmic pattern
+that already occurs in many of the inference problems we
+consider, resulting in a general, semiring-independent algo-
+rithm for summing any SPF. DECOMPOSE, shown in Algo-
+rithm 2, chooses a variable Xt that appears in the scope of
+multiple of v’s children; creates |Xt| partially assigned and
+simpliﬁed copies Svi of the sub-SPF Sv for Xt assigned
+to each value xi ∈ Xt; multiplies each Svi by an indicator
+to ensure that only one is ever non-zero when S is evalu-
+ated; and then replaces v with a sum over {Svi}. Any node
+u ∈ Sv that does not have Xt in its scope is re-used across
+each Svi, which can drastically limit the amount of dupli-
+cation that occurs. Furthermore, each Svi is simpliﬁed by
+
+Algorithm 2 Decompose a product node.
+Input: product node v, with children {c}
+Output: node s, such that its children are decomposable
+
+with respect to Xt and Ss, Sv are compatible
+
+1: function DECOMPOSE(v)
+2: Xt ← choose var. that appears in multiple Xc
+3: Xv\t ← Xv\{Xt}
+s ← create new sum node
+4:
+for all xi ∈ Xt do
+5:
+create simpliﬁed Svi(Xv\t) ← Sv(Xv\t, xi)
+6:
+set vi as child of s
+7:
+set f (Xt) = [Xt = xi] as child of vi
+8:
+9:
+10:
+11:
+
+set s as a child of each of v’s parents
+remove v and all edges containing v
+return s
+
+// vi is the root of Svi
+
+removing any nodes that became 0 when setting Xt = xi.
+Variables are chosen heuristically; a good heuristic min-
+imizes the amount of duplication that occurs. Similarly,
+SUMSPF heuristically orders the children in lines 4 and 7.
+A good ordering will ﬁrst evaluate children that may return
+an absorbing value (e.g., 0 for ⊗) because SUMSPF can
+break out of these lines if this occurs. In general, decom-
+posing an SPF is hard, and the resulting decomposed SPF
+may be exponentially larger than the input SPF, although
+good heuristics can often avoid this. Many extensions to
+SUMSPF are also possible, some of which we detail in later
+sections. Understanding inference in non-decomposable
+SPFs is important for future work on extending SPF learn-
+ing to even more challenging classes of functions, particu-
+larly those without obvious decomposability structure.
+4. Learning tractable representations
+Instead of performing inference in an intractable model,
+it can often be simpler to learn a tractable representation
+directly from data (e.g., Bach & Jordan (2001); Gens &
+Domingos (2013)). The general problem we consider is
+that of learning a decomposable SPF S : X → R on
+a semiring (R,⊕,⊗, 0, 1) from a set of i.i.d.
+instances
+T = {(x(i), y(i))} drawn from a ﬁxed distribution DX×R,
+
+where y(i) =(cid:76)Z F (x(i), Z), F is some (unknown) SPF,
+learning, (cid:76)X S(X) can be computed efﬁciently.
+
+and Z is a (possibly empty) set of unobserved variables
+or parameters, such that S(x(i)) ≈ y(i), for all i. After
+In the
+sum-product semiring, this corresponds to summation (or
+integration), for which estimation of a joint probability dis-
+tribution over X is a special case.
+For certain problems, such as constraint satisfaction or
+MPE inference, the desired quantity is the argument of the
+sum. This can be recovered (if meaningful in the current
+semiring) from an SPF by a single downward pass that re-
+cursively selects all children of a product node and the (or
+a) active child of a sum node (e.g., the child with the small-
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Algorithm 3 Learn a decomposable SPF from data.
+Input: a dataset T = {(x(i), y(i))} over variables X
+Input: integer thresholds t, v > 0
+Output: S(X), an SPF over the input variables X
+1: function LEARNSPF(T, X)
+if |T| ≤ t or |X| ≤ v then
+2:
+estimate S(X) such that S(x(i)) ≈ y(i) for all i
+3:
+else
+4:
+decompose X into disjoint subsets {Xi}
+5:
+if |{Xi}| > 1 then
+6:
+7:
+8:
+9:
+10:
+11:
+
+else
+cluster T into subsets of similar instances {Tj}
+
+S(X) ←(cid:78)
+S(X) ←(cid:76)
+
+i LEARNSPF(T, Xi)
+
+return S(X)
+
+j LEARNSPF(Tj, X)
+
+est value if minimizing). Learning for this domain corre-
+sponds to a generalization of learning for structured predic-
+tion (Taskar et al., 2005). Formally, the problem is to learn
+an SPF S from instances T = {(x(i), y(i))}, where y(i) =
+arg⊕y∈Y F (x(i), y), such that arg⊕y∈Y S(x(i), y) ≈
+y(i), for all i. Here, x(i) can be an arbitrarily structured in-
+put and inference is over the variables Y. Both of the above
+learning problems can be solved by the algorithm schema
+we present, with minor differences in the subroutines.
+We focus here on the former but discuss the latter below,
+alongside experiments on learning nonconvex functions
+that, by construction, can be efﬁciently optimized.
+As shown by the sum-product theorem, the key to tractable
+inference is to identify the decomposability structure of an
+SPF. The difﬁculty, however, is that in general this structure
+varies throughout the space. For example, as a protein folds
+there exist conformations of the protein in which two par-
+ticular amino acids are energetically independent (decom-
+posable), and other conformations in which these amino
+acids directly interact, but in which other amino acids may
+no longer interact. This suggests a simple algorithm, which
+we call LEARNSPF (shown in Algorithm 3), that ﬁrst tries
+to identify a decomposable partition of the variables and,
+if successful, recurses on each subset of variables in order
+to ﬁnd ﬁner-grained decomposability. Otherwise, LEARN-
+SPF clusters the training instances, grouping those with
+analogous decomposition structure, and recurses on each
+cluster. Once either the set of variables is small enough to
+be summed over (in practice, unary leaf nodes are rarely
+necessary) or the number of instances is too small to con-
+tain meaningful statistical information, LEARNSPF simply
+estimates an SPF S(X) such that S(x(i)) ≈ y(i) for all i
+in the current set of instances. LEARNSPF is a generaliza-
+tion of LearnSPN (Gens & Domingos, 2013), a simple but
+effective SPN structure learning algorithm.
+LEARNSPF is actually an algorithm schema that can be
+instantiated with different variable partitioning, cluster-
+
+variables X such that (cid:76)X S(X) ≈ ((cid:76)X1
+((cid:76)X2
+
+ing, and leaf creation subroutines for different semir-
+ings and problems. To successfully decompose the vari-
+ables, LEARNSPF must ﬁnd a partition {X1, X2} of the
+S1(X1)) ⊗
+S2(X2)). We refer to this as approximate decom-
+posability. In probabilistic inference, mutual information
+or pairwise independence tests can be used to determine
+decomposability (Gens & Domingos, 2013). For our ex-
+periments, decomposable partitions correspond to the con-
+nected components of a graph over the variables in which
+correlated variables are connected. Instances can be clus-
+tered by virtually any clustering algorithm, such as a naive
+Bayes mixture model or k-means, which we use in our ex-
+periments. Instances can also be split by conditioning on
+speciﬁc values of the variables, as in SUMSPF or in a deci-
+sion tree. Similarly, leaf functions can be estimated using
+any appropriate learning algorithm, such as linear regres-
+sion or kernel density estimation.
+In Section 6, we present preliminary experiments on learn-
+ing nonconvex functions that can be globally optimized
+in polynomial time. However, this is just one particular
+application of LEARNSPF, which can be used to learn a
+tractable representation for any problem that consists of
+summation over a semiring. In the following section, we
+brieﬂy discuss common inference problems that corre-
+spond to summing an SPF on a speciﬁc semiring. For each,
+we demonstrate the beneﬁt of the sum-product theorem,
+relate its core algorithms to SUMSPF, and specify the
+problem solved by LEARNSPF. Additional details and
+semirings can be found in the supplement. Table 1 provides
+a summary of some of the relevant inference problems.
+5. Applications to speciﬁc semirings
+5.1. Logical inference
+Consider the Boolean semiring B = (B,∨,∧, 0, 1), where
+B = {0, 1}, ∨ is logical disjunction (OR), and ∧ is log-
+ical conjunction (AND). If each variable is Boolean and
+leaf functions are literals (i.e., each φl(Xj) is Xj or ¬Xj,
+where ¬ is logical negation), then SPFs on B correspond
+exactly to negation normal form (NNF), a DAG-based rep-
+resentation of a propositional formula (sentence) (Barwise,
+1982). An NNF can be exponentially smaller than the same
+sentence in a standard (ﬂat) representation such as con-
+junctive or disjunctive normal form (CNF or DNF), and
+is never larger (Darwiche & Marquis, 2002). Summation
+
+of an NNF F (X) on B is(cid:87)X F (X), which corresponds
+
+to propositional satisﬁability (SAT): the problem of deter-
+mining if there exists a satisfying assignment for F . Thus,
+the tractability of SAT for decomposable NNFs follows di-
+rectly from the sum-product theorem.
+Corollary 3 (Darwiche, 2001). The satisﬁability of a de-
+composable NNF is decidable in time linear in its size.
+Satisﬁability of an arbitrary NNF can be determined either
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Table 1. Some of the inference problems that correspond to summing an SPF on a speciﬁc semiring, with details on the variables and leaf
+functions and a core algorithm that is an instance of SUMSPF. B = {0, 1}. N and R denote the natural and real numbers. Subscript +
+denotes the restriction to non-negative numbers and subscript (−)∞ denotes the inclusion of (negative) ∞. Um denotes the universe of
+relations of arity up to m (see Section E of the supplement). N[X] denotes the polynomials with coefﬁcients from N. See the supplement
+for information on MPE-SAT (Sang et al., 2007) and Generic-Join (Ngo et al., 2014).
+
+Domain
+Logical
+inference
+
+Constraint
+satisfaction
+
+Probabilistic
+inference
+Continuous
+functions
+Relational
+databases
+
+Inference task
+SAT
+#SAT
+MAX-SAT
+CSPs
+Fuzzy CSPs
+Weighted CSPs
+Marginal
+MPE
+Integration
+Optimization
+Unions of CQs
+Provenance
+
+Semiring
+Variables
+(B,∨,∧, 0, 1)
+Boolean
+(N, +,×, 0, 1)
+Boolean
+(N−∞, max, +,−∞, 0) Boolean
+(B,∨,∧, 0, 1)
+Discrete
+Discrete
+([0, 1], max, min, 0, 1)
+(R+,∞, min, +,∞, 0)
+Discrete
+(R+, +,×, 0, 1)
+Discrete
+(R+, max,×, 0, 1)
+Discrete
+(R+, +,×, 0, 1)
+Continuous
+(R∞, min, +,∞, 0)
+Continuous
+(Um,∪, (cid:46)(cid:47), ∅, 1R)
+Sets of tuples Unary tuples
+(N[X], +,×, 0, 1)
+Discrete
+
+Leaf functions
+Literals
+Literals
+Literals
+Univariate constraints
+Univariate constraints
+Univariate constraints
+Potentials
+Potentials
+Univariate functions
+Univariate functions
+
+K-relation tuples
+
+SUMSPF
+DPLL
+#DPLL
+MPE-SAT
+Backtracking
+
+-
+-
+
+Recursive
+conditioning
+
+-
+RDIS
+Generic-Join
+
+by decomposing the NNF or by expanding it to a CNF and
+using a SAT solver. DPLL (Davis et al., 1962), the stan-
+dard algorithm for solving SAT, is an instance of SUMSPF
+(see also Huang & Darwiche (2007)). Speciﬁcally, DPLL
+is a recursive algorithm that at each level chooses a variable
+X ∈ X for CNF F (X) and computes F = F|X=0∨F|X=1
+by recursing on each disjunct, where F|X=x is F with X
+assigned value x. Thus, each level of recursion of DPLL
+corresponds to a call to DECOMPOSE.
+Learning in the Boolean semiring is a well-studied area,
+which includes problems from learning Boolean cir-
+cuits (Jukna, 2012) (of which decomposable SPFs are a
+restricted subclass, known as syntactically multilinear cir-
+cuits) to learning sets of rules (Rivest, 1987). However,
+learned rule sets are typically encoded in large CNF knowl-
+edge bases, making reasoning over them intractable.
+In
+contrast, decomposable NNF is a tractable but expressive
+formalism for knowledge representation that supports a
+rich class of polynomial-time logical operations, including
+SAT (Darwiche, 2001). Thus, LEARNSPF in this semiring
+provides a method for learning large, complex knowledge
+bases that are encoded in decomposable NNF and there-
+fore support efﬁcient querying, which could greatly beneﬁt
+existing rule learning systems.
+5.2. Constraint satisfaction.
+A constraint satisfaction problem (CSP) consists of a
+set of constraints {Ci} on variables X, where each
+constraint Ci(Xi)
+assign-
+Solving a CSP consists of
+ments to its variables.
+ﬁnding an assignment
+to X that satisﬁes each con-
+: Xi → B
+straint. When constraints are functions Ci
+then
+that are 1 when Ci
+
+is satisﬁed and 0 otherwise,
+
+satisfying
+
+speciﬁes
+
+the
+
+i
+
+i
+
+-
+
+xi∈Xi
+
+xi∈Xi
+Xt∈Xi
+
+(cid:0)Ci(xi) ∧ [Xi =
+F (X) = (cid:86)
+i Ci(Xi) = (cid:86)
+(cid:87)
+[Xt = xit](cid:1) is a
+(cid:0)Ci(xi) ∧(cid:86)
+xi](cid:1) = (cid:86)
+(cid:87)
+Solving F corresponds to computing(cid:87)X F (X), which is
+
+CSP and F is an SPF on the Boolean semiring B, i.e., an
+OR-AND network (OAN), a generalization of NNF, and
+a decomposable CSP is one with a decomposable OAN.
+summation on B (see also Bistarelli et al. (1997); Chang &
+Mackworth (2005); Rollon et al. (2013)). The solution for
+F can be recovered with a downward pass that recursively
+selects the (or a) non-zero child of an OR node, and all chil-
+dren of an AND node. Corollary 4 follows immediately.
+Corollary 4. Every decomposable CSP can be solved in
+time linear in its size.
+Thus, for inference to be efﬁcient it sufﬁces that the CSP
+be expressible by a tractably-sized decomposable OAN;
+a much weaker condition than that of low treewidth.
+Like DPLL, backtracking-based search algorithms (Kumar,
+1992) for CSPs are also instances of SUMSPF (see also
+Mateescu & Dechter (2005)). Further, SPFs on a number of
+other semirings correspond to various extensions of CSPs,
+including fuzzy, probabilistic, and weighted CSPs (see Ta-
+ble 1 and Bistarelli et al. (1997)).
+LEARNSPF for CSPs addresses a variant of structured
+prediction (Taskar et al., 2005); speciﬁcally, learning a
+y F (x(i), y) ≈ y(i)
+for training data {(x(i), y(i))}, where x(i) is a structured
+object representing a CSP and y(i) is its solution. LEARN-
+SPF solves this problem while guaranteeing that
+the
+learned CSP remains tractable. This is a much simpler and
+more attractive approach than existing constraint learning
+methods such as Lallouet et al. (2010), which uses induc-
+tive logic programming and has no tractability guarantees.
+
+function F : X → B such that arg(cid:87)
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Xj
+
+(cid:81)
+
+P (e) =(cid:80)XE
+
+5.3. Probabilistic inference
+Many probability distributions can be compactly repre-
+i ψi(Xi), where
+sented as graphical models: P (X) = 1
+ψi is a potential over variables Xi ⊆ X and Z is known
+Z
+as the partition function (Pearl, 1988). One of the main
+inference problems in graphical models is to compute the
+probability of evidence e ∈ XE for variables XE ⊆ X,
+P (e, XE), where XE = X\XE. The par-
+tition function Z is the unnormalized probability of empty
+evidence (XE = ∅). Unfortunately, computing Z or P (e)
+is generally intractable. Building on a number of earlier
+works (Darwiche, 2003; Dechter & Mateescu, 2007; Bac-
+chus et al., 2009), Poon & Domingos (2011) introduced
+sum-product networks (SPNs), a class of distributions in
+which inference is guaranteed to be tractable. An SPN
+is an SPF on the non-negative real sum-product semiring
+(R+, +,×, 0, 1). A graphical model is a ﬂat SPN, in the
+same way that a CNF is a ﬂat NNF (Darwiche & Marquis,
+2002). For an SPN S, the unnormalized probability of evi-
+dence e ∈ XE for variables XE is computed by replacing
+each leaf function φl ∈ {φl(Xj) ∈ S|Xj ∈ XE} with
+the constant φl(ej) and summing the SPN. The corollary
+below follows immediately from the sum-product theorem.
+Corollary 5. The probability of evidence in a decompos-
+able SPN can be computed in time linear in its size.
+A similar result (shown in the supplement) for ﬁnding the
+most probable state of the non-evidence variables also fol-
+lows from the sum-product theorem. One important conse-
+quence of the sum-product theorem is that decomposability
+is the sole condition required for an SPN to be tractable;
+previously, completeness was also required (Poon &
+Domingos, 2011; Gens & Domingos, 2013). This expands
+the range of tractable SPNs and simpliﬁes the design of
+tractable representations based on them, such as tractable
+probabilistic knowledge bases (Domingos & Webb, 2012).
+Most existing algorithms for inference in graphical mod-
+els correspond to different methods of decomposing a ﬂat
+SPN, and can be loosely clustered into tree-based, condi-
+tioning, and compilation methods, all of which SUMSPF
+generalizes. Details are provided in the supplement.
+LEARNSPF for SPNs corresponds to learning a probabil-
+ity distribution from a set of samples {(x(i), y(i))}. Note
+that y(i) in this case is deﬁned implicitly by the empiri-
+cal frequency of x(i) in the dataset. Learning the param-
+eters and structure of SPNs is a fast-growing area of re-
+search (e.g., Gens & Domingos (2013); Rooshenas & Lowd
+(2014); Peharz et al. (2014); Adel et al. (2015)), and we re-
+fer readers to these references for more details.
+5.4. Integration and optimization
+SPFs can be generalized to continuous (real) domains,
+where each variable Xi has domain Xi ⊆ R and the semir-
+ing set is a subset of R∞. For the sum-product theo-
+
+···(cid:82)
+
+Xn
+
+Xv\c
+
+(cid:76)
+functions, and (C2)(cid:76)Xv\c
+
+X S(X)dµ = (cid:82)
+(cid:82)
+1 = (cid:82)
+(cid:76)Xv\c
+(cid:81){j:Xj∈Xv\c} dµj. We thus assume that either µv\c has
+
+rem to hold, the only additional conditions are that (C1)
+φl(Xj) is computable in constant time for all leaf
+1 (cid:54)= ∞ for all sum nodes v ∈ S
+and all children c ∈ Ch(v), where Xv\c is the domain of
+Xv\c = Xv\Xc.
+Integration. In the non-negative real sum-product semir-
+ing (R+, +,×, 0, 1), summation of an SPF with contin-
+uous variables corresponds to integration over X . Ac-
+cordingly, we generalize SPFs as follows. Let µ1, . . . , µn
+be measures over X1, . . . ,Xn, respectively, where each
+: Xj → R+ is integrable with re-
+leaf function φl
+spect to µj, which satisﬁes (C1). Summation (integra-
+tion) of an SPF S(X) then corresponds to computing
+S(X)dµ1 ··· dµn. For (C2),
+X1
+1 dµv\c must be integrable for all sum
+nodes v ∈ S and all children c ∈ Ch(v), where dµv\c =
+ﬁnite support over Xv\c or that Xv\c = ∅. Corollary 6
+follows immediately.
+Corollary 6. Every decomposable SPF of real variables
+can be integrated in time linear in its size.
+Thus, decomposable SPFs deﬁne a class of functions for
+which exact integration is tractable. SUMSPF deﬁnes a
+novel algorithm for (approximate) integration that is based
+on recursive problem decomposition, and can be exponen-
+tially more efﬁcient than standard integration algorithms
+such as trapezoidal or Monte Carlo methods (Press et al.,
+2007) because it dynamically decomposes the problem at
+each recursion level and caches intermediate computations.
+More detail is provided in the supplement.
+In this semiring, LEARNSPF learns a decomposable con-
+tinuous SPF S : X → R+ on samples {(x(i), y(i) =
+F (x(i)))} from an SPF F : X → R+, where S can be
+integrated efﬁciently over the domain X . Thus, LEARN-
+SPF provides a novel method for learning and integrating
+complex functions, such as the partition function of contin-
+uous probability distributions.
+Nonconvex optimization. Summing a continuous SPF
+in one of the min-sum, min-product, max-sum, or max-
+product semirings corresponds to optimizing a (potentially
+nonconvex) continuous objective function. Our results
+hold for all of these, but we focus here on the real min-
+sum semiring (R∞, min, +,∞, 0), where summation of a
+min-sum function (MSF) F (X) corresponds to computing
+minX F (X). A ﬂat MSF is simply a sum of terms. To sat-
+isfy (C1), we assume that minxj∈Xj φl(xj) is computable
+in constant time for all φl ∈ F . (C2) is trivially satisﬁed
+for min. The corollary below follows immediately.
+Corollary 7. The global minimum of a decomposable MSF
+can be found in time linear in its size.
+SUMSPF provides an outline for a general nonconvex
+optimization algorithm for sum-of-terms (or product-of-
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+factors) functions. The recent RDIS algorithm for non-
+convex optimization (Friesen & Domingos, 2015), which
+achieves exponential speedups compared to other algo-
+rithms, is an instance of SUMSPF where values are chosen
+via multi-start gradient descent and variables in DECOM-
+POSE are chosen by graph partitioning. Friesen & Domin-
+gos (2015), however, do not specify tractability conditions
+for the optimization; thus, Corollary 7 deﬁnes a novel class
+of functions that can be efﬁciently globally optimized.
+For nonconvex optimization, LEARNSPF solves a variant
+of structured prediction (Taskar et al., 2005), in which the
+variables to predict are continuous instead of discrete (e.g.,
+protein folding, structure from motion (Friesen & Domin-
+gos, 2015)). The training data is a set {(x(i), y(i))}, where
+x(i) is a structured object representing a nonconvex func-
+tion and y(i) is a vector of values specifying the global
+minimum of that function. LEARNSPF learns a function
+S : X ×Y → R∞ such that arg miny∈Y S(x(i), y) ≈ y(i),
+where the arg min can be computed efﬁciently because S
+is decomposable. More detail is provided in Section 6.
+6. Experiments
+We evaluated LEARNSPF on the task of learning a noncon-
+vex decomposable min-sum function (MSF) from a train-
+ing set of solutions of instances of a highly-multimodal
+test function consisting of a sum of terms. By learning an
+MSF, instead of just a sum of terms, we learn the general
+mathematical form of the optimization problem in such a
+way that the resulting learned problem is tractable, whereas
+the original sum of terms is not. The test function we
+learn from is a variant of the Rastrigin function (Torn &
+Zilinskas, 1989), a standard highly-multimodal test func-
+tion for global optimization consisting of a sum of multi-
+dimensional sinusoids in quadratic basins. The function,
+FX(Y) = F (Y; X), has parameters X, which determine
+the dependencies between the variables Y and the location
+of the minima. To test LEARNSPF, we sampled a dataset
+of function instances T = {(x(i), y(i))}m
+i=1 from a distri-
+bution over X × Y, where y(i) = arg miny∈Y Fx(i)(y).
+LEARNSPF partitioned variables Y based on the con-
+nected components of a graph containing a node for each
+Yi ∈ Y and an edge between two nodes only if Yi and
+Yj were correlated, as measured by Spearman rank corre-
+lation. Instances were clustered by running k-means on the
+values y(i). For this preliminary test, LEARNSPF did not
+learn the leaf functions of the learned min-sum function
+(MSF) M (Y); instead, when evaluating or minimizing a
+leaf node in M, we evaluated or minimized the test func-
+tion with all variables not in the scope of the leaf node ﬁxed
+to 0 (none of the optima were positioned at 0). This corre-
+sponds to having perfectly learned leaf nodes if the scopes
+of the leaf nodes accurately reﬂect the decomposability of
+F , otherwise a large error is incurred. We did this to study
+
+Figure 1. The average minimum found over 20 samples of the
+test function versus the number of variables, with standard error
+bars. Each function was optimized for the same amount of time.
+
+the effect of learning the decomposability structure in isola-
+tion from the error due to learning leaf nodes. The function
+used for comparison is also perfectly learned. Thresholds t
+and v were set to 30 and 2, respectively.
+The dataset was split into 300 training samples and 50 test
+samples, where minY Fx(i)(Y) = 0 for all i for com-
+parison purposes. After training, we computed yM =
+arg minY M (Y) for each function in the test set by ﬁrst
+minimizing each leaf function (with respect to only those
+variables in the scope of the leaf function) with multi-start
+L-BFGS (Liu & Nocedal, 1989) and then performing an
+upward and a downward pass in M. Figure 1 shows the re-
+sult of minimizing the learned MSF M and evaluating the
+test function at yM (blue line) compared to running multi-
+start L-BFGS directly on the test function and reporting the
+minimum found (red line), where both optimizations are
+run for the same ﬁxed amount of time (one minute per test
+sample). LEARNSPF accurately learned the decomposition
+structure of the test function, allowing it to ﬁnd much bet-
+ter minima when optimized, since optimizing many small
+functions at the leaves requires exploring exponentially
+fewer modes than optimizing the full function. Additional
+experimental details are provided in the supplement.
+7. Conclusion
+This paper developed a novel foundation for learning
+tractable representations in any semiring based on the sum-
+product theorem, a simple tractability condition for all in-
+ference problems that reduce to summation on a semiring.
+With it, we developed a general inference algorithm and
+an algorithm for learning tractable representations in any
+semiring. We demonstrated the power and generality of
+our approach by applying it to learning a nonconvex func-
+tion that can be optimized in polynomial time, a new type
+of structured prediction problem. We showed empirically
+that our learned function greatly outperforms a continuous
+function learned without regard to the cost of optimizing
+it. We also showed that the sum-product theorem speciﬁes
+an exponentially weaker condition for tractability than low
+treewidth and that its corollaries include many previous re-
+sults in the literature, as well as a number of novel results.
+
+Number of variables050100150200Avg. minimum found0200400Learned MSF with multistart L-BFGSMultistart L-BFGSThe Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Acknowledgments
+This research was partly funded by ONR grants N00014-
+13-1-0720 and N00014-12-1-0312, and AFRL contract
+FA8750-13-2-0019. The views and conclusions contained
+in this document are those of the authors and should not be
+interpreted as necessarily representing the ofﬁcial policies,
+either expressed or implied, of ONR, AFRL, or the United
+States Government.
+References
+Adel, T., Balduzzi, D., and Ghodsi, A. Learning the struc-
+ture of sum-product networks via an SVD-based algo-
+rithm. In Proceedings of the 31st Conference on Uncer-
+tainty in Artiﬁcial Intelligence, pp. 32–41, 2015.
+
+Aji, S. M. and McEliece, R. J. The generalized distributive
+law. IEEE Transactions on Information Theory, 46:325–
+343, 2000.
+
+Bacchus, F., Dalmao, S., and Pitassi, T. Solving #SAT and
+Bayesian inference with backtracking search. Journal of
+Artiﬁcial Intelligence Research, 34:391–442, 2009.
+
+Bach, F. and Jordan, M. I. Thin junction trees. In Advances
+in Neural Information Processing Systems, pp. 569–576,
+2001.
+
+Barwise, J. Handbook of mathematical logic. Elsevier,
+
+1982.
+
+Bistarelli, S., Montanari, U., and Rossi, F. Semiring-based
+constraint satisfaction and optimization. Journal of the
+ACM, 44:201–236, 1997.
+
+Darwiche, A. A differential approach to inference in
+Bayesian networks. Journal of the ACM, 50:280–305,
+2003.
+
+Davis, M., Logemann, G., and Loveland, D. A machine
+program for theorem-proving. Communications of the
+ACM, 5:394–397, 1962.
+
+Dechter, R. Bucket elimination: A unifying framework for
+
+reasoning. Artiﬁcial Intelligence, 113:41–85, 1999.
+
+Dechter, R. and Mateescu, R. AND/OR search spaces for
+graphical models. Artiﬁcial intelligence, 171:73–106,
+2007.
+
+Domingos, P. and Webb, W. A. A tractable ﬁrst-order prob-
+abilistic logic. In Proceedings of the 26th Conference on
+Artiﬁcial Intelligence, pp. 1902–1909, 2012.
+
+Domingos, P., Niepert, M., and Lowd, D. (eds.). Proceed-
+ings of the ICML-14 Workshop on Learning Tractable
+Probabilistic Models. ACM, 2014.
+
+Friesen, A. L. and Domingos, P. Recursive Decomposition
+for Nonconvex Optimization. In Proceedings of the 24th
+International Joint Conference on Artiﬁcial Intelligence,
+pp. 253–259, 2015.
+
+Gens, R. and Domingos, P. Discriminative learning of sum-
+In Advances in Neural Information
+
+product networks.
+Processing Systems, pp. 3239–3247, 2012.
+
+Gens, R. and Domingos, P. Learning the structure of sum-
+product networks. In Proceedings of the 30th Interna-
+tional Conference on Machine Learning, pp. 873–880,
+2013.
+
+Chandrasekaran, V., Srebro, N., and Harsha, P. Complex-
+ity of inference in graphical models. In Proceedings of
+the 24th Conference on Uncertainty in Artiﬁcial Intelli-
+gence, pp. 70–78, 2008.
+
+Green, T., Karvounarakis, G., and Tannen, V. Provenance
+semirings. In Proceedings of the 26th ACM SIGMOD-
+SIGACT-SIGART symposium on Principles of Database
+Systems, pp. 31–40. ACM Press, 2007.
+
+Chang, L. and Mackworth, A. K. A generalization of gen-
+eralized arc consistency: From constraint satisfaction to
+constraint-based inference. In Proceedings of the IJCAI-
+05 Workshop on Modeling and Solving Problems with
+Constraints, 2005.
+
+Chechetka, A. and Guestrin, C. Efﬁcient principled learn-
+ing of thin junction trees. In Advances in Neural Infor-
+mation Processing Systems, pp. 273–280, 2007.
+
+Huang, J. and Darwiche, A. The language of search.
+Journal of Artiﬁcial Intelligence Research, 29:191–219,
+2007.
+
+Jukna, S. Boolean Function Complexity. Springer Berlin
+
+Heidelberg, 2012.
+
+Kask, K., Dechter, R., Larrosa, J., and Dechter, A. Unify-
+ing tree decompositions for reasoning in graphical mod-
+els. Artiﬁcial Intelligence, 166:165–193, 2005.
+
+Darwiche, A. and Marquis, P. A knowledge compilation
+Journal of Artiﬁcial Intelligence Research, 17:
+
+map.
+229–264, 2002.
+
+Kimmig, A., Van Den Broeck, G., and De Raedt, L. Alge-
+braic model counting. arXiv preprint arXiv:1211.4475,
+2012.
+
+Darwiche, A. Decomposable negation normal form. Jour-
+
+nal of the ACM, 48:608–647, 2001.
+
+Kumar, V. Algorithms for constraint-satisfaction problems:
+
+A survey. AI Magazine, 13:32–44, 1992.
+
+The Sum-Product Theorem: A Foundation for Learning Tractable Models
+
+Lallouet, A., Lopez, M., Martin, L., and Vrain, C. On
+learning constraint problems. Proceedings of the Inter-
+national Conference on Tools with Artiﬁcial Intelligence,
+1:45–52, 2010.
+
+Shpilka, A. and Yehudayoff, A. Arithmetic circuits: A
+survey of recent results and open questions. Founda-
+tions and Trends in Theoretical Computer Science, 5:
+207–388, 2010.
+
+Lauritzen, S. L. and Spiegelhalter, D. J. Local computa-
+tions with probabilities on graphical structures and their
+application to expert systems. Journal of the Royal Sta-
+tistical Society, 50(2):157–224, 1988.
+
+Taskar, B., Chatalbashev, V., Koller, D., and Guestrin, C.
+Learning structured prediction models: A large margin
+approach. In Proceedings of the 22nd International Con-
+ference on Machine Learning, pp. 896–903, 2005.
+
+Torn, A. and Zilinskas, A. Global Optimization. Springer-
+
+Verlag, 1989.
+
+Wilson, N. Decision diagrams for the computation of
+In Proceedings of the 19th Inter-
+semiring valuations.
+national Joint Conference on Artiﬁcial Intelligence, pp.
+331–336, 2005.
+
+Liu, D. C. and Nocedal, J. On the limited memory BFGS
+method for large scale optimization. Mathematical Pro-
+gramming, 45:503–528, 1989.
+
+Mateescu, R. and Dechter, R. The relationship between
+AND/OR search spaces and variable elimination. In Pro-
+ceedings of the 21st Conference on Uncertainty in Arti-
+ﬁcial Intelligence, pp. 380–387, 2005.
+
+Ngo, H. Q., R´e, C., and Rudra, A. Skew strikes back. ACM
+
+SIGMOD Record, 42(4):5–16, 2014.
+
+Pearl, J. Probabilistic Reasoning in Intelligent Systems.
+
+Morgan Kauffmann, San Mateo, CA, 1988.
+
+Peharz, R., Gens, R., and Domingos, P. Learning selective
+sum-product networks. In Proceedings of the ICML-14
+Workshop on Learning Tractable Probabilistic Models,
+2014.
+
+Poon, H. and Domingos, P. Sum-product networks: A new
+deep architecture. In Proceedings of the 27th Conference
+on Uncertainty in Artiﬁcial Intelligence, pp. 337–346.
+AUAI Press, 2011.
+
+Press, W. H., Teukolsky, S. A., Vetterling, W. T., and Flan-
+nery, B. P. Numerical Recipes: The Art of Scientiﬁc
+Computing (3rd ed.). Cambridge University Press, 2007.
+
+Rivest, R. L. Learning decision lists. Machine Learning, 2:
+
+229–246, 1987.
+
+Rollon, E., Larrosa, J., and Dechter, R. Semiring-based
+mini-bucket partitioning schemes. In Proceedings of the
+23rd International Joint Conference on Artiﬁcial Intelli-
+gence, pp. 644–650, 2013.
+
+Rooshenas, A. and Lowd, D. Learning sum-product net-
+works with direct and indirect variable interactions. In
+Proceedings of the 31st International Conference on Ma-
+chine Learning, pp. 710–718, 2014.
+
+Sang, T., Beame, P., and Kautz, H. A dynamic approach
+to MPE and weighted MAX-SAT. In Proceedings of the
+20th International Joint Conference on Artiﬁcial Intelli-
+gence, pp. 173–179, 2007.
+
+

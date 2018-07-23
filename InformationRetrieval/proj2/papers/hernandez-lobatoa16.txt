@@ -1,0 +1,1126 @@
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+Daniel Hern´andez-Lobato
+Universidad Aut´onoma de Madrid, Francisco Tom´as y Valiente 11, 28049, Madrid, Spain.
+Jos´e Miguel Hern´andez-Lobato
+Harvard University, 33 Oxford street, Cambridge, MA 02138, USA.
+Amar Shah
+Cambridge University, Trumpington Street, Cambridge CB2 1PZ, United Kingdom.
+Ryan P. Adams
+Harvard University and Twitter, 33 Oxford street Cambridge, MA 02138, USA.
+
+DANIEL.HERNANDEZ@UAM.ES
+
+JMHL@SEAS.HARVARD.EDU
+
+AS793@CAM.AC.UK
+
+RPA@SEAS.HARVARD.EDU
+
+Abstract
+
+We present PESMO, a Bayesian method for iden-
+tifying the Pareto set of multi-objective optimiza-
+tion problems, when the functions are expen-
+sive to evaluate. PESMO chooses the evaluation
+points to maximally reduce the entropy of the
+posterior distribution over the Pareto set. The
+PESMO acquisition function is decomposed as a
+sum of objective-speciﬁc acquisition functions,
+which makes it possible to use the algorithm in
+decoupled scenarios in which the objectives can
+be evaluated separately and perhaps with differ-
+ent costs. This decoupling capability is useful
+to identify difﬁcult objectives that require more
+evaluations. PESMO also offers gains in efﬁ-
+ciency, as its cost scales linearly with the number
+of objectives, in comparison to the exponential
+cost of other methods. We compare PESMO with
+other methods on synthetic and real-world prob-
+lems. The results show that PESMO produces
+better recommendations with a smaller number
+of evaluations, and that a decoupled evaluation
+can lead to improvements in performance, par-
+ticularly when the number of objectives is large.
+
+1. Introduction
+We address the problem of optimizing K real-valued
+functions f1(x), . . . , fK(x) over
+some bounded do-
+main X ⊂ Rd, where d is the dimensionality of the input
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+space. This is a more general, challenging and realistic
+scenario than the one considered in traditional optimization
+problems where there is a single-objective function. For ex-
+ample, in a complex robotic system, we may be interested
+in minimizing the energy consumption while maximizing
+locomotion speed (Ariizumi et al., 2014). When selecting
+a ﬁnancial portfolio, it may be desirable to maximize re-
+turns while minimizing various risks. In a mechanical de-
+sign, one may wish to minimize manufacturing cost while
+maximizing durability. In each of these multi-objective ex-
+amples, it is unlikely to be possible to optimize all of the
+objectives simultaneously as they may be conﬂicting: a
+fast-moving robot probably consumes more energy, high-
+return ﬁnancial instruments typically carry greater risk,
+and cheaply manufactured goods are often more likely to
+break. Nevertheless, it is still possible to ﬁnd a set of opti-
+mal points X (cid:63) known as the Pareto set (Collette & Siarry,
+2003). Rather than a single best point, this set represents
+a collection of solutions at which no objective can be im-
+proved without damaging one of the others.
+In the context of minimization, we say that x Pareto
+dominates x(cid:48)
+least one
+of the inequalities being strict. The Pareto set X (cid:63) is
+then the subset of non-dominated points in X , i.e., the
+set such that ∀x(cid:63) ∈ X (cid:63), ∀x ∈ X , ∃ k ∈ 1, . . . , K for
+which fk(x(cid:63)) < fk(x). The Pareto set is considered to be
+optimal because for each point in that set one cannot im-
+prove in one of the objectives without deteriorating some
+other objective. Given X (cid:63), the user may choose a point
+from this set according to their preferences, e.g., locomo-
+tion speed vs. energy consumption. The Pareto set is often
+not ﬁnite, and most strategies aim at ﬁnding a ﬁnite set with
+which to approximate X (cid:63) well.
+It frequently happens that there is a high cost to evaluat-
+
+if fk(x) ≤ fk(x(cid:48)) ∀k, with at
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+ing one or more of the functions fk(·). For example, in the
+robotic example, the evaluation process may involve a time
+consuming experiment with the embodied robot.
+In this
+case, one wishes to minimize the number of evaluations
+required to obtain a useful approximation to the Pareto
+set X (cid:63). Furthermore, it is often the case that there is no
+simple closed form for the objectives fk(·), i.e., they can
+be regarded as black boxes. One promising approach in
+this setting has been to use a probabilistic model such as a
+Gaussian process to approximate each function (Knowles,
+2006; Emmerich, 2008; Ponweiser et al., 2008; Picheny,
+2015). At each iteration, these strategies use the uncer-
+tainty captured by the probabilistic model to generate an
+acquisition (utility) function, the maximum of which pro-
+vides an effective heuristic for identifying a promising lo-
+cation on which to evaluate the objectives. Unlike the ac-
+tual objectives, the acquisition function is a function of the
+model and therefore relatively cheap to evaluate and max-
+imize. This approach contrasts with model-free methods
+based on genetic algorithms or evolutionary strategies that
+are known to be effective for approximating the Pareto set,
+but demand a large number of function evaluations (Deb
+et al., 2002; Li, 2003; Zitzler & Thiele, 1999).
+Despite these successes, there are notable limitations to
+current model-based approaches: 1) they often build the
+acquisition function by transforming the multi-objective
+problem into a single-objective problem using scalarization
+techniques (an approach that is expected to be suboptimal),
+2) the acquisition function generally requires the evalua-
+tion of all of the objective functions at the same location in
+each iteration, and 3) the computational cost of evaluating
+the acquisition function typically grows exponentially with
+the number of objectives, which limits their applicability to
+optimization problems with just 2 or 3 objectives.
+We describe here a strategy for multi-objective optimiza-
+tion that addresses these concerns. We extend previous
+single-objective strategies based on stepwise uncertainty
+reduction to the multi-objective case (Villemonteix et al.,
+2009; Hern´andez-Lobato et al., 2014; Henning & Schuler,
+2012). In the single-objective case, these strategies choose
+the next evaluation location based on the reduction of the
+Shannon entropy of the posterior estimate of the mini-
+mizer x(cid:63). The idea is that a smaller entropy implies that
+the minimizer x(cid:63) is better identiﬁed; the heuristic then
+chooses candidate evaluations based on how much they are
+expected to improve the quality of this estimate. These in-
+formation gain criteria have been shown to often provide
+better results than other alternatives based, e.g., on the pop-
+ular expected improvement (Hern´andez-Lobato et al., 2014;
+Henning & Schuler, 2012; Shah & Ghahramani, 2015).
+The extension to the multi-objective case is obtained by
+considering the entropy of the posterior distribution over
+
+the Pareto set X (cid:63). More precisely, we choose the next eval-
+uation as the one that is expected to most reduce the entropy
+of our estimate of X (cid:63). The proposed approach is called
+predictive entropy search for multi-objective optimization
+(PESMO). Several experiments involving real-world and
+synthetic optimization problems, show that PESMO can
+lead to better performance than related methods from the
+literature. Furthermore, in PESMO the acquisition function
+is expressed as a sum across the different objectives, al-
+lowing for decoupled scenarios in which we can choose to
+only evaluate a subset of objectives at any given location.
+In the robotics example, one might be able to decouple the
+problems by estimating energy consumption from a simu-
+lator even if the locomotion speed could only be evaluated
+via physical experimentation. Another example, inspired
+by Gelbart et al. (2014), might be the design of a low-
+calorie cookie: one wishes to maximize taste while min-
+imizing calories, but calories are a simple function of the
+ingredients, while taste could require human trials. The
+results obtained show that PESMO can obtain better re-
+sults with a smaller number of evaluations of the objec-
+tive functions in such scenarios. Furthermore, we have ob-
+served that the decoupled evaluation provides signiﬁcant
+improvements over a coupled evaluation when the number
+of objectives is large. Finally, unlike other methods (Pon-
+weiser et al., 2008; Picheny, 2015), the computational cost
+of PESMO grows linearly with the number of objectives.
+
+2. Multi-objective Bayesian Optimization via
+
+Predictive Entropy Search
+
+In this section we describe the proposed approach for multi-
+objective optimization based on predictive entropy search.
+Given some previous evaluations of each objective func-
+tion fk(·), we seek to choose new evaluations that maxi-
+mize the information gained about the Pareto set X (cid:63). This
+approach requires a probabilistic model for the unknown
+objectives, and we therefore assume that each fk(·) follows
+a Gaussian process (GP) prior (Rasmussen & Williams,
+2006), with observation noise that is i.i.d. Gaussian with
+zero mean. GPs are often used in model-based approaches
+to multi-objective optimization because of their ﬂexibil-
+ity and ability to model uncertainty (Knowles, 2006; Em-
+merich, 2008; Ponweiser et al., 2008; Picheny, 2015). For
+simplicity, we initially consider a coupled setting in which
+we evaluate all objectives at the same location in any given
+iteration. Nevertheless, the approach described can be eas-
+ily extended to the decoupled scenario.
+Let D = {(xn, yn)}N
+n=1 be the data (function evaluations)
+collected up to step N, where yn is a K-dimensional vector
+with the values resulting from the evaluation of all objec-
+tives at step n, and xn is a vector in input space denoting
+the evaluation location. The next query xN +1 is the one
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+that maximizes the expected reduction in the entropy H(·)
+of the posterior distribution over the Pareto set X (cid:63), i.e.,
+p(X (cid:63)|D). The acquisition function of PESMO is hence:
+
+α(x) = H(X (cid:63)|D) − Ey [H(X (cid:63)|D ∪ {(x, y)})] ,
+
+(1)
+
+taken with respect
+
+els, p(y|D, x) =(cid:81)K
+
+the GP models at x
+where y is the output of all
+and the expectation is
+to the
+posterior distribution for y given by these mod-
+k=1 p(yk|D, x). The GPs are assumed
+to be independent a priori. This acquisition function is
+known as entropy search (Villemonteix et al., 2009; Hen-
+ning & Schuler, 2012). Thus, at each iteration we set the lo-
+cation of the next evaluation to xN +1 = arg maxx∈X α(x).
+A practical difﬁculty, however, is that the exact evalua-
+tion of Eq. (1) is generally infeasible and the function
+must be approximated; we follow the approach described
+in (Hern´andez-Lobato et al., 2014; Houlsby et al., 2012).
+In particular, Eq. (1) is the mutual information between X (cid:63)
+and y given D. The mutual information is symmetric and
+hence we can exchange the roles of the variables X (cid:63) and y,
+leading to an expression that is equivalent to Eq. (1):
+α(x) = H(y|D, x) − EX (cid:63) [H(y|D, x,X (cid:63))] ,
+
+(2)
+
+where the expectation is now with respect to the pos-
+terior distribution for the Pareto set X (cid:63) given the ob-
+served data, and H(y|D, x,X (cid:63)) measures the entropy
+of p(y|D, x,X (cid:63)), i.e., the predictive distribution for the
+objectives at x given D and conditioned to X (cid:63) being
+the Pareto set of the objective functions. This alterna-
+tive formulation is known as predictive entropy search
+(Hern´andez-Lobato et al., 2014) and it signiﬁcantly simpli-
+ﬁes the evaluation of the acquisition function α(·). In par-
+ticular, we no longer have to evaluate or approximate the
+entropy of the Pareto set, X (cid:63), which may be quite difﬁcult.
+The new acquisition function obtained in Eq. (2) favors the
+evaluation in the regions of the input space for which X (cid:63)
+is more informative about y. These are precisely also the
+regions in which y is more informative about X (cid:63).
+The ﬁrst term in the r.h.s. of Eq. (2) is straight-forward to
+evaluate; it is simply the entropy of the predictive distri-
+bution p(y|D, x), which is a factorizable K-dimensional
+Gaussian distribution. Thus, we have that
+
+K
+2
+
+H(y|D, x) =
+
+k=1
+
+k ) ,
+
+0.5 log(vPD
+
+log(2πe) +
+
+(3)
+is the predictive variance of fk(·) at x. The
+where vPD
+k
+difﬁculty comes from the evaluation of the second term
+in the r.h.s. of Eq. (2), which is intractable and must be
+approximated; we follow Hern´andez-Lobato et al. (2014)
+and approximate the expectation using a Monte Carlo es-
+timate of the Pareto set, X (cid:63) given D. This involves sam-
+pling several times the objective functions from their pos-
+terior distribution p(f1, . . . , fK|D). This step is done as in
+
+K(cid:88)
+
+Hern´andez-Lobato et al. (2014) using random kernel fea-
+tures and linear models that accurately approximate the
+samples from p(f1, . . . , fK|D). In practice, we generate
+10 samples from the posterior of each objective fk(·).
+Given the samples of the objectives, we must optimize
+them to obtain a sample from the Pareto set X (cid:63). Note
+that unlike the true objectives, the sampled functions can be
+evaluated without signiﬁcant cost. Thus, given these func-
+tions, we use a grid search with d × 1, 000 points to solve
+the corresponding multi-objective problem to ﬁnd X (cid:63),
+where d is the number of dimensions. Of course, in high
+dimensional problems such a grid search is expected to
+be sub-optimal; in that case, we use the NSGA-II evo-
+lutionary algorithm (Deb et al., 2002). The Pareto set
+is then approximated using a representative subset of 50
+points. Given such a sample of X (cid:63), the differential en-
+tropy of p(y|D, x,X (cid:63)) is estimated using the expectation
+propagation algorithm (Minka, 2001), as described in the
+proceeding section.
+
+2.1. Approximating the Conditional Predictive
+
+Distribution Using Expectation Propagation
+
+(cid:34)
+
+(cid:35)
+
+1 − K(cid:89)
+
+To approximate the entropy of the conditional predic-
+tive distribution p(y|D, x,X (cid:63)) we consider the distribu-
+tion p(X (cid:63)|f1, . . . , fK). In particular, X (cid:63) is the Pareto set
+of f1, . . . , fK iff ∀x(cid:63) ∈ X (cid:63),∀x(cid:48) ∈ X ,∃ k ∈ 1, . . . , K such
+that fk(x(cid:63)) ≤ fk(x(cid:48)), assuming minimization. That is,
+each point within the Pareto set has to be better or equal to
+any other point in the domain of the functions in at least
+one of the objectives. Let f be the set {f1, . . . , fK}. Infor-
+mally, the conditions just described can be translated into
+the following un-normalized distribution for X (cid:63):
+
+p(X (cid:63)|f ) ∝ (cid:89)
+(cid:89)
+(cid:89)
+(cid:89)
+where ψ(x(cid:48), x(cid:63)) = 1 −(cid:81)K
+noiseless case p(y|x, f ) =(cid:81)K
+
+ψ(x(cid:48), x(cid:63)) ,
+(4)
+k=1 Θ (fk(x(cid:48)) − fk(x(cid:63))), Θ(·)
+is the Heaviside step function, and we have used the con-
+vention that Θ(0) = 1. Thus, the r.h.s. of Eq. (4) is non-
+zero only for a valid Pareto set. Next, we note that in the
+k=1 δ(yk−fk(x)), where δ(·)
+is the Dirac delta function; in the noisy case we simply re-
+place the delta functions with Gaussians. We can hence
+write the unnormalized version of p(y|D, x,X (cid:63)) as:
+p(y|D, x,X (cid:63)) ∝
+
+p(y|x, f )p(X (cid:63)|f )p(f|D)df
+
+Θ (fk(x(cid:48)) − fk(x(cid:63)))
+
+x(cid:63)∈X (cid:63)
+
+x(cid:63)∈X (cid:63)
+
+x(cid:48)∈X
+
+x(cid:48)∈X
+
+k=1
+
+=
+
+∝
+
+δ(yk − fk(x))
+
+ψ(x, x(cid:63))
+
+ψ(x(cid:48), x(cid:63)) p(f|D) df ,
+
+(5)
+
+(cid:90)
+(cid:90) K(cid:89)
+× (cid:89)
+
+k=1
+
+x(cid:48)∈X\{x}
+
+(cid:89)
+
+x(cid:63)∈X (cid:63)
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+where we have separated out the factors ψ that do not de-
+pend on x, the point in which the acquisition function α(·)
+is going to be evaluated. The approximation to the r.h.s. of
+Eq. (5) is obtained in two stages. First, we approximate X
+with the set ˜X = {xn}N
+n=1 ∪ X (cid:63) ∪ {x}, i.e., the union of
+the input locations where the objective functions have been
+already evaluated, the current Pareto set and the candidate
+location x on which α(·) should be evaluated. Then, we re-
+place each non-Gaussian factor ψ with a corresponding ap-
+proximate Gaussian factor ˜ψ whose parameters are found
+using expectation propagation (EP) (Minka, 2001). That is,
+
+ψ(x(cid:48), x(cid:63)) = 1 − K(cid:89)
+
+Θ (fk(x(cid:48)) − fk(x(cid:63)))
+
+k=1
+
+≈ ˜ψ(x(cid:48), x(cid:63)) =
+
+K(cid:89)
+
+k=1
+
+˜φk(fk(x(cid:48)), fk(x(cid:63))) ,
+
+(6)
+
+(cid:111)
+
+(cid:110)− 1
+
+k
+
+kυk
+
+where each approximate factor ˜φk is an unnormalized
+In particular, we
+two-dimensional Gaussian distribution.
+set ˜φk(fk(x(cid:48)), fk(x(cid:63))) = exp
+˜Vkυk + ˜mT
+2 υT
+,
+where we have deﬁned υk = (fk(x(cid:48)), fk(x(cid:63)))T, and ˜Vk
+and ˜mk are parameters to be adjusted by EP, which reﬁnes
+each ˜ψ until convergence to enforce that it looks similar to
+the corresponding exact factor ψ (Minka, 2001). The ap-
+proximate factors ˜ψ that do not depend on the candidate
+input x are reused multiple times to evaluate the acquisi-
+tion function α(·), and they only have to be computed once.
+The |X (cid:63)| factors that depend on x must be obtained rela-
+tively quickly to guarantee that α(·) is not very expensive
+to evaluate. Thus, in practice we only update those factors
+once using EP, i.e., they are not reﬁned until convergence.
+Once EP has been run, we approximate p(y|D, x,X (cid:63))
+by the normalized Gaussian that results from replac-
+ing each exact
+factor ψ by the corresponding ap-
+proximate ˜ψ. Note that
+the Gaussian distribution is
+closed under the product operation, and because all
+non-Gaussian factors in Eq. (5) have been replaced by
+Gaussians,
+the result is a Gaussian distribution. That
+), where
+the parameters mCPD
+can be obtained from each
+k
+˜ψ and p(f1, . . . , fK|D).
+If we combine this result with
+Eq. (3), we obtain an approximation to the acquisition func-
+tion in Eq. (2) that is given by the difference in entropies
+before and after conditioning on the Pareto sets. That is,
+
+is, p(y|D, x,X (cid:63)) ≈(cid:81)K
+
+k=1 N (fk(x)|mCPD
+and vCPD
+
+, vCPD
+
+k
+
+k
+
+k
+
+(x|X (cid:63)
+log vCPD
+2
+
+k
+
+(s))
+
+log vPD
+k (x)
+2
+
+− 1
+S
+
+s=1
+
+k=1
+
+(7)
+,
+where S is the number of Monte Carlo samples, {X (cid:63)
+(s)}S
+s=1
+are the Pareto sets sampled to approximate the expectation
+in Eq. (2), and vPD
+(s)) are respectively
+the variances of the predictive distribution at x, before and
+after conditioning to X (cid:63)
+(s). Last, in the case of noisy obser-
+vations around each fk(·), we just increase the predictive
+
+k (x) and vCPD
+
+(x|X (cid:63)
+
+k
+
+α(x) ≈ K(cid:88)
+
+S(cid:88)
+
+variances by adding the noise variance. The next evalua-
+tion is simply set to xN +1 = arg maxx∈X α(x).
+Note that Eq. (7) is the sum of K functions
+
+αk(x) =
+
+log vPD
+k (x)
+2
+
+− 1
+S
+
+(x|X (cid:63)
+log vCPD
+2
+
+k
+
+(s))
+
+,
+
+(8)
+
+S(cid:88)
+
+s=1
+
+that intuitively measure the contribution of each objective
+to the total acquisition. In a decoupled evaluation setting,
+each αk(·) can be individually maximized to identify the
+location xop
+k = arg maxx∈X αk(x), on which it is expected
+to be most useful to evaluate each of the K objectives. The
+objective k with the largest individual acquisition αk(xop
+k )
+can then be chosen for evaluation in the next iteration. This
+approach is expected to reduce the entropy of the posterior
+over the Pareto set more quickly, i.e., with a smaller number
+of evaluations of the objectives, and to lead to better results.
+The total computational cost of evaluating the acquisi-
+tion function α(x) includes the cost of running EP, which
+is O(Km3), where m = N + |X (cid:63)
+(s)|, N is the number of
+observations made and K is the number of objectives. This
+is done once per each sample X (cid:63)
+(s). After this, we can re-
+use the factors that are independent of the candidate loca-
+tion x. The cost of computing the predictive variance at
+each x is hence O(K|X (cid:63)
+(s)|3). In our experiments, the size
+of the Pareto set sample X (cid:63)
+(s) is 50, which means that m is a
+few hundred at most. The supplementary material contains
+additional details about the EP approximation to Eq. (5).
+3. Related Work
+ParEGO is another method for multi-objective Bayesian
+optimization (Knowles, 2006). ParEGO transforms the
+multi-objective problem into a single-objective problem
+using a scalarization technique: at each iteration, a vec-
+tor of K weights θ = (θ1, . . . , θK)T, with θk ∈ [0, 1]
+k=1 θk = 1, is sampled at random from a uniform
+distribution. Given θ, a single-objective function is built:
+
+and(cid:80)K
+
+fθ(x) = maxK
+
+k=1(θkfk(x)) + ρ
+
+θkfk(x)
+
+(9)
+
+k=1
+
+where ρ is set equal to 0.05. See (Nakayama et al., 2009,
+Sec. 1.3.3) for further details. After step N of the opti-
+mization process, and given θ, a new set of N observations
+of fθ(·) are obtained by evaluating this function in the al-
+ready observed points {xn}N
+n=1. Then, a GP model is ﬁt
+to the new data and expected improvement (Mockus et al.,
+1978; Jones et al., 1998) is used ﬁnd the location of the
+next evaluation xN +1. The cost of evaluating the acquisi-
+tion function in ParEGO is O(N 3), where N is the number
+of observations made. This is the cost of ﬁtting the GP to
+the new data (only done once). Thus, ParEGO is a simple
+and fast technique. Nevertheless, it is often outperformed
+by more advanced approaches (Ponweiser et al., 2008).
+
+K(cid:88)
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+k (x) − c · vPD
+k (x) and vPD
+
+SMSego is another technique for multi-objective Bayesian
+optimization (Ponweiser et al., 2008). The ﬁrst step in
+SMSego is to ﬁnd a set of Pareto points ˜X (cid:63), e.g., by
+optimizing the posterior means of the GPs, or by ﬁnd-
+ing the non-dominated observations. Consider now an
+optimistic estimate of the objectives at input location x
+given by mPD
+k (x)1/2, where c is some con-
+stant, and mPD
+k (x) are the posterior mean and
+variance of the kth objective at location x, respectively.
+The acquisition value computed at a candidate location x ∈
+X by SMSego is given by the gain in hyper-volume ob-
+tained by the corresponding optimistic estimate, after an -
+correction has been made. The hyper-volume is simply the
+volume of points in functional space above the Pareto front
+(this is simply the function space values associated to the
+Pareto set), with respect to a given reference point (Zitzler
+& Thiele, 1999). Because the hyper-volume is maximized
+by the actual Pareto set, it is a natural measure of perfor-
+mance. Thus, SMSego does not reduce the problem to a
+single-objective. However, at each iteration it has to ﬁnd
+a set of Pareto points and to ﬁt a different GP to each one
+of the objectives. This gives a computational cost that is
+O(KN 3). Finally, evaluating the gain in hyper-volume at
+each candidate location x is also more expensive than the
+computation of expected improvement in ParEGO.
+A similar method to SMSego is the Pareto active learning
+(PAL) algorithm (Zuluaga et al., 2013). At iteration N,
+PAL uses the GP prediction for each point x ∈ X
+to maintain an uncertainty region RN (x) about
+the
+This region is
+objective values associated with x.
+deﬁned as the intersection of RN−1(x),
+the un-
+certainty region in the previous iteration, and Qc(x),
+deﬁned as as the hyper-rectangle with lower-corner
+given by mPD
+k (x)0.5,
+for k = 1, . . . , K,
+and upper-corner given by mPD
+k (x)1/2,
+for k = 1, . . . , K, for some constant c. Given these re-
+gions, PAL classiﬁes each point x ∈ X as Pareto-optimal,
+non-Pareto-optimal or uncertain. A point is classiﬁed as
+Pareto-optimal if the worst value in RN (x) is not domi-
+nated by the best value in RN (x(cid:48)), for any other x(cid:48) ∈ X ,
+with an  tolerance. A point is classiﬁed as non-Pareto-
+optimal if the best value in RN (x) is dominated by the
+worst value in RN (x(cid:48)) for any other x(cid:48) ∈ X , with an 
+tolerance. All other points remain uncertain. After the
+classiﬁcation, PAL chooses the uncertain point x with the
+largest uncertainty region RN (x). The total computational
+cost of PAL is hence similar to that of SMSego.
+The expected hyper-volume improvement (EHI) (Em-
+merich, 2008) is a natural extension of expected improve-
+ment to the multi-objective setting (Mockus et al., 1978;
+Jones et al., 1998). Given the predictive distribution of
+the GPs at a candidate input location x, the acquisition is
+the expected increment of the hyper-volume of a candidate
+
+i.e.,
+
+k (x) − c · vPD
+
+k (x) + c · vPD
+
+Pareto set ˜X (cid:63). Thus, EHI also needs to ﬁnd a Pareto set ˜X (cid:63).
+This set can be obtained as in SMSego. A difﬁculty is, how-
+ever, that computing the expected increment of the hyper-
+volume is very expensive. For this, the output space is di-
+vided in a series of cells, and the probability of improve-
+ment is simply obtained as the probability that the observa-
+tion made at x lies in a non-dominated cell. This involves a
+sum across all non-dominated cells, whose number grows
+exponentially with the number of objectives K. In particu-
+lar, the total number of cells is (| ˜X (cid:63)|+1)K. Thus, although
+some methods have been suggested to speed-up its calcula-
+tion, e.g., (Hupkens et al., 2014; Feliot et al., 2015), EHI is
+only feasible for 2 or 3 objectives at most.
+Sequential uncertainty reduction (SUR) is another method
+proposed for multi-objective Bayesian optimization
+(Picheny, 2015). The working principle of SUR is similar
+to that of EHI. However, SUR considers the probability
+of improving the hyper-volume in the whole domain of
+the objectives X . Thus, SUR also needs to ﬁnd a set of
+Pareto points ˜X (cid:63). These can be obtained as in SMSego.
+The acquisition computed by SUR is simply the expected
+decrease in the area under the probability of improving
+the hyper-volume, after evaluating the objectives at a new
+candidate location x. The SUR acquisition is computed
+also by dividing the output space in a total of (| ˜X (cid:63)| + 1)K
+cells, and the area under the probability of improvement is
+obtained using a Sobol sequence as the integration points.
+Although some grouping of the cells has been suggested
+(Picheny, 2015), SUR is an extremely expensive criterion
+that is only feasible for 2 or 3 objectives at most.
+The proposed approach, PESMO, differs from the methods
+described in this section in that 1) it does not transform
+the multi-objective problem into a single-objective, 2) the
+acquisition function of PESMO can be decomposed as the
+sum of K individual acquisition functions, and this allows
+for decoupled evaluations, and 3) the computational cost of
+PESMO is linear in the total number of objectives K.
+4. Experiments
+We compare PESMO with the other strategies described
+in Section 3: ParEGO, SMSego, EHI and SUR. We do
+not compare results with PAL because it is expected to
+give similar results to those of SMSego, as both meth-
+ods are based on a lower conﬁdence bound. We have
+coded all these methods in the software for Bayesian
+optimization Spearmint (https://github.com/HIPS/
+Spearmint). We use a Mat´ern covariance function for
+the GPs and all hyper-parameters (noise, length-scales and
+amplitude) are approximately sampled from their poste-
+rior distribution (we generate 10 samples from this distri-
+bution). The acquisition function of each method is aver-
+aged over these samples. In ParEGO we consider a differ-
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+ent scalarization (i.e., a different value of θ) for each sam-
+ple of the hyper-parameters. In SMSego, EHI and SUR,
+for each hyper-parameter sample we consider a different
+Pareto set ˜X (cid:63), obtained by optimizing the posterior means
+of the GPs. The resulting Pareto set is extended by includ-
+ing all non-dominated observations. At iteration N, each
+method gives a recommendation in the form of a Pareto
+set obtained by optimizing the posterior means of the GPs.
+The acquisition function of each method is maximized us-
+ing L-BFGS (a grid of size 1, 000 is used to ﬁnd a good
+starting point). The gradients of the acquisition function
+are approximated by differences (except in ParEGO).
+4.1. Accuracy of the PESMO Approximation
+
+One question is whether the proposed approximations are
+sufﬁciently accurate for the effective identiﬁcation of the
+Pareto set. We compare in a one-dimensional problem
+with 2 objectives the acquisition function computed by
+PESMO with a more accurate estimate obtained via expen-
+sive Monte Carlo sampling and a non-parametric estimator
+of the entropy (Singh et al., 2003). Figure 1 (top) shows at a
+given step the observed data and the posterior mean and the
+standard deviation of each objective. The ﬁgure on the bot-
+tom shows the acquisition function computed by PESMO
+and by the Monte Carlo method (Exact). Both functions
+look very similar, including the location of the global max-
+imizer. This indicates that (7), obtained by expectation
+propagation, is potentially a good approximation of (2), the
+exact acquisition. The supplementary material has extra re-
+sults showing that the individual acquisition functions com-
+puted by PESMO, i.e., αk(·), for k = 1, 2, are also accurate.
+4.2. Experiments with Synthetic Objectives
+
+We compare PESMO with other approaches in a 3-
+dimensional problem with 2 objectives obtained by sam-
+pling the functions from the GP prior. We generate 100 of
+these problems and report the average performance when
+considering noiseless observations and when the observa-
+tions are contaminated with Gaussian noise with standard
+deviation equal to 0.1. The performance metric is the
+hyper-volume indicator, which is maximized by the actual
+Pareto set (Zitzler & Thiele, 1999). At each iteration we
+report the logarithm of the relative difference between the
+hyper-volume of the actual Pareto set (obtained by optimiz-
+ing the actual objectives) and the hyper-volume of the rec-
+ommendation (obtained by optimizing the posterior means
+of the GPs). Figure 2 (left-column) shows, as a function
+of the evaluations made, the average performance of each
+method with error bars. PESMO obtains the best results,
+and when executed in a decoupled scenario, slight improve-
+ments are observed (only with noisy observations).
+Table 1 shows the average time in seconds to determine
+the next evaluation in each method. The fastest method
+
+Figure 1. (top) Observations of each objective and posterior mean
+and standard deviations of each GP model. (bottom) Estimates
+of the acquisition function (2) by PESMO, and by a Monte Carlo
+method combined with a non-parametric estimator of the entropy
+(Exact), which is expected to be more accurate. Best seen in color.
+
+is ParEGO followed by SMSego and PESMO. The decou-
+pled version of PESMO, PESMOdec, takes more time be-
+cause it optimizes α1(·) and α2(·). The slowest meth-
+ods are EHI and SUR. Most of their cost is in the last
+iterations, in which the Pareto set size, | ˜X (cid:63)|, is large.
+The cost of evaluating the acquisition function in EHI and
+SUR is O((| ˜X (cid:63)| + 1)K), leading to expensive optimiza-
+tion via L-BFGS. In PESMO the cost of evaluating α(·) is
+O(K|X (cid:63)
+(s)|3) because K linear systems are solved. These
+computations are faster because they are performed by the
+open-BLAS library, which is optimized for each processor.
+The acquisition function of EHI and SUR does not involve
+solving linear systems and these methods cannot use open-
+BLAS. Note that we also keep ﬁxed |X (cid:63)
+(s)| = 50 in PESMO.
+Table 1. Avg. time in seconds doing calculations per iteration.
+PESMO PESMOdec ParEGO SMSego
+SUR
+11±0.2 16±1.3 405±115 623±59
+33±1.0
+We have carried out additional synthetic experiments with
+4 objectives on a 6-dimensional input space. In this case,
+EHI and SUR become infeasible, so we do not compare
+results with them. Again, we sample the objectives from
+the GP prior. Figure 2 (right-column) shows, as a function
+of the evaluations made, the average performance of each
+method. The best method is PESMO, and in this case, the
+decoupled evaluation performs signiﬁcantly better. This
+improvement is because in the decoupled setting, PESMO
+identiﬁes the most difﬁcult objectives and evaluates them
+more times. In particular, because there are 4 objectives it
+is likely that some objectives are more difﬁcult than oth-
+
+52±2.5
+
+EHI
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+Figure 2. (left-column) Average log relative difference between the hyper-volume of the recommendation and the maximum hyper-
+volume for each number of evaluations made. We consider noiseless (top) and noisy observations (bottom). The problem considered
+has 2 objectives and 3 dimensions. (right-column) Similar results for a problem with 4 objectives and 6 dimensions. We do not compare
+results with EHI and SUR because they are infeasible due to their exponential cost with the number of objectives. Best seen in color.
+ers just by chance. Figure 3 illustrates this behavior for
+a representative case in which the ﬁrst two objectives are
+non-linear (difﬁcult) and the last two objectives are linear
+(easy). We note that the decoupled version of PESMO eval-
+uates the ﬁrst two objectives almost three times more.
+
+These are conﬂicting objectives because reducing the pre-
+diction error will involve larger networks which will take
+longer at test time. We consider feed-forward networks
+with ReLus at the hidden layers and a soft-max output
+layer. The networks are coded in the Keras library and they
+are trained using Adam (D. Kingma, 2014) with a mini-
+batch size of 4, 000 instances during 150 epochs. The ad-
+justable parameters are: The number of hidden units per
+layer (between 50 and 300), the number of layers (between
+1 and 3), the learning rate, the amount of dropout, and the
+level of (cid:96)1 and (cid:96)2 regularization. The prediction error is
+measured on a set of 10, 000 instances extracted from the
+training set. The rest of the training data, i.e., 50, 000 in-
+stances, is used for training. We consider a logit transfor-
+mation of the prediction error because the error rates are
+very small. The prediction time is measured as the average
+time required for doing 10, 000 predictions. We compute
+the logarithm of the ratio between the prediction time of
+the network and the prediction time of the fastest network,
+(i.e., a single hidden layer and 50 units). When measur-
+ing the prediction time we do not train the network and
+consider random weights (the time objective is also set to
+ignore irrelevant parameters). Thus, the problem is suited
+for a decoupled evaluation because both objectives can be
+evaluated separately. We run each method for a total of
+200 evaluations of the objectives and report results after
+100 and 200 evaluations. Because there is no ground truth
+and the objectives are noisy, we re-evaluate 3 times the
+values associated with the recommendations made by each
+method (in the form of a Pareto set) and average the results.
+
+Figure 3. (top) Contour curves of 4 illustrative objectives on 6 di-
+mensions obtained by changing the ﬁrst two dimensions in input
+space while keeping the other 4 ﬁxed to zero. The ﬁrst 2 objec-
+tives are non-linear while the 2 last objectives are linear. (bottom)
+Number of evaluations of each objective done by PESMOdecoupled
+as a function of the iterations performed N. Best seen in color.
+
+4.3. Finding a Fast and Accurate Neural Network
+
+We consider the MNIST dataset (LeCun et al., 1998) and
+evaluate each method on the task of ﬁnding a neural net-
+work with low prediction error and small prediction time.
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+Table 2. Avg. hyper-volume after 100 and 200 evaluations.
+# Eval. PESMO PESMOdec ParEGO SMSego EHI
+100 66.2±.2
+200 67.8±.1
+
+SUR
+62.9±1.2 65.0±.3 64.0±.9 66.6±.2
+66.1±.2 67.1±.2 66.6±.2 67.2±.1
+
+67.6±.1
+67.8±.1
+
+Figure 4. Avg. Pareto fronts obtained by each method after 100 (left) and 200 (right) evaluations of the objectives. Best seen in color.
+Then, we compute the Pareto front (i.e., the function space
+The good results obtained by PESMOdecoupled are explained
+by Figure 5, which shows the average number of evalua-
+values of the Pareto set) and its hyper-volume. We repeat
+these experiments 50 times and report the average results.
+tions of each objective. More precisely, the objective that
+measures the prediction time is evaluated just a few times.
+Table 2 shows the hyper-volumes obtained in the experi-
+This makes sense because it depends on only two param-
+ments (the higher, the better). The best results, after 100
+eters, i.e., the number of layers and the number of hidden
+evaluations of the objectives, correspond to the decoupled
+units per layer. It is hence simpler than the prediction er-
+version of PESMO, followed by SUR and by the coupled
+ror. PESMOdecoupled is able to detect this and focuses on
+version. When 200 evaluations are done, the best method
+the evaluation of the prediction error. Of course, evaluating
+is PESMO in either setting, i.e., coupled or decoupled. After
+the prediction error more times is more expensive, since it
+PESMO, SUR gives the best results, followed by SMSego
+involves training the neural network more times. Neverthe-
+and EHI. ParEGO is the worst performing method in either
+less, this shows that PESMOdecoupled is able to successfully
+setting. In summary, PESMO gives the best overall results,
+discriminate between easy and difﬁcult objective functions.
+and its decoupled version performs much better than the
+other methods when the number of evaluations is small.
+The supplementary material has extra experiments compar-
+ing each method on the task of ﬁnding an ensemble of deci-
+sion trees of small size and good prediction accuracy. The
+results obtained are similar to the ones reported here.
+5. Conclusions
+We have described PESMO, a method for multi-objective
+Bayesian optimization. At each iteration, PESMO evaluates
+the objective functions at the input location that is most
+expected to reduce the entropy of posterior estimate of the
+Pareto set. Several synthetic experiments show that PESMO
+has better performance than other methods from the litera-
+ture. That is, PESMO obtains better recommendations with
+a smaller number of evaluations, both in the case of noise-
+less and noisy observations. Furthermore, the acquisition
+function of PESMO can be understood as a sum of K indi-
+vidual acquisition functions, one per each of the K objec-
+tives. This allows for a decoupled evaluation scenario, in
+which the most promising objective is identiﬁed by maxi-
+mizing the individual acquisition functions. When run in a
+decoupled evaluation setting, PESMO is able to identify the
+most difﬁcult objectives and, by focusing on their evalua-
+tion, it provides better results. This behavior of PESMO has
+been illustrated on a multi-objective optimization problem
+that consists of ﬁnding an accurate and fast neural network.
+Finally, the computational cost of PESMO is small. In par-
+ticular, it scales linearly with the number of objectives K.
+Other methods have an exponential cost with respect to K
+which makes them infeasible for more than 3 objectives.
+
+Figure 4 shows the average Pareto front obtained by each
+method after 100 and 200 evaluations of the objectives. The
+results displayed are consistent with the ones in Table 2. In
+particular, PESMO is able to ﬁnd networks that are faster
+than the ones found by the other methods, for a similar pre-
+diction error on the validation set. This is especially the
+case of PESMO when executed in a decoupled setting, after
+doing only 100 evaluations of the objectives. We also note
+that PESMO ﬁnds the most accurate networks, with almost
+1.5% of prediction error in the validation set.
+
+Figure 5. Number of evaluations of each objective done by
+PESMOdecoupled, as a function of the iteration number N, in the
+problem of ﬁnding good neural networks. Best seen in color.
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+Acknowledgments
+Daniel Hern´andez-Lobato gratefully acknowledges the use
+of the facilities of Centro de Computaci´on Cient´ıﬁca
+(CCC) at Universidad Aut´onoma de Madrid. This au-
+thor also acknowledges ﬁnancial support from the Span-
+ish Plan Nacional I+D+i, Grants TIN2013-42351-P and
+TIN2015-70308-REDT, and from Comunidad de Madrid,
+Grant S2013/ICE-2845 CASI-CAM-CM. Jos´e Miguel
+Hern´andez-Lobato acknowledges ﬁnancial support from
+the Rafael del Pino Fundation. Amar Shah acknowledges
+support from the Qualcomm Innovation Fellowship pro-
+gram. Ryan P. Adams acknowledges support from the Al-
+fred P. Sloan Foundation.
+
+References
+Ariizumi, R., Tesch, M., Choset, H., and Matsuno, F.
+Expensive multiobjective optimization for robotics with
+In 2014 IEEE
+consideration of heteroscedastic noise.
+International Conference on Intelligent Robots and Sys-
+tems, pp. 2230–2235, 2014.
+
+Collette, Y. and Siarry, P. Multiobjective Optimization:
+
+Principles and Case Studies. Springer, 2003.
+
+D. Kingma, J. Ba. Adam: A method for stochastic opti-
+
+mization. 2014. arXiv:1412.6980.
+
+Deb, K., Pratap, A., Agarwal, S., and Meyarivan, T. A
+fast and elitist multiobjective genetic algorithm: NSGA-
+II. IEEE Transactions on Evolutionary Computation, 6:
+182–197, 2002.
+
+Emmerich, A. The computation of the expected improve-
+ment in dominated hypervolume of Pareto front approx-
+imations. Technical Report LIACS TR-4-2008, Leiden
+University, The Netherlands, 2008.
+
+Feliot, P., Bect, J., and Vazquez, E. A Bayesian approach
+to constrained single- and multi-objective optimization.
+2015. arXiv:1510.00503 [stat.CO].
+
+Gelbart, M. A., Snoek, J., and Adams, R. P. Bayesian opti-
+mization with unknown constraints. In Thirtieth Confer-
+ence on Uncertainty in Artiﬁcial Intelligence, 2014.
+
+Henning, P. and Schuler, C. J.
+
+information-efﬁcient global optimization.
+Machine Learning Research, 13:1809–1837, 2012.
+
+Entropy search for
+Journal of
+
+Hern´andez-Lobato, J. M., Hoffman, M. W., and Ghahra-
+mani, Z. Predictive entropy search for efﬁcient global
+In Advances in
+optimization of black-box functions.
+Neural Information Processing Systems 27, pp. 918–
+926. 2014.
+
+Houlsby, N., Hern´andez-lobato, J. M., Husz´ar, F., and
+Ghahramani, Z. Collaborative Gaussian processes for
+preference learning. In Advances in Neural Information
+Processing Systems 25, pp. 2096–2104. 2012.
+
+Hupkens, I., Emmerich, M., and Deutz, A. Faster com-
+putation of expected hypervolume improvement. 2014.
+arXiv:1408.7114 [cs.DS].
+
+Jones, D. R., Schonlau, M., and Welch, W. J. Efﬁcient
+global optimization of expensive black-box functions.
+Journal of Global Optimization, 13(4):455–492, 1998.
+
+Knowles, J. ParEGO: a hybrid algorithm with on-line land-
+scape approximation for expensive multiobjective opti-
+mization problems. IEEE Transactions on Evolutionary
+Computation, 10:50–66, 2006.
+
+LeCun, Y., Bottou, L., Bengio, Y., and Haffner, P. Gradient-
+based learning applied to document recognition. Pro-
+ceedings of the IEEE, 86(11):2278–2324, 1998.
+
+Li, X. A non-dominated sorting particle swarm optimizer
+for multiobjective optimization. In Genetic and Evolu-
+tionary Computation GECCO 2003, pp. 37–48. 2003.
+
+Minka, T.
+
+A Family of Algorithms for Approximate
+
+Bayesian Inference. PhD thesis, MIT, 2001.
+
+Mockus, J., Tiesis, V., and Zilinskas, A. The application of
+Bayesian methods for seeking the extremum. Towards
+Global Optimization, 2(117-129):2, 1978.
+
+Nakayama, H., Yun, Y., and M.Yoon. Sequential Approxi-
+mate Multiobjective Optimization Using Computational
+Intelligence. Springer, 2009.
+
+Picheny, V. Multiobjective optimization using Gaussian
+process emulators via stepwise uncertainty reduction.
+Statistics and Computing, 25:1265–1280, 2015.
+
+Ponweiser, W., Wagner, T., Biermann, D., and Vincze, M.
+Multiobjective optimization on a limited budget of eval-
+uations using model-assisted S-metric selection. In Par-
+allel Problem Solving from Nature PPSN X, pp. 784–
+794. 2008.
+
+Rasmussen, C. E. and Williams, C. K. I. Gaussian Pro-
+cesses for Machine Learning (Adaptive Computation
+and Machine Learning). The MIT Press, 2006.
+
+Shah, A. and Ghahramani, Z. Parallel predictive entropy
+search for batch global optimization of expensive objec-
+tive functions. In Advances in Neural Information Pro-
+cessing Systems 28, pp. 3312–3320. 2015.
+
+Singh, H., Misra, N., Hnizdo, V., Fedorowicz, A., and
+Demchuk, E. Nearest neighbor estimates of entropy.
+American journal of mathematical and management sci-
+ences, 23:301–321, 2003.
+
+Predictive Entropy Search for Multi-objective Bayesian Optimization
+
+Villemonteix, J., Vazquez, E., and Walter, E. An informa-
+tional approach to the global optimization of expensive-
+to-evaluate functions. Journal of Global Optimization,
+44:509–534, 2009.
+
+Zitzler, E. and Thiele, L. Multiobjective evolutionary algo-
+rithms: a comparative case study and the strength Pareto
+approach. IEEE Transactions on Evolutionary Compu-
+tation, 3:257–271, 1999.
+
+Zuluaga, M., Krause, A., Sergent, G., and P¨uschel, M. Ac-
+tive learning for multi-objective optimization. In Inter-
+national Conference on Machine Learning, pp. 462–470,
+2013.
+
+

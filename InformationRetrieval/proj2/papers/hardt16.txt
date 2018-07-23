@@ -1,0 +1,1051 @@
+Train faster, generalize better: Stability of stochastic gradient descent
+
+Moritz Hardt
+Benjamin Recht
+Yoram Singer
+
+Abstract
+
+We show that parametric models trained by a
+stochastic gradient method (SGM) with few it-
+erations have vanishing generalization error. We
+prove our results by arguing that SGM is algo-
+rithmically stable in the sense of Bousquet and
+Elisseeff. Our analysis only employs elemen-
+tary tools from convex and continuous optimiza-
+tion. We derive stability bounds for both con-
+vex and non-convex optimization under standard
+Lipschitz and smoothness assumptions.
+Applying our results to the convex case, we pro-
+vide new insights for why multiple epochs of
+stochastic gradient methods generalize well in
+practice.
+In the non-convex case, we give a
+new interpretation of common practices in neural
+networks, and formally show that popular tech-
+niques for training large deep models are indeed
+stability-promoting. Our ﬁndings conceptually
+underscore the importance of reducing training
+time beyond its obvious beneﬁt.
+
+1. Introduction
+The most widely used optimization method in machine
+learning practice is stochastic gradient method (SGM).
+Stochastic gradient methods aim to minimize the empiri-
+cal risk of a model by repeatedly computing the gradient of
+a loss function on a single training example, or a batch of
+few examples, and updating the model parameters accord-
+ingly. SGM is scalable, robust, and performs well across
+many different domains ranging from smooth and strongly
+convex problems to complex non-convex objectives.
+In a nutshell, our results establish that: Any model trained
+with stochastic gradient method in a reasonable amount of
+time attains small generalization error.
+As training time is inevitably limited in practice, our re-
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume
+48. Copyright 2016 by the author(s).
+
+MRTZ@GOOGLE.COM
+BRECHT@BERKELEY.EDU
+SINGER@GOOGLE.COM
+
+sults help to explain the strong generalization performance
+of stochastic gradient methods observed in practice. More
+concretely, we bound the generalization error of a model
+in terms of the number of iterations that stochastic gradient
+method took in order to train the model. Our main analy-
+sis tool is to employ the notion of algorithmic stability due
+to Bousquet and Elisseeff (2002). We demonstrate that the
+stochastic gradient method is stable provided that the ob-
+jective is relatively smooth and the number of steps taken
+is sufﬁciently small.
+It is common in practice to perform a linear number of steps
+in the size of the sample and to access each data point mul-
+tiple times. Our results show in a broad range of settings
+that, provided the number of iterations is linear in the num-
+ber of data points, the generalization error is bounded by
+a vanishing function of the sample size. The results hold
+true even for complex models with large number of param-
+eters and no explicit regularization term in the objective.
+Namely, fast training time by itself is sufﬁcient to prevent
+overﬁtting.
+Our bounds are algorithm speciﬁc: Since the number of
+iterations we allow can be larger than the sample size, an
+arbitrary algorithm could easily achieve small training er-
+ror by memorizing all training data with no generalization
+ability whatsoever.
+In contrast, if the stochastic gradient
+method manages to ﬁt the training data in a reasonable
+number of iterations, it is guaranteed to generalize.
+Conceptually, we show that minimizing training time is not
+only beneﬁcial for obvious computational advantages, but
+also has the important byproduct of decreasing generaliza-
+tion error. Consequently, it may make sense for practition-
+ers to focus on minimizing training time, for instance, by
+designing model architectures for which stochastic gradi-
+ent method converges fastest to a desired error level.
+
+1.1. Our contributions
+Our focus is on generating generalization bounds for mod-
+els learned with stochastic gradient descent. Recall that the
+generalization bound is the expected difference between
+the error a model incurs on a training set versus the er-
+ror incurred on a new data point, sampled from the same
+
+Stability of stochastic gradient descent
+
+distribution that generated the training data. Throughout,
+we assume we are training models using n sampled data
+points.
+Our results build on a fundamental connection between the
+generalization error of an algorithm and its stability proper-
+ties. Roughly speaking, an algorithm is stable if the train-
+ing error it achieves varies only slightly if we change any
+single training data point. The precise notion of stability
+we use is known as uniform stability due to (Bousquet &
+Elisseeff, 2002). It states that a randomized algorithm A
+is uniformly stable if for all data sets differing in only one
+element, the learned models produce nearly the same pre-
+dictions. We review this method in Section 2, and provide
+a new adaptation of this theory to iterative algorithms.
+In Section 3, we show that stochastic gradient is uniformly
+stable, and our techniques mimic its convergence proofs.
+For convex loss functions, we prove that the stability mea-
+sure decreases as a function of the sum of the step sizes.
+For strongly convex loss functions, we show that stochastic
+gradient is stable, even if we train for an arbitrarily long
+time. We can combine our bounds on the generalization er-
+ror of stochastic gradient method with optimization bounds
+quantifying the convergence of the empirical loss achieved
+by SGM. In Section 5, we show that models trained for
+multiple epochs match classic bounds for stochastic gradi-
+ent (Nemirovski & Yudin, 1978; 1983).
+More surprisingly, our results carry over to the case where
+the loss-function is non-convex. In this case we show that
+the method generalizes provided the steps are sufﬁciently
+small and the number of iterations is not too large. More
+speciﬁcally, we show the number of steps of stochastic
+gradient can grow as nc for a small c > 1. This pro-
+vides some explanation as to why neural networks can be
+trained for multiple epochs of stochastic gradient and still
+exhibit excellent generalization. In Section 4, we further-
+more show that various heuristics used in practice, espe-
+cially in the deep learning community, help to increase the
+stability of stochastic gradient method. For example, the
+popular dropout scheme (Krizhevsky et al., 2012; Srivas-
+tava et al., 2014) improves all of our bounds. Similarly,
+`2-regularization improves the exponent of n in our non-
+convex result. In fact, we can drive the exponent arbitrar-
+ily close to 1/2 while preserving the non-convexity of the
+problem.
+
+1.2. Related work
+There is a venerable line of work on stability and gener-
+alization dating back more than thirty years (Devroye &
+Wagner, 1979; Kearns & Ron, 1999; Bousquet & Elisseeff,
+2002; Mukherjee et al., 2006; Shalev-Shwartz et al., 2010).
+The landmark work by Bousquet and Elisseeff (Bousquet
+& Elisseeff, 2002) introduced the notion of uniform stabil-
+
+ity that we rely on. They showed that several important
+classiﬁcation techniques are uniformly stable. In particu-
+lar, under certain regularity assumptions, it was shown that
+the optimizer of a regularized empirical loss minimization
+problem is uniformly stable. Previous work generally ap-
+plies only to the exact minimizer of speciﬁc optimization
+problems. It is not immediately evident on how to com-
+pute a generalization bound for an approximate minimizer
+such as one found by using stochastic gradient. Subsequent
+work studied stability bounds for randomized algorithms
+but focused on random perturbations of the cost function,
+such as those induced by bootstrapping or bagging (Elis-
+seeff et al., 2005). This manuscript differs from this foun-
+dational work in that it derives stability bounds about the
+learning procedure, analyzing algorithmic properties that
+induce stability.
+Classic results by Nemirovski and Yudin show that the
+stochastic gradient method produces is nearly optimal for
+empirical risk minimization of convex loss functions (Ne-
+mirovski & Yudin, 1978; 1983; Nemirovski et al., 2009;
+Frostig et al., 2015). These results have been extended
+by many machine learning researchers, yielding tighter
+bounds and probabilistic guarantees (Hazan et al., 2006;
+Hazan & Kale, 2014; Rakhlin et al., 2012). However, there
+is an important limitation of all of this prior art. The derived
+generalization bounds only hold for single passes over the
+data. That is, in order for the bounds to be valid, each train-
+ing example must be used no more than once in a stochas-
+tic gradient update.
+In practice, of course, one tends to
+run multiple epochs of the stochastic gradient method. Our
+results resolve this issue by combining stability with op-
+timization error. We use the foundational results to esti-
+mate the error on the empirical risk and then use stability
+to derive a deviation from the true risk. This enables us to
+study the risk incurred by multiple epochs and provide sim-
+ple analyses of regularization methods for convex stochas-
+tic gradient. We compare our results to this related work
+in Section 5. We note that Rosasco and Villa obtain risk
+bounds for least squares minimization with an incremental
+gradient method in terms of the number of epochs (Rosasco
+& Villa, 2014). These bounds are akin to our study in Sec-
+tion 5, although our results are incomparable due to various
+different assumptions.
+Finally, we note that in the non-convex case, the stochastic
+gradient method is remarkably successful for training large
+neural networks (Bottou, 1998; Krizhevsky et al., 2012).
+However, our theoretical understanding of this method is
+limited. Several authors have shown that the stochastic
+gradient method ﬁnds a stationary point of nonconvex cost
+functions (Kushner & Yin, 2003; Ghadimi & Lan, 2013).
+Beyond asymptotic convergence to stationary points, little
+is known about ﬁnding models with low training or gener-
+alization error in the nonconvex case. There have recently
+
+Stability of stochastic gradient descent
+
+been several important studies investigating optimal train-
+ing of neural nets. For example Livni et al. show that
+networks with polynomial activations can be learned in a
+greedy fashion (Livni et al., 2014). Janzamin et al. (Jan-
+zamin et al., 2015) show that two layer neural networks
+can be learned using tensor methods. Arora et al. (Arora
+et al., 2015) show that two-layer sparse coding dictionar-
+ies can be learned via stochastic gradient. Our work com-
+plements these developments: rather than providing new
+insights into mechanisms that yield low training error, we
+provide insights into mechanisms that yield low generaliza-
+tion error. If one can achieve low training error quickly on
+a nonconvex problem with stochastic gradient, our results
+guarantee that the resulting model generalizes well.
+
+2. Stability of randomized iterative
+
+algorithms
+
+def
+
+Consider the following general setting of supervised learn-
+ing. There is an unknown distribution D over exam-
+ples from some space Z. We receive a sample S =
+(z1, . . . , zn) of n examples drawn i.i.d. from D. Our goal
+is to ﬁnd a model w with small population risk, deﬁned
+as: R[w]
+= Ez⇠D f (w; z) . Here, where f is a loss func-
+tion and f (w; z) designates the loss of the model described
+by w encountered on example z.
+Since we cannot measure the objective R[w] directly, we
+instead use a sample-averaged proxy, the empirical risk,
+deﬁned as RS[w]
+The generalization error of a model w is the difference
+
+i=1 f (w; zi) ,
+
+nPn
+
+def
+= 1
+
+RS[w]   R[w].
+
+(2.1)
+When w = A(S) is chosen as a function of the data by a
+potentially randomized algorithm A it makes sense to con-
+sider the expected generalization error
+
+def
+
+✏gen
+
+= ES,A[RS[A(S)]   R[A(S)]] ,
+
+(2.2)
+where the expectation is over the randomness of A and the
+sample S.
+In order to bound the generalization error of an algorithm,
+we employ the following notion of uniform stability in
+which we allow randomized algorithms as well.
+Deﬁnition 2.1. A randomized algorithm A is ✏-uniformly
+stable if for all data sets S, S0 2 Zn such that S and S0
+differ in at most one example, we have
+
+sup
+
+z
+
+EA [f (A(S); z)   f (A(S0); z)]  ✏.
+
+(2.3)
+
+Here, the expectation is taken only over the internal ran-
+domness of A. We will denote by ✏stab(A, n) the inﬁmum
+over all ✏ for which (2.3) holds. We will omit the tuple
+(A, n) when it is clear from the context.
+
+We recall the important theorem that uniform stability im-
+plies generalization in expectation. The proof is based on
+an argument in Lemma 7 of (Bousquet & Elisseeff, 2002)
+and very similar to Lemma 11 in (Shalev-Shwartz et al.,
+2010).
+Theorem 2.2. Let A be ✏-uniformly stable.
+|ES,A [RS[A(S)]   R[A(S)]]| ✏.
+Theorem 2.2 proves that if an algorithm is uniformly stable,
+then its generalization error is small. We now turn to some
+properties of iterative algorithms that control their uniform
+stability.
+
+Then,
+
+2.1. Properties of update rules
+We consider general update rules of the form G :⌦ ! ⌦
+which map a point w 2 ⌦ in the parameter space to another
+point G(w). The most common update is the gradient up-
+date rule G(w) = w   ↵rf (w) , where ↵   0 is a step
+size and f :⌦ ! R is a function that we want to optimize.
+The canonical update rule we will consider
+in this
+manuscript
+is an incremental gradient update, where
+G(w) = w   ↵rf (w) for some convex function f. We
+will return to a detailed discussion of this speciﬁc update in
+the sequel, but the reader should keep this particular exam-
+ple in mind throughout the remainder of this section.
+The following two deﬁnitions provide the foundation of our
+analysis of how two different sequences of update rules di-
+verge when iterated from the same starting point. These
+deﬁnitions will ultimately be useful when analyzing the sta-
+bility of stochastic gradient descent.
+Deﬁnition 2.3. An update rule is ⌘-expansive if for all
+v, w 2 ⌦, kG(v)   G(w)k  ⌘kv   wk. It is  -bounded if
+kw   G(w)k   .
+With these two properties, we can establish the following
+lemma of how a sequence of updates to a model diverge
+when the training set is perturbed.
+Lemma 2.4 (Growth recursion). Fix an arbitrary sequence
+of updates G1, . . . , GT and another sequence G01, . . . , G0T .
+Let w0 = w00 be a starting point in ⌦ and deﬁne  t =
+kw0t   wtk where wt, w0t are deﬁned recursively through
+(t > 0)
+
+w0t+1 = G0t(w0t) .
+Then, we have the recurrence relation  0 = 0,
+
+wt+1 = Gt(wt)
+
+ t+1 8><>:
+
+⌘ t
+min(⌘, 1) t + 2 t Gt and G0t are  -bounded,
+
+Gt = G0t is ⌘-expansive
+
+Gt is ⌘ expansive
+
+3. Stability of Stochastic Gradient Method
+Given n labeled examples S = (z1, . . . , zn) where zi 2
+Z, consider a decomposable objective function f (w) =
+
+Stability of stochastic gradient descent
+
+nPn
+i=1 f (w; zi), where f (w; zi) denotes the loss of w
+1
+on the example zi. The stochastic gradient update for this
+problem with learning rate ↵t > 0 is given by wt+1 =
+wt   ↵trwf (wt; zit) . Stochastic gradient method (SGM)
+is the algorithm resulting from performing stochastic gra-
+dient updates T times where the indices it are randomly
+chosen. There are two popular schemes for choosing the
+examples’ indices. One is to pick it uniformly at random
+in {1, . . . , n} at each step. The other is to choose a random
+permutation over {1, . . . , n} and cycle through the exam-
+ples repeatedly in the order determined by the permutation.
+Our results hold for both variants.
+In parallel with the previous section the stochastic gradient
+method is akin to applying the gradient update rule deﬁned
+as follows.
+Deﬁnition 3.1. For a nonnegative step size ↵   0 and
+a function f :⌦ ! R, we deﬁne the gradient update rule
+Gf,↵ as Gf,↵(w) = w   ↵rf (w) .
+3.1. Proof idea: Stability of stochastic gradient method
+In order to prove that the stochastic gradient method is sta-
+ble, we will analyze the output of the algorithm on two
+data sets that differ in precisely one location. Note that if
+the loss function is L-Lipschitz for every example z, we
+have E|f (w; z)   f (w0; z)| L Ekw   w0k for all w and
+w0. Hence, it sufﬁces to analyze how wt and w0t diverge
+in the domain as a function of time t. Recalling that wt is
+obtained from wt 1 via a gradient update, our goal is to
+bound  t = kwt   w0tk recursively and in expectation as a
+function of  t 1.
+There are two cases to consider.
+In the ﬁrst case, SGM
+selects the index of an example at step t on which is iden-
+tical in S and S0. Unfortunately, it could still be the case
+that  t grows, since wt and w0t differ and so the gradients
+at these two points may still differ. Below, we will show
+how to control  t in terms of the convexity and smoothness
+properties of the stochastic gradients.
+The second case to consider is when SGM selects the one
+example to update in which S and S0 differ. Note that
+this happens only with probability 1/n if examples are se-
+lected randomly. In this case, we simply bound the increase
+in  t by the norm of the two gradient rf (wt 1; z) and
+rf (w0t 1; z0). The sum of the norms is bounded by 2↵tL
+and we obtain  t   t + 2↵tL. Combining the two cases,
+we can then solve a simple recurrence relation to obtain a
+bound on  T .
+This simple approach sufﬁces to obtain the desired result in
+the convex case, but there are additional difﬁculties in the
+non-convex case. Here, we need to use an intriguing sta-
+bility property of stochastic gradient method. Speciﬁcally,
+the ﬁrst time step t0 at which SGM even encounters the
+
+example in which S and S0 differ is a random variable in
+{1, . . . , n} which tends to be relatively large. Speciﬁcally,
+for any m 2{ 1, . . . , n}, the probability that t0  m is
+upper bounded by m/n. This allows us to argue that SGM
+has a long “burn-in period” where  t does not grow at all.
+Once  t begins to grow, the step size has already decayed
+allowing us to obtain a non-trivial bound.
+We now turn to making this argument precise.
+
+3.2. Expansion properties of stochastic gradients
+Let us now record some of the core properties of the
+stochastic gradient update. The gradient update rule is
+bounded provided that the function f satisﬁes the following
+common Lipschitz condition.
+Deﬁnition 3.2. We say that f is L-Lipschitz if for all points
+u in the domain of f we have krf (x)k  L. This implies
+that |f (u)   f (v)| Lku   vk .
+Lemma 3.3. Assume that f is L-Lipschitz. Then, the gra-
+dient update Gf,↵ is (↵L)-bounded.
+
+2ku   vk2 .
+
+We now turn to expansiveness. As we will see shortly, dif-
+ferent expansion properties are achieved for non-convex,
+convex, and strongly convex functions.
+Deﬁnition 3.4. A function f :⌦ ! R is  -strongly convex
+if for all u, v 2 ⌦ we have f (u)   f (v) + hrf (v), u  
+vi +  
+We say f is convex if it is 0-strongly convex. The following
+standard notion of smoothness leads to a bound on how
+expansive the gradient update is.
+Deﬁnition 3.5. A function f :⌦ ! R is  -smooth if for all
+for all u, v 2 ⌦ we have krf (u)   rf (v)k   ku   vk .
+In general, smoothness will imply that the gradient updates
+cannot be overly expansive. When the function is also con-
+vex and the step size is sufﬁciently small the gradient up-
+date becomes non-expansive. When the function is addi-
+tionally strongly convex, the gradient update becomes con-
+tractive in the sense that ⌘ will be less than one and u and
+v will actually shrink closer to one another. The majority
+of the following results can be found in several textbooks
+and monographs. Notable references are Polyak (Polyak,
+1987) and Nesterov (Nesterov, 2004). We include proofs
+in the appendix for completeness.
+Lemma 3.6. Assume that f is  -smooth.
+Then, Gf,↵ is
+(1 + ↵ )-expansive. If f is in addition convex, then for any
+↵  2/ , the update Gf,↵ is 1-expansive. If f is in addition
+ +  , Gf,↵ is⇣1   ↵  
+ + ⌘-
+ -strongly convex, then for ↵  2
+expansive.
+
+Henceforth we will no longer mention which random se-
+lection rule we use as the proofs are almost identical for
+both rules.
+
+Stability of stochastic gradient descent
+
+2L2
+
+t=1 ↵t .
+
+3.3. Convex optimization
+We begin with a simple stability bound for convex loss min-
+imization via stochastic gradient method.
+Theorem 3.7. Assume that the loss function f (· ; z) is
+ -smooth, convex and L-Lipschitz for every z. Suppose
+that we run SGM with step sizes ↵t  2/  for T
+steps. Then, SGM satisﬁes uniform stability with ✏stab 
+n PT
+
+Proof. Let S and S0 be two samples of size n differing
+in only a single example. Consider the gradient updates
+G1, . . . , GT and G01, . . . , G0T induced by running SGM on
+sample S and S0, respectively. Let wT and w0T denote the
+corresponding outputs of SGM.
+We now ﬁx an example z 2 Z and apply the Lipschitz
+condition on f (· ; z) to get
+
+E|f (wT ; z)   f (w0T ; z)| L E [ T ] ,
+
+(3.1)
+where  T = kwT   w0Tk. Observe that at step t, with prob-
+ability 1   1/n, the example selected by SGM is the same
+in both S and S0. In this case we have that Gt = G0t and
+we can use the 1-expansivity of the update rule Gt which
+follows from Lemma 3.6 using the fact that the objective
+function is convex and that ↵t  2/ . With probability
+1/n the selected example is different in which case we use
+that both Gt and G0t are ↵tL-bounded as a consequence of
+Lemma 3.3. Hence, we can apply Lemma 2.4 and linear-
+ity of expectation to conclude that for every t, E [ t+1] 
+ 1   1
+n . Unrav-
+n PT
+t=1 ↵t . Plugging
+eling the recursion gives E [ T ]  2L
+⇤
+this back into equation (3.1), gives the desired result.
+
+n  E [ t] + 1
+
+n = E [ t] + 2L↵t
+
+n E [ t] + 2↵tL
+
+We refer the reader to the full version (?) for our results on
+strongly convex optimization.
+
+3.4. Non-convex optimization
+In this section we prove stability results for stochastic gra-
+dient methods that do not require convexity. We will still
+assume that the objective function is smooth and Lipschitz
+as deﬁned previously.
+The crux of the proof is to observe that SGM typically
+makes several steps before it even encounters the one ex-
+ample on which two data sets in the stability analysis dif-
+fer.
+Theorem 3.8. Assume that f (·; z) 2 [0, 1] is an L-
+Lipschitz and  -smooth loss function for every z. Suppose
+that we run SGM for T steps with monotonically non-
+increasing step sizes ↵t  c/t. Then, SGM has uniform
+stability with
+
+✏stab 
+
+1 + 1/ c
+n   1
+
+(2cL2)
+
+1
+
+ c+1 T
+
+ c
+
+ c+1
+
+In particular, omitting constant factors that depend on  ,
+c, and L, we get ✏stab / T 1 1/( c+1)
+
+.
+
+n
+
+4. Stability-inducing operations
+In light of our results, it makes sense to analyse for op-
+erations that increase the stability of the stochastic gradi-
+ent method. We show in this section that pleasingly sev-
+eral popular heuristics and methods indeed improve the
+stability of SGM. Our rather straightforward analyses both
+strengthen the bounds we previously obtained and help to
+provide an explanation for the empirical success of these
+methods.
+
+2kwk2.
+
+Weight Decay and Regularization. Weight decay is a
+simple and effective method that often improves general-
+ization (Krogh & Hertz, 1992).
+Deﬁnition 4.1. Let f :⌦ ! ⌦, be a differentiable function.
+We deﬁne the gradient update with weight decay at rate µ
+as Gf,µ,↵(w) = (1   ↵µ)w   ↵rf (w).
+It is easy to verify that the above update rule is equivalent
+to performing a gradient update on the `2-regularized ob-
+jective g(w) = f (w) + µ
+Lemma 4.2. Assume that f is  -smooth. Then, Gf,µ,↵ is
+(1 + ↵(    µ))-expansive.
+The above lemma shows as that a regularization parame-
+ter µ counters a smoothness parameter  . Once r > ,
+the
+gradient update with decay becomes contractive. Any the-
+orem we proved in previous sections that has a dependence
+on   leads to a corresponding theorem for stochastic gradi-
+ent with weight decay in which   is replaced with     µ.
+Gradient Clipping.
+It is common when training deep
+neural networks to enforce bounds on the norm of the gra-
+dients encountered by SGD. This is often done by either
+truncation, scaling, or dropping of examples that cause an
+exceptionally large value of the gradient norm.
+Consider for example gradient clipping.
+In this pro-
+cedure, a stochastic gradient rf (w; z) is replaced with
+rcf (w; z) = clip(rf (w; z)) where clip(x) = x if kxk 
+B and B/kxk otherwise.
+Lemma 4.3. If f is  -smooth, then krcf (w; z)k  B and
+krcf (v; z)   rcf (w; z)k   kv   wk.
+Similar arguments would apply to the different variants of
+gradient warping. Any such heuristic where the warping
+operation is Lipschitz directly leads to a bound on the Lip-
+schitz parameter L that appears in our bounds. It is also
+easy to introduce a varying Lipschitz parameter Lt to ac-
+count for possibly different values.
+
+Stability of stochastic gradient descent
+
+Dropout. Dropout (Srivastava et al., 2014) is a popular
+and effective heuristic for preventing large neural networks
+from overﬁtting. Here we prove that, indeed, dropout im-
+proves all of our stability bounds generically.
+At each iteration of dropout SGD, we sample a random di-
+agonal matrix P with precisely s diagonal entries equal to
+1 and the rest equal to 0. Instead of taking a stochastic gra-
+dient step rf (w; z) we instead update with the perturbed
+gradient rdf (w; z) := Prf (P w; z). The dropout up-
+date is both more bounded and smoother than the standard
+stochastic gradient update.
+Lemma 4.4. Assume that f is L-Lipschitz and  -smooth.
+Then, the dropout gradient rdf (w; z) with dropout rate
+s has norm bounded by L and satisﬁes EP krdf (v; z)  
+rdf (w; z)k  (ps/d) kv   wk.
+
+5. Convex risk minimization
+We now outline how our generalization bounds lead to
+bounds on the population risk achieved by SGM in the con-
+vex setting. We restrict our attention to the convex case
+where we can contrast against known results. The main
+feature of our results is that we show that one can achieve
+bounds comparable or perhaps better than known results
+on stochastic gradient for risk minimization by running for
+multiple passes over the data set.
+The key to the analysis in this section is to decompose the
+risk estimates into an optimization error term and a stabil-
+ity term. The optimization error designates how closely we
+optimize the empirical risk or a proxy of the empirical risk.
+By optimizing with stochastic gradient, we will be able
+to balance this optimization accuracy against how well we
+generalize. These results are inspired by the work of Bous-
+quet and Bottou who provided similar analyses for SGM
+based on uniform convergence (Bottou & Bousquet, 2008).
+However, our stability results will yield sharper bounds.
+Throughout this section, our risk decomposition works as
+follows. We deﬁne the optimization error to be the gap
+between the empirical risk and minimum empirical risk
+? ]⇤ where
+in expectation:
+? = arg minw RS[w]. By Theorem 2.2, the expected
+wS
+risk of a w output by SGM is bounded as E[R[w]] 
+In
+E[RS[w]] + ✏stab  E[RS[wS
+general, the optimization error decreases with the number
+of SGM iterations while the stability increases. Balancing
+these two terms will thus provide a reasonable excess risk
+against the empirical risk minimizer. Note that our analysis
+involves the expected minimum empirical risk which could
+be considerably smaller than the minimum risk. However,
+as we now show, it can never be larger.
+Lemma 5.1. Let w? denote the minimizer of the popula-
+tion risk and wS
+? denote the minimizer of the empirical risk
+
+= E⇥RS[w]   RS[wS
+
+? ]] + ✏opt(w) + ✏stab.
+
+✏opt(w)
+
+def
+
+given a sampled data set S. Then E[RS[wS
+
+? ]]  R[w?].
+
+2
+
+2 L2↵.
+
+D2
+T↵ + 1
+
+To analyze the optimization error, we will make use of a
+classical result due to Nemirovski and Yudin (Nemirovski
+& Yudin, 1983).
+Theorem 5.2. Assume we run stochastic gradient descent
+with constant stepsize ↵ on a convex function R[w] =
+Ez[f (w; z)] . Assume further that krf (w; z)k  L and
+kw0   w?k  D for some minimizer w? of R. Let ¯wT de-
+note the average of the T iterates of the algorithm. Then
+we have R[ ¯wT ]  R[w?] + 1
+The upper bound stated in the previous theorem is known
+to be tight even if the function is  -smooth (Nemirovski &
+Yudin, 1983).
+Theorem 5.2 directly provides a generalization bound for
+SGM that holds when we make a single pass over the data.
+The theorem requires fresh samples from the distribution in
+each update step of SGM. Hence, given n data points, we
+cannot make more than n steps, and each sample must not
+be used more than once.
+Corollary 5.3. Let f be a convex loss function satisfying
+krf (w, z)k  L and let w? be a minimizer of the popu-
+lation risk R[w] = Ez f (w; z). Suppose we make a single
+pass of SGM over the sample S = (z1, . . . , zn) with ﬁxed
+step size ↵ = D
+Lpn starting from a point w0 that satis-
+ﬁes kw0   w?k  D. Then, the average ¯wn of the iterates
+satisﬁes E[R[ ¯wn]]  R[w?] + DLpn .
+We now contrast this bound with what follows from our
+results.
+Proposition 5.4. Let S = (z1, . . . , zn) be a sample of
+size n. Let f be a  -smooth convex loss function satisfy-
+ing krf (w, z)k  L and let wS
+? be a minimizer of the
+nPn
+empirical risk RS[w] = 1
+i=1 f (w; zi). Suppose we run
+T steps of SGM with step size
+Lpn  n
+T ·r T
+
+n + 2T!
+
+↵ =
+
+D
+
+.
+
+T
+
+? ]] + DLpnq n+2T
+
+? k 
+the average ¯wT over the iterates satisﬁes
+
+from a starting point w0 that satisﬁes kw0   wS
+D. Then,
+E[R[ ¯wT ]]  E[RS[wS
+Note that the bound from our stability analysis is not di-
+rectly comparable to Corollary 5.3 as we are comparing
+against the expected minimum empirical risk rather than
+the minimum risk. Lemma 5.1 implies that the excess risk
+in our bound is at most worse by a factor of p3 compared
+with Corollary 5.3 when T = n. Moreover, the excess risk
+in our bound tends to a factor merely p2 larger than the
+Nemirovski-Yudin bound as T goes to inﬁnity. In contrast,
+the classical bound does not apply when T > n.
+
+Stability of stochastic gradient descent
+
+6. Experimental Evaluation
+The goal of our experiments is to isolate the effect of train-
+ing time, measured in number of steps, on the stability of
+SGM. We evaluated broadly a variety of neural network ar-
+chitectures and varying step sizes on a number of different
+datasets.
+To measure algorithmic stability we consider two proxies.
+The ﬁrst is the Euclidean distance between the parameters
+of two identical models trained on the datasets which dif-
+fer by a single example. In all of our proofs, we use slow
+growth of this parameter distance as a way to prove stabil-
+ity. Note that it is not necessary for this parameter distance
+to grow slowly in order for our models to be algorithmi-
+cally stable. This is a strictly stronger notion. Our second
+weaker proxy is to measure the generalization error directly
+in terms of the absolute different between the test error and
+training error of the model.
+We analyzed four standard machine learning datasets each
+with their own corresponding deep architecture. We stud-
+ied the LeNet architecture for MNIST, the cuda-convnet
+architecture for CIFAR-10, the AlexNet model for Ima-
+geNet, and the LSTM model for the Penn Treebank Lan-
+guage Model (PTB). Full details of our architectures and
+training procedures can be found below.
+In all cases, we ran the following experiment. We choose a
+random example from the training set and remove it. The
+remaining examples constitute our set S. Then we create a
+set S0 by replacing a random element of S with the element
+we deleted. We train stochastic gradient descent with the
+same random seed on datasets S and S0. We record the Eu-
+clidean distance between the individual layers in the neural
+network after every 100 SGM updates. We also record the
+training and testing errors once per epoch.
+Our experiments show four primary ﬁndings:
+Step size dependence. Doubling the step size no more
+than doubles the generalization error (see Figure 1). This
+behavior is fairly consistent for both generalization error
+deﬁned with respect to classiﬁcation accuracy and cross en-
+tropy (the loss function used for training). It thus suggests
+that there is at most a linear dependence on the step size in
+the generalization error.
+Parameter distance. We evaluate the normalized Eu-
+
+clidean distance pkw   w0k2/(kwk2 + kw0k2) between
+
+the parameters w and w0 of two models trained on two
+copies of the data differing in a random substitution. We
+observe that the parameter distance grows sub-linearly even
+in cases where our theory currently uses an exponential
+bound. This shows that our bounds are pessimistic.
+Parameter distance verus generalization.
+There is a
+close correspondence between the parameter distance and
+
+generalization error. A priori, it could have been the case
+that the generalization error is small even though the pa-
+rameter distance is large. Our experiments show that these
+two quantities often move in tandem and seem to be closely
+related.
+Late substitution. When measuring parameter distance
+it is indeed important that SGM does not immediately
+encounter the random substitution, but only after some
+progress in training has occurred. If we artiﬁcially place the
+corrupted data point at the ﬁrst step of SGM, the parameter
+distance can grow signiﬁcantly faster subsequently. This
+effect is most pronounced in the ImageNet experiments, as
+displayed in Figure 2.
+
+Experiments. We evaluated convolutional neural net-
+works for image classiﬁcation on three datasets: MNIST,
+Cifar10 and ImageNet. Starting with Cifar10, we chose
+a standard model consisting of three convolutional lay-
+ers each followed by a pooling operation. This model
+roughly corresponds to that proposed by Krizhevsky et
+al. (Krizhevsky et al., 2012) and available in the “cuda-
+convnet” code1. However, to make the experiments more
+interpretable, we avoid all forms of regularization such
+as weight decay or dropout. The learning rate was ﬁxed
+at 0.01. We also do not employ data augmentation even
+though this would greatly improve the ultimate test accu-
+racy of the model. Additionally, we use only constant step
+sizes in our experiments. With these restrictions the model
+we use converges to below 20% test error. While this is
+not state of the art on Cifar10, our goal is not to optimize
+test accuracy but rather a simple, interpretable experimen-
+tal setup.
+The situation on MNIST is largely analogous to what we
+saw on Cifar10. We trained a LeNet inspired model with
+two convolutional layers and one fully-connected layer.
+The ﬁrst and second convolutional layers have 20 and 50
+hidden units respectively. This model is much smaller and
+converges signiﬁcantly faster than the Cifar10 models, typ-
+ically achieving best test error in ﬁve epochs. We trained
+with minibatch size 60. As a result, the amount of overﬁt-
+ting is smaller.
+In the case of MNIST, we also repeated
+our experiments after replacing the usual cross entropy ob-
+jective with a squared loss objective. The results are in the
+full version on arxiv. It turned out that this does not harm
+convergence at all, while leading to somewhat smaller gen-
+eralization error and parameter divergence.
+On ImageNet, we trained the standard AlexNet architec-
+ture (Krizhevsky et al., 2012) using data augmentation, reg-
+ularization, and dropout. Unlike in the case of Cifar10,
+we were unable to ﬁnd a setting of hyperparameters that
+yielded reasonable performance without using these tech-
+
+1https://code.google.com/archive/p/cuda-convnet
+
+Stability of stochastic gradient descent
+
+Figure 2. Experiments on ImageNet. Top left: Parameter diver-
+gence with early substitution. Top right: Late substitution. Bot-
+tom: Generalization error for varying model size.
+
+ing Zaremba et al., we trained regularized LSTMs with two
+layers that were unrolled for 20 steps. We initialize the hid-
+den states to zero. We trained with minibatch size 20. The
+LSTM has 200 units per layer and its parameters are initial-
+ized to have mean zero and standard deviation of 0.1. We
+did not use dropout to enhance reproducibility. Dropout
+would only increase the stability of our models. The re-
+sults are displayed in Figure 3.
+
+Figure 3. Training on PTB dataset with LSTM architecture.
+
+Acknowledgements
+The authors would like to thank Martin Abadi, Samy Ben-
+gio, Thomas Breuel, John Duchi, Vineet Gupta, Kevin
+Jamieson, Kenneth Marino, Giorgio Patrini, John Platt,
+Eric Price, Ludwig Schmidt, Nati Srebro, Ilya Sutskever,
+and Oriol Vinyals for their valuable feedback.
+
+Figure 1. Experimental results on Cifar. Top: Generalization er-
+ror. Middle: Parameter divergence. Bottom: Comparison of train,
+test, and generalization eror with parameter divergence.
+
+niques. However, for Figure 2 (bottom), we did not use
+data-augmentation to exaggerate the effects of overﬁtting
+and demonstrate the impact scaling the model-size. This
+ﬁgure demonstrates that the model-size appears to be a
+second-order effect with regards to generalization error,
+and step-size has a considerably stronger impact.
+
+6.1. Recurrent neural networks with LSTM
+We also examined the stability of recurrent neural net-
+works. Speciﬁcally, we looked at an LSTM architecture
+for language modeling (Zaremba et al., 2014). We focused
+on word-level prediction experiments using the Penn Tree
+Bank (PTB) (Marcus et al., 1993), consisting of 929,000
+training words, 73,000 validation words, and 82,000 test
+words. PTB has 10,000 words in its vocabulary2. Follow-
+
+2Data
+
+source:
+
+˜imikolov/rnnlm/simple-examples.tgz
+
+http://www.fit.vutbr.cz/
+
+05101520epoch0.000.020.040.060.080.100.120.140.16abs(trainerror-testerror)Generalizationerrorstepsize.0008.0016.0032.0064.01280102030405060epoch0.00.10.20.30.40.5NormalizedeuclideandistanceParameterdistancelayerconv1conv2conv3all0102030405060epoch0.00.10.20.30.40.50.6Trainvstestvsparameterdistancenormdifftrainerrortesterrorabs(trainerror-testerror)01234567epoch0.000.050.100.150.200.250.300.350.400.45NormalizedeuclideandistanceEarlysubstitutionlayerconv101234567epoch0.0000.0020.0040.0060.0080.0100.0120.0140.0160.018NormalizedeuclideandistanceLatesubstitutionlayerconv10246810121416epoch0.000.050.100.150.200.25GeneralizationerrorVaryingmodelsizesize10242048409681921638405101520epoch050100150200250LossTraining,testerrortraintestabs(train-test)05101520epoch0.00.10.20.30.40.5NormalizedeuclideandistanceParameterdistanceLayerLSTMallStability of stochastic gradient descent
+
+References
+Arora, Sanjeev, Ge, Rong, Ma, Tengyu, and Moitra, Ankur.
+Simple, efﬁcient, and neural algorithms for sparse cod-
+ing. In Proceedings of the Conference on Learning The-
+ory (COLT), 2015.
+
+Bottou, L´eon. Online algorithms and stochastic approxima-
+tions. In Saad, David (ed.), Online Learning and Neural
+Networks. Cambridge University Press, Cambridge, UK,
+1998.
+
+Bottou, L´eon and Bousquet, Olivier. The tradeoffs of large
+In Neural Information Processing Sys-
+
+scale learning.
+tems, 2008.
+
+Bousquet, Olivier and Elisseeff, Andr´e. Stability and gen-
+eralization. Journal of Machine Learning Research, 2:
+499–526, 2002.
+
+Devroye, Luc P. and Wagner, T.J. Distribution-free per-
+formance bounds for potential function rules. Informa-
+tion Theory, IEEE Transactions on, 25(5):601–604, Sep
+1979. ISSN 0018-9448.
+
+Elisseeff, Andre, Evgeniou, Theodoros, and Pontil, Mas-
+similiano. Stability of randomized learning algorithms.
+Journal of Machine Learning Research, 6:55–79, 2005.
+
+Frostig, R., Ge, R., Kakade, S. M., and Sidford, A. Com-
+peting with the empirical risk minimizer in a single pass.
+In Conference on Learning Theory (COLT), 2015.
+
+Ghadimi, Saeed and Lan, Guanghui. Stochastic ﬁrst-and
+zeroth-order methods for nonconvex stochastic program-
+ming. SIAM Journal on Optimization, 23(4):2341–2368,
+2013.
+
+Hazan, Elad and Kale, Satyen.
+
+Beyond the regret
+minimization barrier: optimal algorithms for stochas-
+tic strongly-convex optimization. Journal of Machine
+Learning Research, 15(1):2489–2512, 2014.
+
+Hazan, Elad, Kalai, Adam, Kale, Satyen, and Agarwal,
+Amit. Logarithmic regret algorithms for online convex
+optimization. In Proceedings of the 19th Annual Confer-
+ence on Learning Theory, 2006.
+
+Janzamin, Majid, Sedghi, Hanie, and Anandkumar, Anima.
+Generalization bounds for neural networks through ten-
+sor factorization. Preprint available at arXiv:1506.
+08473, 2015.
+
+Kearns, Michael J. and Ron, Dana. Algorithmic stabil-
+ity and sanity-check bounds for leave-one-out cross-
+validation.
+Neural Computation, 11(6):1427–1453,
+1999.
+
+Krizhevsky, Alex, Sutskever, Ilya, and Hinton, Geoffrey E.
+Imagenet classiﬁcation with deep convolutional neural
+networks. In Proc. NIPS, pp. 1097–1105, 2012.
+
+Krogh, A. and Hertz, J. A. A simple weight decay can im-
+prove generalization. In Proc. NIPS, pp. 950–957, 1992.
+
+Kushner, Harold J. and Yin, G. George. Stochastic Ap-
+proximation and Recursive Algorithms and Applications.
+Springer-Verlag, New York, second edition, 2003.
+
+Livni, Roi, Shalev-Shwartz, Shai, and Shamir, Ohad. On
+the computational efﬁciency of training neural networks.
+In Advances in Neural Information Processing Systems,
+pp. 855–863, 2014.
+
+Marcus, Mitchell P, Marcinkiewicz, Mary Ann, and San-
+torini, Beatrice. Building a large annotated corpus of
+English: The Penn Treebank. Computational linguistics,
+19(2):313–330, 1993.
+
+Mukherjee, Sayan, Niyogi, Partha, Poggio, Tomaso, and
+Rifkin, Ryan M. Learning theory: stability is sufﬁcient
+for generalization and necessary and sufﬁcient for con-
+sistency of empirical risk minimization. Adv. Comput.
+Math., 25(1-3):161–193, 2006.
+
+Nemirovski, A, Juditsky, A, Lan, G, and Shapiro, A.
+Robust stochastic approximation approach to stochastic
+programming. SIAM Journal on Optimization, 19(4):
+1574–1609, 2009.
+
+Nemirovski, Arkadi and Yudin, David B. On Cezari’s con-
+vergence of the steepest descent method for approximat-
+ing saddle point of convex-concave functions. In Soviet
+Mathetmatics Doklady, volume 19, 1978.
+
+Nemirovski, Arkadi and Yudin, David B. Problem com-
+plexity and method efﬁciency in optimization. Wiley In-
+terscience, 1983.
+
+Nesterov, Y. Introductory lectures on convex optimization,
+volume 87 of Applied Optimization. Kluwer Academic
+Publishers, Boston, MA, 2004. ISBN 1-4020-7553-7. A
+basic course.
+
+Polyak, B. T. Introduction to optimization. Optimization
+
+Software, Inc., 1987.
+
+Rakhlin, Alexander, Shamir, Ohad, and Sridharan, Karthik.
+Making gradient descent optimal for strongly convex
+stochastic optimization. In Proceedings of the 29th In-
+ternational Conference on Machine Learning, 2012. Ex-
+tended version at arxiv:1109.5647.
+
+Rosasco, Lorenzo and Villa, Silvia. Learning with in-
+cremental iterative regularization. Preprint available at
+arXiv:1405.0042v2, 2014.
+
+Stability of stochastic gradient descent
+
+Shalev-Shwartz, Shai, Shamir, Ohad, Srebro, Nathan, and
+Sridharan, Karthik. Learnability, stability and uniform
+convergence. Journal of Machine Learning Research,
+11:2635–2670, 2010.
+
+Srivastava, Nitish, Hinton, Geoffrey, Krizhevsky, Alex,
+Sutskever, Ilya, and Salakhutdinov, Ruslan. Dropout:
+A simple way to prevent neural networks from overﬁt-
+ting. The Journal of Machine Learning Research, 15(1):
+1929–1958, 2014.
+
+Zaremba, Wojciech, Sutskever, Ilya, and Vinyals, Oriol.
+Recurrent neural network regularization. Technical re-
+port, 2014. Preprint available at arxiv:1409.2329.
+
+

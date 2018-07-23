@@ -1,0 +1,28 @@
+<html>
+
+<head>
+	<title>I'M ON THE BOAT!!!!</title>
+</head>
+
+<body>
+	<div style="text-align: center;">
+		<img src="static/img/boat.jpg">
+	</div>
+	<div class="search" style="vertical-align: middle; text-align: center;">
+		<form action="{{ url_for('search') }}" method=post>
+			<input type="text" placeholder="You're really on the boat!!!" value="{{ sent }}" name="query" required>
+			<button type="submit">GET ON THE BOAT</button>
+		</form>
+	</div>
+	<div class="result">
+	 <ul>
+	 {% for title,url,highlights in entries %}
+	  <li><h2><a href="http://{{url}}">{{ title
+                  }}</a></h2><br><h4>{{highlights}}</h4><br><h3><a
+              href="static/{{url}}">snapshot</h3></li>
+	 {% endfor %}
+	 </ul>
+	</div>
+</body>
+
+</html>

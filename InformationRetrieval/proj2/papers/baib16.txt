@@ -1,0 +1,1509 @@
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+Wenruo Bai
+Rishabh Iyer
+Kai Wei
+Jeff Bilmes
+University of Washington, Seattle, WA 98195, USA
+
+WRBAI@UW.EDU
+RKIYER@U.WASHINGTON.EDU
+WEIKAI.HUST@GMAIL.COM
+BILMES@UW.EDU
+
+Abstract
+
+problems that have the following form:
+
+We investigate a new optimization problem in-
+volving minimizing the Ratio of two Submodular
+(RS) functions. We argue that this problem
+occurs naturally in several real world applications.
+We then show the connection between this
+problem and several related problems including
+minimizing the difference between submodular
+functions (Iyer & Bilmes, 2012b; Narasimhan &
+Bilmes, 2005), and to submodular optimization
+subject to submodular constraints (Iyer & Bilmes,
+2013). We show that RS optimization can be
+solved with bounded approximation factors. We
+also provide a hardness bound and show that our
+tightest algorithm matches the lower bound up to
+a log factor. Finally, we empirically demonstrate
+the performance and good scalability properties
+of our algorithms.
+
+1. Introduction
+A set function f : 2V → R+ is said to be submodular
+(Fujishige, 2005) if for all subsets S, T ⊆ V , it holds
+that f (S) + f (T ) ≥ f (S ∪ T ) + f (S ∩ T ). Deﬁning
+f (j|S) (cid:44) f (S ∪ j) − f (S) as the gain of j ∈ V in the
+context of S ⊆ V , then f is submodular if and only if
+f (j|S) ≥ f (j|T ) for all S ⊆ T and j /∈ T . The function
+f is monotone iff f (j|S) ≥ 0,∀j /∈ S, S ⊆ V . W.l.o.g.,
+we assume the ground set is V = {1, 2,··· , n}. While
+general set function optimization is often intractable, many
+forms of submodular function optimization can be solved
+near optimally or even optimally in certain cases, and
+hence submodularity is also often called the discrete analog
+of convexity (Lov´asz, 1983). Submodularity, moreover,
+is inherent in a large set of real-world machine learning
+applications, therefore making them useful in practice.
+In this paper, we study a new class of discrete optimization
+
+Proceedings of the 33 rd International Conference on Machine
+Learning, New York, NY, USA, 2016. JMLR: W&CP volume 48.
+Copyright 2016 by the author(s).
+
+Problem 1: min
+∅⊂X⊆V
+
+f (X)
+g(X)
+
+,
+
+(1)
+
+where f and g are monotone non-decreasing submodu-
+lar functions. We call the objective f (A)
+g(A) a ratio of sub-
+modular (RS) function. We do not require that either
+f or g is normalized, we only assume f (∅) ≥ 0 and
+g(∅) ≥ 0. We assume, w.l.o.g., that both f and g satisfy
+f (v) > 0, g(v) > 0,∀v ∈ V , since we may simply remove
+any item v ∈ V for consideration if g(v) = 0 and add any
+item v ∈ V to the solution if f (v) = 0. As a consequence
+of this assumption and the monotonicity of f and g, we have
+that f (A) > 0, g(A) > 0,∀∅ ⊂ A ⊆ V .
+We call this problem RS minimization. In Section 5, we
+extend the algorithms here to handle non-monotone submod-
+ular functions. We also consider a related problem called
+RS maximization:
+
+Problem 2: max
+∅⊂X⊆V
+
+g(X)
+f (X)
+
+.
+
+(2)
+
+We observe that RS Minimization and RS Maximization are
+equivalent, in that an algorithm for Problem 1 also solves
+Problem 2. To be precise, given an α-approximation al-
+gorithm (α > 1) for Problem 1, one can achieve a 1/α
+approximation for Problem 2, using the solution obtained
+by the algorithm for Problem 1.
+
+1.1. Applications
+In the below, we describe how Problems 1 and 2 appear
+naturally in several machine learning applications.
+
+Maximizing the F-Measure in Information Retrieval:
+Consider the problem where one is given a set U of objects
+(e.g., documents, images etc.) which can be expressed as
+a bag of words W . One can construct a bipartite graph
+G(U, W, E), where U is the set of objects, W is the set of
+words, and the edge eu,w ∈ E between the object u and the
+word w exists if the word w is present in the object u. Deﬁne
+a neighborhood function Γ : 2U → 2W on the bipartite
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+graph G that maps from any subset of the objects X ⊆ U to
+the set of words Γ(X) ⊆ W contained in the objects. We are
+interested in the information retrieval problem of ﬁnding a
+set of objects that cover exactly a set of target words T ⊆ W .
+The quality of any subset X ⊆ U may be measured as the
+F-Measure of the coverage on the target words T . More
+formally, the quality measure can be deﬁned as:
+
+F (X) =
+
+2|Γ(X) ∩ T|
+|T| + |Γ(X)| .
+
+(3)
+
+The goal is to ﬁnd a set of objects X that maximizes
+the F-measure F (X). Note that both |Γ(X) ∩ T| and
+|T| +|Γ(X)| are monotone submodular. Hence the problem
+is an instance of RS maximization (Problem 2).
+
+Normalized Cuts and Ratio Cuts: Another application
+of RS optimization is the normalized cut and ratio cut prob-
+lem, which have been extensively used in image segmen-
+tation and clustering (Shi & Malik, 2000; Kawahara et al.,
+2011). Let G = (V, E) be a similarity graph deﬁned on the
+set of vertices V , where wa,a(cid:48) is the edge weight between the
+vertex a and a(cid:48) ∈ V and measures the similarity between
+a(cid:48)∈V \A wa,a(cid:48)
+be the graph cut function deﬁned on the graph G, and let
+v∈V wa,v be the function that measures
+the association of the subset A to the ground set V . The
+normalized cut problem as deﬁned in (Shi & Malik, 2000)
+is to minimize the following objective:
+
+these two vertices. Let h(A) = (cid:80)
+m(A) =(cid:80)
+
+(cid:80)
+
+(cid:80)
+
+a∈A
+
+a∈A
+
+h(A)
+m(A)
+
+m(V ) − m(A)
+which can further simpliﬁed as follows:
+
++
+
+h(A)
+
+h(A)m(V )
+
+m(A)(m(V ) − m(A))
+
+.
+
+,
+
+(4)
+
+(5)
+
+Note that m(V ) is a constant, and both h(A) and
+m(A)(m(V )−m(A)) are symmetric submodular functions.
+Therefore, the normalized cuts problem can be formulated as
+a non-monotone instance of RS minimization (Problem 1).
+A similar case is given in (Narasimhan & Bilmes, 2007).
+
+Maximizing Diversity & Minimizing Cooperative Costs:
+A ﬁnal set of applications are related to simultaneously
+maximizing diversity or coverage, while minimizing coop-
+erative costs. Applications of this involve sensor placement,
+feature selection (Krause et al., 2008; Iyer & Bilmes, 2012b;
+Liu et al., 2013), and data subset selection (Lin & Bilmes,
+2011; Wei et al., 2013; 2015a). While these problems are
+often modeled as a difference of submodular functions, or
+constrained submodular optimization, one can also model
+them as a ratio of submodular functions, where the submod-
+ular function f models the cooperative costs while g models
+information and utility. The ratio g(A)
+f (A) naturally models
+the cost normalized utility of the set A. Maximizing g(A)
+f (A)
+(Problem 2) leads to the best cost normalized subset A.
+
+Algorithm 1 A (1 + )-approximation algorithm for RS
+minimization using an exact algorithm for DS minimization
+1: Input: f, g,  ∈ [0, 1) and an exact algorithm for DS
+
+minimization.
+
+2
+
+.
+
+2: Output: A (1 + )-approximate solution for Prob. 1
+3: Set λmax← f (A)
+g(A) for arbitrary A ⊆ V , and λmin ← 0.
+4: while λmax > (1 + )λmin do
+¯λ ← λmin+λmax
+5:
+ˆX ← argminX⊃∅[f (X) − ¯λg(X)].
+6:
+if f ( ˆX)
+7:
+g( ˆX)
+8:
+9:
+10:
+11:
+12: end while
+13: Return ˆX ← argminX [f (X) − ¯λg(X)].
+
+λmin ← ¯λ
+λmax ← ¯λ
+
+≥ ¯λ then
+
+end if
+
+else
+
+1.2. RoadMap of this Paper
+The rest of the paper is organized as follows. We ﬁrst de-
+scribe connections between RS minimization and related
+problems studied in the literature (Section 2). In particu-
+lar, we show how this is closely related to the problem of
+minimizing the difference between submodular functions
+and to the problem of submodular optimization subject to
+submodular lower bound and upper bound constraints. In
+Section 3, we provide several approximation algorithms
+along with the analysis of their approximation guarantees
+for RS minimization. The algorithms include GreedyRatio,
+Binary Search, Majorization-Minimization, and Ellipsoidal
+Approximations. In Section 4, we prove matching hard-
+ness bounds for this Problem. In Section 5, we consider
+extensions of RS minimization where f and g may be su-
+permodular and/or non-monotone submodular. Empirical
+evaluations on synthetic data are given in Section 6.
+
+2. Connections to Related Problems
+Connections to DS optimization: A problem related to
+the RS minimization is the Difference of Submodular (DS)
+minimization deﬁned as follows:
+
+Problem: min
+X⊆V
+
+[f (X) − λg(X)],
+
+(6)
+
+where λ ≥ 0. We call the objective f (X) − λg(X) a
+difference of submodular (DS) function. We show below
+that, in fact, an exact algorithm for DS minimization can
+be used as a subroutine to also solve RS minimization via a
+simple binary search scheme as described in Alg. 1.
+Lemma 2.1. Given  > 0 and an exact algorithm for solv-
+ing DS minimization (Problem 6), Algorithm 1 provides a
+(1 + )-approximation for RS minimization (Problem 1), by
+solving O(log(1/)) instances of DS minimization.
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+Proof. When the algorithm terminates, the following holds:
+minX [f (X) − λming(X)] ≥ 0, which implies that f (X)
+g(X) ≥
+≤ λmax ≤
+λmin,∀X ⊂ V . Therefore, it holds that: f ( ˆX)
+(1 + )λmin ≤ (1 + ) minX
+
+g( ˆX)
+
+f (X)
+
+g(X) .
+
+While RS minimization and DS minimization are closely
+related, we show below the class of set functions rep-
+resentable as an RS function is strictly contained by
+the class of DS functions. Thus, the DS minimization
+problem encapsulates a strictly larger class of combinatorial
+optimization problems.
+Lemma 2.2. Any RS function can be expressed as a DS
+function. However, there exists an instance of a DS function
+that cannot be represented as an RS function.
+
+Proof. The ﬁrst half of the lemma holds since any RS func-
+tion is a set function, and any set function can be expressed
+as a DS function (Narasimhan & Bilmes, 2005).
+To show the second half of the Lemma, we give a counter-
+example as follows: Let V = {1, 2}, h(X) = f1(X) −
+
+g1(X) where f1(X) = (cid:112)2|X| and g1(X) = |X|. Note
+
+that h(X), by deﬁnition, is a DS function. Assume that
+h(X) can be expressed as f2(X)
+g2(X) with f2(X) and g2(X)
+being non-decreasing submodular functions. We then have
+that f2(∅) = f2(V ) = 0, since f2(∅)
+g2(V ) = 0. How-
+ever, we have that f2({1}) = h({1})g2({1}) > 0, which
+contradicts the monotonicity of f2.
+
+g2(∅) = f2(V )
+
+In Section 3, we give bounded approximation algorithms
+for RS minimization. This is unlike DS minimization that,
+in the worst case, is inapproximable (Iyer & Bilmes, 2012b)
+— hence, we cannot simply optimize log f /g and expect
+guarantees. Nevertheless, there are a number of heuristic
+approaches to DS optimization that work well in prac-
+tice (Iyer & Bilmes, 2012b; Narasimhan & Bilmes, 2005;
+Kawahara & Washio, 2011). Moreover, there are several
+special cases of DS minimization that can be solved exactly
+(Section 3) and hence where a (1 + )-approximation for
+RS minimization may be obtained via Algorithm 1.
+
+Relation to SCSC and SCSK: Another related and re-
+cently studied class of problems is submodular optimization
+subject to submodular cover and submodular knapsack con-
+straints (Iyer & Bilmes, 2013), namely:
+
+Problem (SCSC): min{f (X)| g(X) ≥ c},
+Problem (SCSK): max{g(X)| f (X) ≤ b},
+
+(7)
+(8)
+
+which generalize (Wolsey, 1982; Atamt¨urk & Narayanan,
+2009). These problems are referred to as Submodular Cost
+Submodular Cover (SCSC) and Submodular Cost Submod-
+ular Knapsack (SCSK), respectively. As shown in (Iyer
+& Bilmes, 2013), both SCSC and SCSK admit bi-criterion
+
+Algorithm 2 Approx. algorithm for RS minimization using
+an approximation algorithm for SCSC.
+1: Input: f, g,  > 0, and a [σ, ρ] bicriterion approxima-
+
+tion algorithm for SCSC.
+
+approximation for Problem 1.
+
+ρ
+
+2: Output: An σ(1+)
+3: c ← g(V ), ˆXc ← V , and ˆX ← ˆXc.
+4: while g( ˆXc) > minj∈V g(j) do
+5:
+6:
+7:
+
+c ← (1 + )−1c
+ˆXc ← [σ, ρ] approx. for Problem 7 with c.
+if f ( ˆX)
+g( ˆX)
+
+> f ( ˆXc)
+g( ˆXc)
+
+then
+
+ˆX ← ˆXc
+
+end if
+
+8:
+9:
+10: end while
+11: Return ˆX.
+
+approximation algorithms. Without loss of generality, we
+concentrate on SCSC. An algorithm is a [σ, ρ] bi-criterion
+algorithm for SCSC if it is guaranteed to obtain a set X
+such that f (X) ≤ σf (X∗) (approximate optimality) and
+g(X) ≥ ρc (approximate feasibility), where X∗ is the opti-
+mizer for SCSC. Note that it typically holds that σ ≥ 1 and
+ρ ≤ 1. Interestingly, we show in the below that any [σ, ρ] bi-
+criterion algorithm for SCSC can be used as a subroutine to
+yield a σ
+ρ -approximation algorithm for RS minimization via
+a simple linear search strategy as described in Algorithm 2.
+Lemma 2.3. Given  > 0, Algorithm 2 is guaranteed to ﬁnd
+a solution ˆX which is a σ
+ρ (1 + )-approximation for RS min-
+imization in O(1/) calls to a [σ, ρ] bi-criterion algorithm
+for SCSC.
+
+f (X)
+
+Proof. Let X∗ = argminX
+g(X) and c∗ = g(X∗). During
+the linear search procedure, we must have searched a c
+such that c ≤ c∗ ≤ (1 + )c. For such c, we have that
+f ( ˆXc) ≤ σf (X∗) and g( ˆXc) ≥ ρc, thanks to the [σ, ρ]
+bi-criterion guarantee. Therefore, we obtain the following:
+f ( ˆXc)
+g( ˆXc)
+
+f (X∗)
+c ≤ σ
+
+≤ σ(1+)
+
+f (X∗)
+g(X∗) .
+
+(1+)f (X∗)
+
+≤ σ
+
+c∗
+
+ρ
+
+ρ
+
+ρ
+
+Using the same argument, we may connect SCSK to RS
+maximization via the same linear search strategy. While
+Lemma 2.3, — showing that a bicriterion approximation
+algorithm for SCSC (or SCSK) can be utilized to solve RS
+minimization (maximization) with bounded approximation
+factors — is theoretically interesting, Algorithm 2 may not
+be practical for large-scale problems, since it involves solv-
+ing O(1/) instances of SCSC. In Section 3, we provide a
+number of more efﬁcient approximation algorithms for RS
+minimization, while still offering similar guarantees.
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+Algorithm 3 GREEDRATIO for RS minimization
+1: Input: f and g.
+2: Output: An approximation solution ˆX.
+3: Initialize: X0 ← ∅, R ← V and i ← 0.
+4: while R (cid:54)= ∅ do
+v ∈ argminv∈R
+5:
+6: Xi+1 ← Xi ∪ v.
+7: R ← {v ∈ R|g(v|Xi+1) > 0}
+i ← i + 1.
+8:
+9: end while
+10: i∗ ∈ argmini
+g(Xi) .
+11: Return ˆX ← Xi∗.
+
+f (v|Xi)
+g(v|Xi) .
+
+f (Xi)
+
+3. Approximation Algorithms for RS
+
+Minimization
+
+In this section, we study four separate cases of RS min-
+imization depending on whether f or g, are modular or
+submodular.
+
+3.1. Modular f and Modular g
+When both f and g are modular, RS minimization be-
+comes very easy. We introduce a simple greedy algorithm–
+GREEDRATIO (Algorithm 3) to handle this scenario. The
+idea of GREEDRATIO is to, in each iteration, greedily add an
+element to the solution set such that the ratio of the marginal
+gain by this element is the smallest. When the algorithm
+terminates, a chain of sets X1 ⊂ . . . ,⊂ X(cid:96) ((cid:96) is the total
+number of iterations) is obtained, and the algorithm sim-
+ply outputs the set Xi∗ that achieves the minimum ratio.
+Though simple, we show below that GREEDRATIO is guar-
+anteed to yield the optimal solution for RS minimization in
+this case.
+Theorem 3.1. When f and g are modular, GREEDRATIO
+ﬁnds the optimal solution for RS minimization with a com-
+plexity of O(n log n).
+
+g(v) . Namely, f (vσ1 )
+
+g(vσ1 ) ≤ ··· ≤ f (vσn )
+
+g(v) ≤ τ} is among the chain of solutions {Xi}n
+
+Proof. Since both f and g are modular functions, we have
+that f (v|X) = f (v) and g(v|X) = g(v) for all X ⊆ V and
+v ∈ V \ X. As a simpler implementation of GREEDRATIO,
+one may ﬁrst obtain a non-decreasing order of the items in V
+as σ = {vσ1 , . . . , vσn} according to their ratio of singleton
+scores f (v)
+g(vσn ) . It is easy to
+verify that for any threshold τ > 0, the set X τ = {v ∈
+V | f (v)
+i=1. Let
+g(X) and r∗ = f (X∗)
+X∗ ∈ argminX
+g(X∗) . Observe that if any
+g(v) < r∗, the item must be contained in
+item v satisﬁes f (v)
+X∗, otherwise, adding v to X∗ would further decrease the
+. Note that X r∗
+objective. Let X r∗
+is contained in the chain of the solutions {Xi}n
+i=1 and that
+f (X r∗
+) = r∗. Therefore, the output ˆX is optimal.
+g(X r∗
+
+g(v) < r∗(cid:111)
+
+v ∈ V | f (v)
+
+)
+
+f (X)
+
+(cid:110)
+
+=
+
+The complexity of algorithm involves computing all n ratio
+of singleton scores and then takes another O(n log n) to sort
+them.
+
+3.2. Modular f and Submodular g
+Next, we study a slightly more general form where f is
+modular and g is submodular. We show below that this
+scenario can still be solved up to a constant 1/(1 − 1/e)
+factor by the same greedy algorithm– GREEDRATIO.
+Theorem 3.2. When f is modular and g is submodular,
+GREEDRATIO is guaranteed to obtain a solution ˆX such
+that
+
+f ( ˆX)
+g( ˆX)
+
+≤ e
+e − 1
+
+f (X∗)
+g(X∗)
+
+,
+
+(9)
+
+where X∗ ∈ argmin∅⊂X⊆V
+
+f (X)
+
+g(X) .
+
+Proof. This simply follows as a special case of Theorem 3.4
+(cf. Section 3.4) when κf = 0.
+
+We point out that GREEDRATIO may require a time com-
+plexity of O(n2) function evaluations in the worst case.
+However, thanks to the lazy evaluation trick as described
+in (Minoux, 1978), Line 5 in GREEDRATIO need not to
+recompute the marginal gain for every item in each round,
+allowing GREEDRATIO to scale to large data sets.
+
+3.3. Submodular f and Modular g
+In contrast to the case above where f is modular and g is
+submodular, we show that here, the opposite case, can actu-
+ally be exactly optimized using the binary search strategy
+in Algorithm 1. The key observation is that the correspond-
+ing DS minimization becomes an instance of submodular
+minimization, which can be optimally solved in poly-time.
+Hence, one can achieve a (1 + )-approximation for this
+case as a Corollary of Theorem 2.1:
+Corollary 3.3. When f is submodular and g is modular,
+using an exact submodular minimization algorithm as a
+subroutine, Algorithm 1 provides a (1 + )-approximation
+for RS minimization in O(log(1/)) calls to the subroutine.
+
+3.4. Submodular f and Submodular g
+Lastly, we study the most general form of RS minimization
+with both f and g being submodular. GREEDRATIO can
+again be shown to yield a curvature dependent bound for
+this problem. The curvature of a submodular function f is
+deﬁned as follows: (Conforti & Cornuejols, 1984; Vondr´ak,
+2010; Iyer et al., 2013a; Wei et al., 2014):
+
+κf = 1 − min
+v∈V
+
+f (v|V \ v)
+
+f (v)
+
+∈ [0, 1].
+
+(10)
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+The curvature κf measures how close a submodular function
+f is to a modular function. f is fully curved if κf = 1
+and is modular if κf = 0.
+In the below, we show that
+GREEDRATIO approximates the RS minimization problem
+with a factor in terms of the curvature κf of the function f.
+Theorem 3.4. GREEDRATIO is guaranteed to obtain a so-
+lution ˆX such that
+
+f ( ˆX)
+g( ˆX)
+
+≤
+
+1
+
+1 − e(κf−1)
+
+f (X∗)
+g(X∗)
+
+,
+
+(11)
+
+where X∗ ∈ argmin∅⊂X⊆V
+of the submodular function f.
+
+f (X)
+
+g(X) and κf is the curvature
+
+Proof. It is equivalent to prove the following:
+
+g( ˆX)
+f ( ˆX)
+
+≥ (1 − e(κf−1))
+
+g(X∗)
+f (X∗)
+
+.
+
+(12)
+
+Denote X1, X2, . . . , Xl as the chain of sets obtained by
+the greedy algorithm and x1, . . . , x(cid:96) as the sequence of
+items added during the algorithm. Note (cid:96) is the number
+of rounds when the algorithm terminates. Denote k as the
+largest index in {1, . . . , (cid:96)} such that f (Xk) ≤ f (X∗). For
+i = 1, 2, . . . , k, it holds that:
+
+g(X∗) ≤ g(Xi−1) +
+
+≤ g(Xi−1) +
+
+(cid:88)
+(cid:88)
+
+v∈X∗\Xi−1
+
+v∈X∗\Xi−1
+
+g(v|Xi−1)
+g(xi|Xi−1)
+f (xi|Xi−1)
+
+f (v|Xi−1)
+
+f (v|Xi−1) ≤ g(xi|Xi−1)
+
+The last inequality follows since g(v|Xi−1)
+f (xi|Xi−1) as
+required by the greedy algorithm. Given the deﬁnition of
+the curvature κf , we have the following
+g(X∗) − g(Xi−1) ≤ g(xi|Xi−1)
+f (xi|Xi−1)
+≤ g(xi|Xi−1)
+f (xi|Xi−1)
+≤ g(xi|Xi−1)
+f (xi|Xi−1)
+
+(cid:88)
+(cid:88)
+
+f (v|Xi−1)
+
+v∈X∗\Xi−1
+
+v∈X∗
+1
+
+1 − κf
+
+f (X∗)
+
+f (v)
+
+Rearranging the inequality, we obtain the following:
+
+g(X∗) − g(Xi)
+g(X∗) − g(Xi−1)
+
+≤
+
+(cid:20)
+1 − (1 − κf )f (xi|Xi−1)
+
+(cid:21)
+
+f (X∗)
+
+, (13)
+
+√
+
+Algorithm 4 ELLIPSOIDAPPROX
+1: Input: f and g
+2: Output: An approximation solution ˆX.
+3:
+4: ˆX ∈ argminX
+
+wf ← the ellipsoidal approximation for f
+
+\\ e(1+)
+
+wf (X)
+g(X)
+solved by Algorithm 2
+
+√
+
+e−1 −Approximately
+
+5: Return ˆX
+
+which implies
+
+(cid:20)
+g(X∗) − g(Xk) ≤ k(cid:89)
+1 − (1 − κf )f (xi|Xi−1)
+f (X∗)
+≤ k(cid:89)
+(cid:105)
+(cid:104)− (1−κf )f (xi|Xi−1)
+(cid:104)− (1−κf )f (Xk )
+
+g(X∗)
+
+f (X∗ )
+
+i=1
+
+i=1
+
+e
+
+(cid:21)
+
+g(X∗)
+
+(14)
+
+(15)
+
+(16)
+Using the fact 1 − x ≤ e−x, we then obtain the following:
+
+f (X∗ )
+
+≤ e
+(cid:20)
+(cid:104)− (1−κf )f (Xk )
+1 − e−(1−κf )(cid:105) g(X∗)
+≥(cid:104)
+
+1 − e
+
+f (X∗ )
+
+≥
+
+f (X∗)
+
+g(X∗)
+
+(cid:105)
+(cid:105)(cid:21) f (X∗)
+
+f (Xk)
+
+.
+
+g(X∗)
+f (X∗)
+
+(17)
+
+(18)
+
+g(Xk)
+f (Xk)
+
+Since (1 − e−(1−κg)x)x−1 monotonically decreases in x
+and f (Xk)
+
+f (X∗) ≤ 1, we have the following:
+
+f ( ˆX)
+g( ˆX)
+
+≤ f (Xk)
+g(Xk)
+
+≤
+
+1
+
+1 − eκf−1
+
+f (X∗)
+g(X∗)
+
+.
+
+(19)
+
+We point out that Theorem 3.4 generalizes Theorem 3.2
+when f is modular, i.e., κf = 0. Note that the approxima-
+tion guarantee of GREEDRATIO deteriorates as the curvature
+κf of the function f increases and becomes unbounded (and
+hence vacuous) when the f is fully curved, i.e., κf = 1.
+
+Ellipsoid Approximation: To yield a bounded approxi-
+mation algorithm for RS minimization, we provide an al-
+gorithmic framework–ELLIPSOIDAPPROX, which involves
+computing the ellipsoidal approximation (EA) of a submod-
+ular function. As shown in Goemans et. al (Goemans
+et al., 2009), one can approximate any monotone submodu-
+lar function f (X) in polynomial time by a surrogate func-
+wf ∈ RV , such that
+
+tion ˆf (X) =(cid:112)wf (X) for a certain modular weight vector
+(cid:113)
+
+√
+wf (X) ≤ f (X) ≤ O(
+
+wf (X),∀X ⊆ V.
+
+(cid:113)
+
+n log n)
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+f (X) by its ellipsoidal approximation(cid:112)wf (X), and then
+
+To apply the idea of EA to RS minimization, we ﬁrst replace
+
+the problem becomes
+
+(cid:112)wf (X)
+
+g(X)
+
+min
+∅⊂X⊆V
+
+,
+
+(20)
+
+(21)
+
+(22)
+
+for which we may use Algorithm 2 (i.e., linear search with
+SCSC) to solve. At every round of Algorithm 2, the SCSC
+problem has the following form:
+
+min{(cid:113)
+
+wf (X)|g(X) ≥ c},
+
+which is effectively,
+
+min{wf (X)|g(X) ≥ c}.
+
+Note that Eqn. 22 can be solved by the greedy algorithm
+with a [1, (1 − 1/e)] bicriterion approximation guaran-
+tee (Iyer & Bilmes, 2013), which then leads to a constant
+factor approximation for Eqn. 20 thanks to Lemma 2.3. The
+following result provides a worst-case approximation factor
+of this approach for RS minimization:
+Theorem 3.5. Let
+wf be the ellipsoidal approximation
+for f and ˆX be the output solution of Algorithm 2 on
+min∅⊂X⊆V
+
+, it then holds that
+
+√
+
+√
+
+wf (X)
+g(X)
+
+f ( ˆX)
+g( ˆX)
+
+√
+
+≤ O(
+
+n log n)
+
+f (X∗)
+g(X∗)
+
+.
+
+(23)
+
+Proof. Let X∗ ∈ argminX
+ˆX of Algorithm 2 has a constant
+(cid:113)
+for Eqn. 20, it then holds that
+
+f (X)
+
+g(X) . Since the output solution
+e−1 (1 + )-approximation
+
+e
+
+f ( ˆX)
+g( ˆX)
+
+√
+≤ O(
+√
+≤ O(
+√
+≤ O(
+
+n log n)
+
+n log n)
+
+n log n)
+
+wf ( ˆX)
+g( ˆX)
+e
+e − 1
+f (X∗)
+g(X∗)
+
+(1 + )
+
+(cid:112)wf (X∗)
+
+g(X∗)
+
+(24)
+
+(25)
+
+(26)
+
+√
+
+As we will see, the O(
+n log n)-approximation factor pro-
+vided by this approach matches the lower bound (hardness)
+of the RS minimization up to a log factor.
+
+Majorization-Minimization: While the Ellipsoidal Ap-
+proximation algorithm provides the tightest approximation
+factor, it does not scale very well even to medium scale
+problems (Iyer & Bilmes, 2013). To this end we propose
+another framework — Majorization-Minimization (MMIN,
+see Alg. 5) — that achieves a slightly worse approximation
+
+pick a subgradient ht at X t of g
+pick a supergradient mt at X t of f
+A ∈ argminX
+solved by Algorithm 1
+
+Algorithm 5 MMIN for RS minimization
+1: Input: f and g
+2: Output: An approximation solution ˆX.
+3: Initialize: An arbitrary set X 0, and t ← 0.
+4: repeat
+5:
+6:
+7:
+8: B ∈ argminX
+9: X t+1 ← argminX∈{A,B} f (X)
+10:
+11: until we have converged (X t = X t−1)
+12: Return ˆX ← X t
+
+mt(X)
+solved by GREEDRATIO
+t ← t + 1
+
+f (X)
+
+g(X)
+
+ht(X)\\ (1 + )−Approximately
+e−1−Approximately
+
+g(X) \\
+
+e
+
+factor, but that scales quite well to large scale problems.
+In the spirit of (Iyer et al., 2013b; Wei et al., 2015b), this
+framework uses modular lower and modular upper bounds
+of a submodular function (Iyer et al., 2013b) to transform
+the originally hard RS minimization problem to a special
+case with either f or g being modular. For either case, the
+result admits constant approximation algorithms as shown
+in Section 3.2 and 3.3. Moreover, the resulting guarantees
+can be translated to a curvature dependent guarantee for the
+original RS minimization.
+Akin to convex functions, submodular functions have tight
+modular lower bounds. These bounds are related to the
+subdifferential ∂f (Y ) of the submodular set function f at a
+set Y ⊆ V , which is deﬁned (Fujishige, 2005) as:
+∂f (Y ) = {y ∈ Rn :
+
+(27)
+f (X) − y(X) ≥ f (Y ) − y(Y ) for all X ⊆ V }
+
+(cid:80)
+For a vector x ∈ RV and X ⊆ V , we write x(X) =
+j∈X x(j). Denote a subgradient at Y by hY ∈ ∂f (Y ).
+The extreme points of ∂f (Y ) may be computed via a greedy
+algorithm: Let π be a permutation of V that assigns the
+elements in Y to the ﬁrst |Y | positions (π(i) ∈ Y if and
+only if i ≤ |Y |). Each such permutation deﬁnes a chain
+i = {π(1), π(2), . . . , π(i)} and
+with elements Sπ
+Sπ|Y | = Y . This chain deﬁnes an extreme point hπ
+Y of ∂f (Y )
+with entries
+
+0 = ∅, Sπ
+
+hπ
+Y (π(i)) = f (Sπ
+
+i ) − f (Sπ
+
+i−1).
+
+(28)
+
+Y (X) =(cid:80)
+
+Y forms a modular lower bound of f,
+Y (j) ≤ f (X),∀X ⊆
+
+Deﬁned as above, hπ
+tight at Y — i.e., hπ
+V and hπ
+We can also deﬁne a modular upper bound of a submodu-
+lar function f via its superdifferentials ∂f (Y ) (Jegelka &
+
+Y (Y ) = f (Y ).
+
+j∈X hπ
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+Bilmes, 2011; Iyer & Bilmes, 2012a) at Y :
+∂f (Y ) = {y ∈ Rn :
+
+(29)
+f (X) − y(X) ≤ f (Y ) − y(Y ); for all X ⊆ V }
+It is possible, moreover, to provide speciﬁc supergradi-
+ents (Iyer & Bilmes, 2012a; Iyer et al., 2013b) that deﬁne
+the following two modular upper bounds (when referring
+either one, we use mf
+
+f (j|X\j) +
+
+f (j|∅),
+
+f (j|V \j) +
+
+(30)
+
+f (j|X).
+
+mf
+
+X):
+
+X,1(Y ) (cid:44) f (X) −(cid:88)
+X,2(Y ) (cid:44) f (X) −(cid:88)
+
+j∈X\Y
+
+mf
+
+j∈X\Y
+
+(cid:88)
+(cid:88)
+
+j∈Y \X
+
+j∈Y \X
+
+X,2(X) = f (X).
+
+X,2(Y ) ≥ f (Y ),∀Y ⊆ V
+
+X,1(Y ) ≥ f (Y ) and mf
+X,1(X) = mf
+
+Then mf
+and mf
+Having formally deﬁned the tight modular upper and lower
+bounds, we are ready to discuss how to apply this machinery
+to RS minimization. MMIN consists of two stages.
+In
+the ﬁrst stage, it replaces f by its modular upper bound
+and keep g as it is, and then solves the resulting problem
+using the algorithms proposed in Section 3.2. In the second
+stage, MMIN replaces g by its modular lower bound and
+keep f as it is, and then solves the resulting problem using
+the algorithms described in Section 3.3. Lastly, MMIN
+outputs the better among these two solutions. We show
+below that MMIN yields a bounded approximation for RS
+minimization in terms of the curvature both of κf and κg.
+Theorem 3.6. MMIN admits a worst-case approximation
+factor of O(min{
+
+1+(n−1)(1−κg) ).
+
+n
+
+n
+
+1+(n−1)(1−κf ) ,
+
+Proof. To prove this theorem, we utilize the Lemma
+from (Iyer et al., 2013a), that stated the following: Given a
+monotone submodular function f, it holds that
+
+f (X) ≤ ˆf m(X) (cid:44)(cid:88)
+
+j∈X
+
+f (j) ≤
+
+n
+
+1 + (n − 1)(1 − κf )
+
+f (X)
+
+(31)
+
+where ˆf m(X) is the simple modular upper bound of f.
+Since, ˆf m approximates f by a factor of
+1+(n−1)(1−κf ),
+the ratio ˆf m(X)/g(X) also approximates f (X)/g(X) by
+the same factor. Moreover, the same bound holds for approx-
+imating g(X) by its modular lower bound. Hence MMin,
+produces the two subproblems as discussed in Sections 3.2
+and 3.3. Both subproblems admit constant approximation
+algorithms.
+
+n
+
+Observe that Theorem 3.6 provides a worst-case approxima-
+tion for RS minimization that interpolates between the cases
+when f and g are modular and submodular. In particular,
+when either f or g are modular, MMIN provides a constant
+factor guarantee for this problem.
+
+4. Hardness of RS Optimization
+In this section, we provide a worst case hardness result
+(lower bound) for RS minimization. We show that when
+√
+f and g are submodular, the problem is NP hard, and one
+cannot approximate it better than a factor of O(
+n), which
+matches the bound of ELLIPSOIDAPPROX up to a log factor.
+Theorem 4.1. There exist an instance of submodular func-
+tion f and g such that no poly-time algorithm can achieve
+an approximation factor better than n1/2−, for any  > 0.
+
+Proof. We prove this result using the hardness construction
+from (Goemans et al., 2009; Svitkina & Fleischer, 2008).
+The main idea of the proof technique is to construct two
+submodular functions f (X) and fR(X) that with high prob-
+ability are indistinguishable. Thus, also with high probabil-
+ity, no algorithm can distinguish between the two functions
+and the gap in their values provides a lower bound on the
+approximation.
+Deﬁne two monotone submodular functions g(X) =
+min{|X|, α} and f (X) = min{β + |X ∩ ¯R|,|X|, α},
+where R ⊆ V is a random set of cardinality α. Let α
+and β be an integer such that α = x
+n/5 and β = x2/5
+for an x2 = ω(log n). Given an arbitrary  > 0, set
+x2 = n2 = ω(log n). Then the ratio between g(R) and
+f (R) is n1/2−. A Chernoff bound analysis very similar
+to (Svitkina & Fleischer, 2008) reveals that any algorithm
+that uses a polynomial number of queries can distinguish
+f and g with probability only n−ω(1), and therefore cannot
+reliably distinguish the functions with a polynomial number
+of queries. Since no algorithm can distinguish between f
+and g, any algorithm will achieve a minimum value of 1 for
+the following optimization problem: minX
+g(X) , whereas
+the optimal solution has a value 1/n1/2−.
+
+√
+
+f (X)
+
+5. Non-Monotone Submodular and
+
+Supermodular f and g
+
+In this section, we investigate extensions of RS minimization
+to the case when f and g are non-monotone submodular,
+and even supermodular.
+
+5.1. Non-Monotone Submodular f and g
+Given a modular function g and a non-monotone submod-
+ular function f, one can use the Binary Search algorithm
+(Algorithm 1), in which case the corresponding DS sub-
+problem becomes an instance of submodular minimization.
+Correspondingly, one can easily extend Theorem 2.1 to
+this case, and achieve a 1 +  approximation factor for this
+problem. We can also extend our algorithms to the sce-
+nario when one of the functions is monotone submodular,
+while the other one is non-monotone. For example, if f is
+monotone submodular, while g is non-monotone, one can
+use Ellipsoidal Approximation on f, and keep g as it is.
+
+√
+wf (X)
+g(X) which is equiv-
+. We can then convert this to SCSK,
+
+The problem then becomes, minX
+alent to maxX
+
+max{g(X)|(cid:112)wf (X) ≤ b}, which is an instance of non-
+
+monotone submodular knapsack, which also has constant
+factor guarantees (Feige et al., 2011). Furthermore, if f is
+non-monotone, while g is monotone, one can replace g by
+its modular upper bound, thereby obtaining an instance of
+an RS optimization problem, with a non-monotone f and a
+modular g, which can be solved by using the Binary search
+algorithm (Algorithm 1) as discussed at the beginning of this
+section. Finally, in case both f and g are non-monotone sub-
+modular (a generalization of (Narasimhan & Bilmes, 2007)),
+one can use Algorithm 1 and repeatedly solve the resulting
+DS optimization problem. While this has no guarantees,
+this is a reasonable heuristic for this problem.
+
+5.2. Extensions to Supermodular f and g
+Consider an instance of Problem 1, when f is modular or
+submodular, but g is supermodular. One can then use Algo-
+rithm 1, and the corresponding DS optimization subproblem
+becomes an instance of submodular minimization, which
+can exactly solved. Hence in this case Problem 1 is solv-
+able in polynomial time. One can also consider an alternate
+case, when f is supermodular, and g is either modular or
+submodular. In this case, the resulting DS optimization
+problem (using Algorithm 1) becomes an instance of sub-
+modular maximization, which can be approximately solved.
+While this does not directly correspond to an approxima-
+tion guarantee for the original problem, it does provide a
+reasonable heuristic for solving the problem. When both
+f and g are monotone supermodular, it remains an open
+problem whether it admits any polynomial time algorithm
+with bounded approximations.
+
+6. Experiments
+We empirically evaluate our proposed algorithmic frame-
+works for RS minimization, including in particular MMIN,
+GREEDRATIO, and ELLIPSOIDAPPROX, on a synthetic data
+set. In particular, we evaluate on a generalized form of the
+F-measure function:
+
+Fλ(X) =
+
+|Γ(X) ∩ T|
+
+λ|T| + (1 − λ)|Γ(X)| ,
+
+(32)
+
+where 0 ≤ λ ≤ 1 is a parameter that determines a trade-
+off weight between precision and recall. Note Fλ=0.5 is
+the same as the F-measure function deﬁned in Eqn. 3. We
+instantiate the F-measure function on a randomly generated
+bipartite graph G(U, W, E). The bipartite graph is deﬁned
+with |U| = 100 and |W| = 100. We deﬁne an edge between
+u ∈ U and w ∈ W independently with probability p = 0.05.
+The set of targets T ⊆ W is also randomly chosen with a
+ﬁxed size 20, i.e., |T| = 20. We run the experiments on 10
+instances of the randomly and independently generated data,
+
+Algorithms for Optimizing the Ratio of Submodular Functions
+
+g(X)√
+
+wf (X)
+
+100
+
+and we report the averaged results.
+As a baseline, we also
+implement a random
+method,
+sampling
+where we
+randomly
+choose
+subsets
+X ⊆ U with size
+|X| = 50 and report
+their averaged function
+valuation in terms of
+Fλ and their standard
+deviation. In Figure 1,
+we compare the perfor-
+mance of all methods
+on with the varying
+λ. We observe that
+GREEDRATIO, though
+very efﬁcient, achieves consistently the best performance
+for all cases of λ among all optimization algorithms.
+Comparable performance is achieved by MMIN and
+ELLIPSOIDAPPROX, although ELLIPSOIDAPPROX is much
+more computationally intensive.
+
+Figure 1. synthetic data experi-
+ment
+
+Acknowledgments
+We wish acknowledge support by the National Science Foun-
+dation under Grant No. IIS-1162606, the National Institutes
+of Health under award R01GM103544, by a Google, a Mi-
+crosoft, and an Intel research award, and also support by
+TerraSwarm, one of six centers of STARnet, a Semiconduc-
+tor Research Corporation program sponsored by MARCO
+and DARPA.
+
+References
+Atamt¨urk, Alper and Narayanan, Vishnu. The submodular
+
+knapsack polytope. Discrete Optimization, 2009.
+
+Conforti, M. and Cornuejols, G. Submodular set func-
+tions, matroids and the greedy algorithm: tight worst-case
+bounds and some generalizations of the Rado-Edmonds
+theorem. Discrete Applied Mathematics, 7(3):251–274,
+1984.
+
+Feige, Uriel, Mirrokni, Vahab, and Vondr´ak, Jan. Maxi-
+mizing non-monotone submodular functions. SIAM J.
+COMPUT., 40(4):1133–1155, 2011.
+
+Fujishige, S. Submodular functions and optimization, vol-
+
+ume 58. Elsevier Science, 2005.
+
+Goemans, M.X., Harvey, N.J.A., Iwata, S., and Mirrokni,
+V. Approximating submodular functions everywhere. In
+SODA, pp. 535–544, 2009.
+
+Iyer, R. and Bilmes, J. The submodular Bregman and
+Lov´asz-Bregman divergences with applications. In NIPS,
+2012a.
+
+600.20.40.60.81Objective value00.10.20.30.40.50.60.70.80.91Comparison of RS minimization algorithms on synthetic dataGreedyRatioEllipsoidApproxMMinRandomAlgorithms for Optimizing the Ratio of Submodular Functions
+
+Iyer, R. and Bilmes, J. Algorithms for approximate mini-
+mization of the difference between submodular functions,
+with applications. In UAI, 2012b.
+
+Svitkina, Z. and Fleischer, L. Submodular approximation:
+Sampling-based algorithms and lower bounds. In FOCS,
+pp. 697–706, 2008.
+
+Vondr´ak, J. Submodularity and curvature: the optimal algo-
+
+rithm. RIMS Kokyuroku Bessatsu, 23, 2010.
+
+Wei, Kai, Liu, Yuzong, Kirchhoff, Katrin, and Bilmes, Jeff.
+Using document summarization techniques for speech
+data subset selection. In NAACL-HLT, 2013.
+
+Wei, Kai, Iyer, Rishabh, and Bilmes, Jeff. Fast multi-stage
+
+submodular maximization. Beijing, China, 2014.
+
+Wei, Kai, Iyer, Rishabh, and Bilmes, Jeff. Submodularity
+in data subset selection and active learning. In Proceed-
+ings of the 32nd International Conference on Machine
+Learning (ICML-15), pp. 1954–1963, 2015a.
+
+Wei, Kai, Iyer, Rishabh K, Wang, Shengjie, Bai, Wenruo,
+and Bilmes, Jeff A. Mixed robust/average submodular
+partitioning: Fast algorithms, guarantees, and applica-
+In Advances in Neural Information Processing
+tions.
+Systems, pp. 2224–2232, 2015b.
+
+Wolsey, Laurence A. An analysis of the greedy algorithm
+for the submodular set covering problem. Combinatorica,
+2(4):385–393, 1982.
+
+Iyer, R. and Bilmes, J. Submodular Optimization with Sub-
+modular Cover and Submodular Knapsack Constraints.
+In NIPS, 2013.
+
+Iyer, R., Jegelka, S., and Bilmes, J. Curvature and Optimal
+Algorithms for Learning and Minimizing Submodular
+Functions . In Neural Information Processing Society
+(NIPS), 2013a.
+
+Iyer, R., Jegelka, S., and Bilmes, J. Fast Semidifferen-
+tial based Submodular function optimization. In ICML,
+2013b.
+
+Jegelka, S. and Bilmes, J. A. Submodularity beyond sub-
+modular energies: coupling edges in graph cuts. In CVPR,
+2011.
+
+Kawahara, Yoshinobu and Washio, Takashi. Prismatic al-
+gorithm for discrete dc programming problems. In NIPS,
+2011.
+
+Kawahara, Yoshinobu, Nagano, Kiyohito, and Okamoto,
+Yoshio. Submodular fractional programming for balanced
+clustering. Pattern Recognition Letters, 32(2):235–243,
+2011.
+
+Krause, A., Singh, A., and Guestrin, C. Near-optimal sensor
+placements in Gaussian processes: Theory, efﬁcient algo-
+rithms and empirical studies. JMLR, 9:235–284, 2008.
+
+Lin, H. and Bilmes, J. Optimal selection of limited vocabu-
+
+lary speech corpora. In Interspeech, 2011.
+
+Liu, Yuzong, Wei, Kai, Kirchhoff, Katrin, Song, Yisong,
+and Bilmes, Jeff. Submodular feature selection for high-
+dimensional acoustic score spaces. In Acoustics, Speech
+and Signal Processing (ICASSP), 2013 IEEE Interna-
+tional Conference on, pp. 7184–7188. IEEE, 2013.
+
+Lov´asz, L. Submodular functions and convexity. Mathemat-
+
+ical Programming, 1983.
+
+Minoux, M. Accelerated greedy algorithms for maximizing
+submodular set functions. Optimization Techniques, pp.
+234–243, 1978.
+
+Narasimhan, M. and Bilmes, J. A submodular-supermodular
+procedure with applications to discriminative structure
+learning. In UAI, 2005.
+
+Narasimhan, Mukund and Bilmes, Jeff. Local search for
+balanced submodular clusterings. In IJCAI, pp. 981–986,
+2007.
+
+Shi, Jianbo and Malik, Jitendra. Normalized cuts and image
+segmentation. Pattern Analysis and Machine Intelligence,
+IEEE Transactions on, 22(8):888–905, 2000.
+
+
